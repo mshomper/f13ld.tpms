@@ -4,6 +4,8 @@
 
 No installation. No dependencies. Open it and go.
 
+![TPMS Builder](tpms_builder_screenshot.png)
+
 🔗 **[Launch the tool](https://mshomper.github.io/tpms-builder)**
 
 ---

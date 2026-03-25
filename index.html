@@ -67,6 +67,14 @@ canvas.vcv{width:100%;display:block}
 #homo-status{font-size:11px;color:#555;margin-bottom:7px;min-height:15px}
 .method-note{font-size:10px;color:#555;margin-top:8px;line-height:1.5;border-top:0.5px solid #2a2a3a;padding-top:7px}
 #footer{font-size:11px;color:#444;margin-top:7px}
+.grad-controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:8px}
+.grad-toggle{font-size:11px;padding:2px 8px;border:0.5px solid #3a3a5a;border-radius:12px;background:transparent;color:#888;cursor:pointer}
+.grad-toggle.on{background:#2a6a4a;color:#69f0ae;border-color:#2a6a4a}
+.grad-axis{display:flex;align-items:center;gap:5px;opacity:0.35;pointer-events:none;transition:opacity 0.2s}
+.grad-axis.enabled{opacity:1;pointer-events:all}
+.grad-axis label{font-size:11px;color:#888;min-width:14px}
+.grad-axis input[type=range]{width:72px;accent-color:#69f0ae}
+.grad-axis .sv{font-size:11px;color:#69f0ae;min-width:36px;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -109,6 +117,34 @@ canvas.vcv{width:100%;display:block}
         <label>wall t</label>
         <input type="range" id="sWall" min="0.02" max="1.5" step="0.02" value="0.3">
         <span class="sv" id="vWall">0.30</span>
+      </div>
+    </div>
+    <hr class="divider">
+    <div class="grad-controls">
+      <button class="grad-toggle" id="gradToggle">gradient: off</button>
+      <div class="grad-axis" id="gax">
+        <label style="color:#ff6b6b">X</label>
+        <span style="font-size:10px;color:#555">lo</span>
+        <input type="range" id="gxLo" min="0.2" max="4" step="0.1" value="0.5" style="accent-color:#ff6b6b">
+        <span style="font-size:10px;color:#555">hi</span>
+        <input type="range" id="gxHi" min="0.2" max="4" step="0.1" value="2.0" style="accent-color:#ff6b6b">
+        <span class="sv" id="vgx" style="color:#ff6b6b">0.5→2.0</span>
+      </div>
+      <div class="grad-axis" id="gay">
+        <label style="color:#69f0ae">Y</label>
+        <span style="font-size:10px;color:#555">lo</span>
+        <input type="range" id="gyLo" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#69f0ae">
+        <span style="font-size:10px;color:#555">hi</span>
+        <input type="range" id="gyHi" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#69f0ae">
+        <span class="sv" id="vgy" style="color:#69f0ae">1.0→1.0</span>
+      </div>
+      <div class="grad-axis" id="gaz">
+        <label style="color:#64b5f6">Z</label>
+        <span style="font-size:10px;color:#555">lo</span>
+        <input type="range" id="gzLo" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#64b5f6">
+        <span style="font-size:10px;color:#555">hi</span>
+        <input type="range" id="gzHi" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#64b5f6">
+        <span class="sv" id="vgz" style="color:#64b5f6">1.0→1.0</span>
       </div>
     </div>
     <hr class="divider">
@@ -157,9 +193,9 @@ resize();window.addEventListener('resize',resize);
 function toFloat(v){const s=parseFloat(parseFloat(v).toFixed(6)).toString();return s.includes('.')?s:s+'.0';}
 const OPTS=['sin(x)','cos(x)','sin(y)','cos(y)','sin(z)','cos(z)'];
 function glslTrig(t,fx,fy,fz){
-  if(t==='sin(x)')return'sin('+fx+'*p.x)';if(t==='cos(x)')return'cos('+fx+'*p.x)';
-  if(t==='sin(y)')return'sin('+fy+'*p.y)';if(t==='cos(y)')return'cos('+fy+'*p.y)';
-  if(t==='sin(z)')return'sin('+fz+'*p.z)';if(t==='cos(z)')return'cos('+fz+'*p.z)';
+  if(t==='sin(x)')return'sin('+fx+'*gx)';if(t==='cos(x)')return'cos('+fx+'*gx)';
+  if(t==='sin(y)')return'sin('+fy+'*gy)';if(t==='cos(y)')return'cos('+fy+'*gy)';
+  if(t==='sin(z)')return'sin('+fz+'*gz)';if(t==='cos(z)')return'cos('+fz+'*gz)';
   return'1.0';
 }
 function jsTrig(t,fx,fy,fz){
@@ -242,12 +278,34 @@ function updateEq(){
 }
 
 let shellMode=false,offsetVal=0,wallVal=0.3,cellMult=1.0;
+let gradOn=false,gxLo=0.5,gxHi=2.0,gyLo=1.0,gyHi=1.0,gzLo=1.0,gzHi=1.0;
+
+document.getElementById('gradToggle').addEventListener('click',function(){
+  gradOn=!gradOn;
+  this.textContent='gradient: '+(gradOn?'on':'off');
+  this.classList.toggle('on',gradOn);
+  ['gax','gay','gaz'].forEach(id=>document.getElementById(id).classList.toggle('enabled',gradOn));
+  rebuildShader();
+});
+['gxLo','gxHi','gyLo','gyHi','gzLo','gzHi'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',function(){
+    gxLo=parseFloat(document.getElementById('gxLo').value);
+    gxHi=parseFloat(document.getElementById('gxHi').value);
+    gyLo=parseFloat(document.getElementById('gyLo').value);
+    gyHi=parseFloat(document.getElementById('gyHi').value);
+    gzLo=parseFloat(document.getElementById('gzLo').value);
+    gzHi=parseFloat(document.getElementById('gzHi').value);
+    document.getElementById('vgx').textContent=gxLo.toFixed(1)+'→'+gxHi.toFixed(1);
+    document.getElementById('vgy').textContent=gyLo.toFixed(1)+'→'+gyHi.toFixed(1);
+    document.getElementById('vgz').textContent=gzLo.toFixed(1)+'→'+gzHi.toFixed(1);
+    rebuildShader();
+  });
+});
 document.getElementById('mSolid').addEventListener('click',function(){shellMode=false;this.classList.add('active');document.getElementById('mShell').classList.remove('active');updateEq();rebuildShader();});
 document.getElementById('mShell').addEventListener('click',function(){shellMode=true;this.classList.add('active');document.getElementById('mSolid').classList.remove('active');updateEq();rebuildShader();});
 document.getElementById('sOffset').addEventListener('input',function(){offsetVal=parseFloat(this.value);document.getElementById('vOffset').textContent=offsetVal.toFixed(2);updateEq();rebuildShader();});
 document.getElementById('sWall').addEventListener('input',function(){wallVal=parseFloat(this.value);document.getElementById('vWall').textContent=wallVal.toFixed(2);updateEq();rebuildShader();});
 document.getElementById('sCells').addEventListener('input',function(){cellMult=parseFloat(this.value);document.getElementById('vCells').textContent=cellMult.toFixed(2)+'×';rebuildShader();});
-
 const VERT='attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
 function buildFrag(terms,shellMode,offsetVal,wallVal,cellMult){
   const active=terms.filter(t=>t.on&&t.factors&&t.factors.length);
@@ -257,12 +315,24 @@ function buildFrag(terms,shellMode,offsetVal,wallVal,cellMult){
   }).join('\n');
   const implicit=shellMode?'abs(v-'+toFloat(offsetVal)+')-'+toFloat(wallVal):'v-'+toFloat(offsetVal);
   const H=toFloat(Math.PI*cellMult);
+  // gradient frequency: mix between lo and hi based on normalized position in [-H,H] -> [0,1]
+  const gxLoS=toFloat(gxLo),gxHiS=toFloat(gxHi);
+  const gyLoS=toFloat(gyLo),gyHiS=toFloat(gyHi);
+  const gzLoS=toFloat(gzLo),gzHiS=toFloat(gzHi);
+  const gradLines=gradOn?[
+    'float t01x=clamp((p.x+H)/(2.0*H),0.0,1.0);',
+    'float t01y=clamp((p.y+H)/(2.0*H),0.0,1.0);',
+    'float t01z=clamp((p.z+H)/(2.0*H),0.0,1.0);',
+    'float gx=p.x*mix('+gxLoS+','+gxHiS+',t01x);',
+    'float gy=p.y*mix('+gyLoS+','+gyHiS+',t01y);',
+    'float gz=p.z*mix('+gzLoS+','+gzHiS+',t01z);',
+  ]:['float gx=p.x;','float gy=p.y;','float gz=p.z;'];
   return[
 'precision highp float;',
 'uniform vec2 res;uniform mat3 rot;uniform float zoom;',
-'float base(vec3 p){float v=0.0;',lines,'return v;}',
-'float implicit(vec3 p){float v=base(p);return '+implicit+';}',
-'vec3 nrm(vec3 p){float e=0.005;return normalize(vec3(implicit(p+vec3(e,0,0))-implicit(p-vec3(e,0,0)),implicit(p+vec3(0,e,0))-implicit(p-vec3(0,e,0)),implicit(p+vec3(0,0,e))-implicit(p-vec3(0,0,e))));}',
+'float base(vec3 p,float H){float v=0.0;\n'+gradLines.join('\n')+'\n'+lines+'\nreturn v;}',
+'float implicit(vec3 p,float H){float v=base(p,H);return '+implicit+';}',
+'vec3 nrm(vec3 p,float H){float e=0.005;return normalize(vec3(implicit(p+vec3(e,0,0),H)-implicit(p-vec3(e,0,0),H),implicit(p+vec3(0,e,0),H)-implicit(p-vec3(0,e,0),H),implicit(p+vec3(0,0,e),H)-implicit(p-vec3(0,0,e),H)));}',
 'vec3 palette(float t){vec3 a=vec3(0.5,0.5,0.5),b=vec3(0.5,0.5,0.5),c=vec3(1.0,1.0,1.0),d=vec3(0.0,0.33,0.67);return a+b*cos(6.28318*(c*t+d));}',
 'void main(){',
 '  vec2 uv=(gl_FragCoord.xy-res*0.5)/min(res.x,res.y);',
@@ -280,8 +350,8 @@ function buildFrag(terms,shellMode,offsetVal,wallVal,cellMult){
 '  float tEn=max(max(tmi.x,tmi.y),tmi.z);',
 '  float tEx=min(min(tma.x,tma.y),tma.z);',
 '  if(tEn>tEx||tEx<0.0){gl_FragColor=bg;return;}',
-'  float t=max(tEn,0.0);float hit=-1.0;float prev=implicit(ro+rd*t);float ss=0.030;',
-'  for(int i=0;i<300;i++){t+=ss;if(t>tEx)break;float g=implicit(ro+rd*t);if(prev*g<0.0){hit=t-ss*(g/(g-prev));break;}prev=g;}',
+'  float t=max(tEn,0.0);float hit=-1.0;float prev=implicit(ro+rd*t,H);float ss=0.030;',
+'  for(int i=0;i<300;i++){t+=ss;if(t>tEx)break;float g=implicit(ro+rd*t,H);if(prev*g<0.0){hit=t-ss*(g/(g-prev));break;}prev=g;}',
 '  if(hit<0.0){',
 '    if(tEn>=0.0){',
 '      vec3 pc=ro+rd*tEn,ep=abs(pc)/H;',
@@ -291,7 +361,7 @@ function buildFrag(terms,shellMode,offsetVal,wallVal,cellMult){
 '    }',
 '    gl_FragColor=bg;return;',
 '  }',
-'  vec3 pos=ro+rd*hit,n=nrm(pos);',
+'  vec3 pos=ro+rd*hit,n=nrm(pos,H);',
 '  if(dot(n,-rd)<0.0)n=-n;',
 '  float azimuth=atan(n.z,n.x)/(2.0*3.14159)+0.5;',
 '  float elevation=n.y*0.5+0.5;',

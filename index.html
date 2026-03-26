@@ -67,6 +67,23 @@ canvas.vcv{width:100%;display:block}
 #homo-status{font-size:11px;color:#555;margin-bottom:7px;min-height:15px}
 .method-note{font-size:10px;color:#555;margin-top:8px;line-height:1.5;border-top:0.5px solid #2a2a3a;padding-top:7px}
 #footer{font-size:11px;color:#444;margin-top:7px}
+.bell-row{display:grid;grid-template-columns:26px 1fr 52px;gap:4px;align-items:center;margin-bottom:5px}
+.bell-lbl{font-size:11px;font-weight:500;text-align:center}
+.bell-val{font-size:10px;font-variant-numeric:tabular-nums;text-align:right;padding-left:4px}
+.bounds-section{margin-top:10px}
+.bounds-title{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
+.bounds-note{font-size:10px;color:#444;margin-bottom:8px;line-height:1.5}
+.bell-row{display:grid;grid-template-columns:26px 1fr 52px;gap:4px;align-items:center;margin-bottom:5px}
+.bell-lbl{font-size:11px;font-weight:500;text-align:center}
+.bell-val{font-size:10px;font-variant-numeric:tabular-nums;text-align:right;padding-left:4px;line-height:1.4}
+.grad-controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:8px}
+.grad-toggle{font-size:11px;padding:2px 8px;border:0.5px solid #3a3a5a;border-radius:12px;background:transparent;color:#888;cursor:pointer}
+.grad-toggle.on{background:#2a6a4a;color:#69f0ae;border-color:#2a6a4a}
+.grad-axis{display:flex;align-items:center;gap:5px;opacity:0.35;pointer-events:none;transition:opacity 0.2s}
+.grad-axis.enabled{opacity:1;pointer-events:all}
+.grad-axis label{font-size:11px;color:#888;min-width:14px}
+.grad-axis input[type=range]{width:72px;accent-color:#69f0ae}
+.grad-axis .sv{font-size:11px;color:#69f0ae;min-width:36px;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -112,33 +129,81 @@ canvas.vcv{width:100%;display:block}
       </div>
     </div>
     <hr class="divider">
+    <div class="grad-controls">
+      <button class="grad-toggle" id="gradToggle">gradient: off</button>
+      <div class="grad-axis" id="gax">
+        <label style="color:#22d3ee">X</label>
+        <span style="font-size:10px;color:#555">lo</span>
+        <input type="range" id="gxLo" min="0.2" max="4" step="0.1" value="0.5" style="accent-color:#22d3ee">
+        <span style="font-size:10px;color:#555">hi</span>
+        <input type="range" id="gxHi" min="0.2" max="4" step="0.1" value="2.0" style="accent-color:#22d3ee">
+        <span class="sv" id="vgx" style="color:#22d3ee">0.5→2.0</span>
+      </div>
+      <div class="grad-axis" id="gay">
+        <label style="color:#e879f9">Y</label>
+        <span style="font-size:10px;color:#555">lo</span>
+        <input type="range" id="gyLo" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#e879f9">
+        <span style="font-size:10px;color:#555">hi</span>
+        <input type="range" id="gyHi" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#e879f9">
+        <span class="sv" id="vgy" style="color:#e879f9">1.0→1.0</span>
+      </div>
+      <div class="grad-axis" id="gaz">
+        <label style="color:#facc15">Z</label>
+        <span style="font-size:10px;color:#555">lo</span>
+        <input type="range" id="gzLo" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#facc15">
+        <span style="font-size:10px;color:#555">hi</span>
+        <input type="range" id="gzHi" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#facc15">
+        <span class="sv" id="vgz" style="color:#facc15">1.0→1.0</span>
+      </div>
+    </div>
+    <hr class="divider">
     <div id="termlist"></div>
     <hr class="divider">
     <div class="homo-controls">
       <label>grid <select id="gridsize"><option value="32">32³</option><option value="48" selected>48³</option><option value="64">64³</option></select></label>
       <label>E_s (GPa) <input type="number" id="Es" value="100" min="1" max="1000" step="10"></label>
       <label>ν <input type="number" id="nu" value="0.3" min="0" max="0.49" step="0.01"></label>
-      <label>n <input type="number" id="nexp" value="1.5" min="1" max="3" step="0.1"></label>
       <button id="runBtn">Run homogenization</button>
     </div>
     <div id="homo-status"></div>
     <div id="homo-results">
       <div class="metrics">
         <div class="metric"><div class="mv" id="rv">—</div><div class="ml">volume fraction ρ</div></div>
-        <div class="metric"><div class="mv" id="rex" style="color:#ff6b6b">—</div><div class="ml">E<sub>x</sub></div><div class="mu">GPa</div></div>
-        <div class="metric"><div class="mv" id="rey" style="color:#69f0ae">—</div><div class="ml">E<sub>y</sub></div><div class="mu">GPa</div></div>
-        <div class="metric"><div class="mv" id="rez" style="color:#64b5f6">—</div><div class="ml">E<sub>z</sub></div><div class="mu">GPa</div></div>
+        <div class="metric"><div class="mv" id="rex" style="color:#22d3ee">—</div><div class="ml">E<sub>x</sub></div><div class="mu">GPa</div></div>
+        <div class="metric"><div class="mv" id="rey" style="color:#e879f9">—</div><div class="ml">E<sub>y</sub></div><div class="mu">GPa</div></div>
+        <div class="metric"><div class="mv" id="rez" style="color:#facc15">—</div><div class="ml">E<sub>z</sub></div><div class="mu">GPa</div></div>
       </div>
       <div id="viz-row">
-        <div class="viz-card"><div class="viz-title">directional stiffness (GPa)</div><canvas class="vcv" id="barcv" height="110"></canvas></div>
-        <div class="viz-card"><div class="viz-title">stiffness ellipsoid (xy · xz · yz)</div><canvas class="vcv" id="ellcv" height="110"></canvas></div>
+        <div class="viz-card"><div class="viz-title">directional stiffness (GPa)</div><canvas class="vcv" id="barcv" height="80"></canvas></div>
+        <div class="viz-card"><div class="viz-title">stiffness ellipsoid (xy · xz · yz)</div><canvas class="vcv" id="ellcv" height="80"></canvas></div>
       </div>
       <div class="metrics" style="margin-top:8px;grid-template-columns:repeat(3,1fr)">
-        <div class="metric"><div class="mv" id="rani">—</div><div class="ml">anisotropy E_max/E_min</div></div>
-        <div class="metric"><div class="mv" id="rgxy" style="color:#c4a0e0">—</div><div class="ml">G<sub>xy</sub></div><div class="mu">GPa</div></div>
+        <div class="metric"><div class="mv" id="rani">—</div><div class="ml">anisotropy</div></div>
+        <div class="metric"><div class="mv" id="rgxy" style="color:#a78bfa">—</div><div class="ml">G<sub>xy</sub></div><div class="mu">GPa</div></div>
         <div class="metric"><div class="mv" id="rnu">—</div><div class="ml">ν_eff</div></div>
       </div>
-      <div class="method-note">Iridescent color encodes surface normal direction. MIL fabric tensor homogenization (Harrigan & Mann 1984). E_i = E_s·ρⁿ·3H_i/ΣH_j.</div>
+      <!-- Surface complexity -->
+      <div class="metrics" style="margin-top:6px;grid-template-columns:1fr">
+        <div class="metric" style="background:#0d1520;border-color:#1a2a40">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <div style="text-align:left">
+              <div class="mv" id="rsav" style="font-size:14px">—</div>
+              <div class="ml">surface complexity (0–1)</div>
+            </div>
+            <div id="sav-bar-wrap" style="flex:1;height:8px;background:#0e0e1a;border-radius:4px;overflow:hidden">
+              <div id="sav-bar" style="height:100%;width:0%;border-radius:4px;transition:width 0.4s,background 0.4s"></div>
+            </div>
+            <div style="text-align:right;font-size:10px;min-width:54px;font-weight:500" id="sav-note">—</div>
+          </div>
+        </div>
+      </div>
+      <!-- Bell curves -->
+      <div style="margin-top:8px">
+        <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Probability distribution of true stiffness</div>
+        <div style="font-size:10px;color:#444;margin-bottom:6px;line-height:1.5">Spread combines method uncertainty (~18%) and grid resolution (~8/N).</div>
+        <div id="bell-rows"></div>
+      </div>
+      <div class="method-note">MIL-HS method: MIL fabric eigenvalues give anisotropy ratios · HS+ bound gives isotropic stiffness ceiling from ρ · directional E_i = E_HS+ × normalized MIL weight · surface complexity = SA/V normalized to [0,1] · bell curves show combined uncertainty.</div>
     </div>
     <div id="footer">Drag to rotate · Scroll to zoom · Color = surface normal direction · Trackball rotation</div>
   </div>
@@ -157,9 +222,9 @@ resize();window.addEventListener('resize',resize);
 function toFloat(v){const s=parseFloat(parseFloat(v).toFixed(6)).toString();return s.includes('.')?s:s+'.0';}
 const OPTS=['sin(x)','cos(x)','sin(y)','cos(y)','sin(z)','cos(z)'];
 function glslTrig(t,fx,fy,fz){
-  if(t==='sin(x)')return'sin('+fx+'*p.x)';if(t==='cos(x)')return'cos('+fx+'*p.x)';
-  if(t==='sin(y)')return'sin('+fy+'*p.y)';if(t==='cos(y)')return'cos('+fy+'*p.y)';
-  if(t==='sin(z)')return'sin('+fz+'*p.z)';if(t==='cos(z)')return'cos('+fz+'*p.z)';
+  if(t==='sin(x)')return'sin('+fx+'*gx)';if(t==='cos(x)')return'cos('+fx+'*gx)';
+  if(t==='sin(y)')return'sin('+fy+'*gy)';if(t==='cos(y)')return'cos('+fy+'*gy)';
+  if(t==='sin(z)')return'sin('+fz+'*gz)';if(t==='cos(z)')return'cos('+fz+'*gz)';
   return'1.0';
 }
 function jsTrig(t,fx,fy,fz){
@@ -242,12 +307,34 @@ function updateEq(){
 }
 
 let shellMode=false,offsetVal=0,wallVal=0.3,cellMult=1.0;
+let gradOn=false,gxLo=0.5,gxHi=2.0,gyLo=1.0,gyHi=1.0,gzLo=1.0,gzHi=1.0;
+
+document.getElementById('gradToggle').addEventListener('click',function(){
+  gradOn=!gradOn;
+  this.textContent='gradient: '+(gradOn?'on':'off');
+  this.classList.toggle('on',gradOn);
+  ['gax','gay','gaz'].forEach(id=>document.getElementById(id).classList.toggle('enabled',gradOn));
+  rebuildShader();
+});
+['gxLo','gxHi','gyLo','gyHi','gzLo','gzHi'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',function(){
+    gxLo=parseFloat(document.getElementById('gxLo').value);
+    gxHi=parseFloat(document.getElementById('gxHi').value);
+    gyLo=parseFloat(document.getElementById('gyLo').value);
+    gyHi=parseFloat(document.getElementById('gyHi').value);
+    gzLo=parseFloat(document.getElementById('gzLo').value);
+    gzHi=parseFloat(document.getElementById('gzHi').value);
+    document.getElementById('vgx').textContent=gxLo.toFixed(1)+'→'+gxHi.toFixed(1);
+    document.getElementById('vgy').textContent=gyLo.toFixed(1)+'→'+gyHi.toFixed(1);
+    document.getElementById('vgz').textContent=gzLo.toFixed(1)+'→'+gzHi.toFixed(1);
+    rebuildShader();
+  });
+});
 document.getElementById('mSolid').addEventListener('click',function(){shellMode=false;this.classList.add('active');document.getElementById('mShell').classList.remove('active');updateEq();rebuildShader();});
 document.getElementById('mShell').addEventListener('click',function(){shellMode=true;this.classList.add('active');document.getElementById('mSolid').classList.remove('active');updateEq();rebuildShader();});
 document.getElementById('sOffset').addEventListener('input',function(){offsetVal=parseFloat(this.value);document.getElementById('vOffset').textContent=offsetVal.toFixed(2);updateEq();rebuildShader();});
 document.getElementById('sWall').addEventListener('input',function(){wallVal=parseFloat(this.value);document.getElementById('vWall').textContent=wallVal.toFixed(2);updateEq();rebuildShader();});
 document.getElementById('sCells').addEventListener('input',function(){cellMult=parseFloat(this.value);document.getElementById('vCells').textContent=cellMult.toFixed(2)+'×';rebuildShader();});
-
 const VERT='attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
 function buildFrag(terms,shellMode,offsetVal,wallVal,cellMult){
   const active=terms.filter(t=>t.on&&t.factors&&t.factors.length);
@@ -257,12 +344,24 @@ function buildFrag(terms,shellMode,offsetVal,wallVal,cellMult){
   }).join('\n');
   const implicit=shellMode?'abs(v-'+toFloat(offsetVal)+')-'+toFloat(wallVal):'v-'+toFloat(offsetVal);
   const H=toFloat(Math.PI*cellMult);
+  // gradient frequency: mix between lo and hi based on normalized position in [-H,H] -> [0,1]
+  const gxLoS=toFloat(gxLo),gxHiS=toFloat(gxHi);
+  const gyLoS=toFloat(gyLo),gyHiS=toFloat(gyHi);
+  const gzLoS=toFloat(gzLo),gzHiS=toFloat(gzHi);
+  const gradLines=gradOn?[
+    'float t01x=clamp((p.x+H)/(2.0*H),0.0,1.0);',
+    'float t01y=clamp((p.y+H)/(2.0*H),0.0,1.0);',
+    'float t01z=clamp((p.z+H)/(2.0*H),0.0,1.0);',
+    'float gx=p.x*mix('+gxLoS+','+gxHiS+',t01x);',
+    'float gy=p.y*mix('+gyLoS+','+gyHiS+',t01y);',
+    'float gz=p.z*mix('+gzLoS+','+gzHiS+',t01z);',
+  ]:['float gx=p.x;','float gy=p.y;','float gz=p.z;'];
   return[
 'precision highp float;',
 'uniform vec2 res;uniform mat3 rot;uniform float zoom;',
-'float base(vec3 p){float v=0.0;',lines,'return v;}',
-'float implicit(vec3 p){float v=base(p);return '+implicit+';}',
-'vec3 nrm(vec3 p){float e=0.005;return normalize(vec3(implicit(p+vec3(e,0,0))-implicit(p-vec3(e,0,0)),implicit(p+vec3(0,e,0))-implicit(p-vec3(0,e,0)),implicit(p+vec3(0,0,e))-implicit(p-vec3(0,0,e))));}',
+'float base(vec3 p,float H){float v=0.0;\n'+gradLines.join('\n')+'\n'+lines+'\nreturn v;}',
+'float implicit(vec3 p,float H){float v=base(p,H);return '+implicit+';}',
+'vec3 nrm(vec3 p,float H){float e=0.005;return normalize(vec3(implicit(p+vec3(e,0,0),H)-implicit(p-vec3(e,0,0),H),implicit(p+vec3(0,e,0),H)-implicit(p-vec3(0,e,0),H),implicit(p+vec3(0,0,e),H)-implicit(p-vec3(0,0,e),H)));}',
 'vec3 palette(float t){vec3 a=vec3(0.5,0.5,0.5),b=vec3(0.5,0.5,0.5),c=vec3(1.0,1.0,1.0),d=vec3(0.0,0.33,0.67);return a+b*cos(6.28318*(c*t+d));}',
 'void main(){',
 '  vec2 uv=(gl_FragCoord.xy-res*0.5)/min(res.x,res.y);',
@@ -280,8 +379,8 @@ function buildFrag(terms,shellMode,offsetVal,wallVal,cellMult){
 '  float tEn=max(max(tmi.x,tmi.y),tmi.z);',
 '  float tEx=min(min(tma.x,tma.y),tma.z);',
 '  if(tEn>tEx||tEx<0.0){gl_FragColor=bg;return;}',
-'  float t=max(tEn,0.0);float hit=-1.0;float prev=implicit(ro+rd*t);float ss=0.030;',
-'  for(int i=0;i<300;i++){t+=ss;if(t>tEx)break;float g=implicit(ro+rd*t);if(prev*g<0.0){hit=t-ss*(g/(g-prev));break;}prev=g;}',
+'  float t=max(tEn,0.0);float hit=-1.0;float prev=implicit(ro+rd*t,H);float ss=0.030;',
+'  for(int i=0;i<300;i++){t+=ss;if(t>tEx)break;float g=implicit(ro+rd*t,H);if(prev*g<0.0){hit=t-ss*(g/(g-prev));break;}prev=g;}',
 '  if(hit<0.0){',
 '    if(tEn>=0.0){',
 '      vec3 pc=ro+rd*tEn,ep=abs(pc)/H;',
@@ -291,7 +390,7 @@ function buildFrag(terms,shellMode,offsetVal,wallVal,cellMult){
 '    }',
 '    gl_FragColor=bg;return;',
 '  }',
-'  vec3 pos=ro+rd*hit,n=nrm(pos);',
+'  vec3 pos=ro+rd*hit,n=nrm(pos,H);',
 '  if(dot(n,-rd)<0.0)n=-n;',
 '  float azimuth=atan(n.z,n.x)/(2.0*3.14159)+0.5;',
 '  float elevation=n.y*0.5+0.5;',
@@ -363,7 +462,7 @@ function drawGizmo(mat){
   gctx.fillStyle='rgba(6,8,15,0.78)';gctx.beginPath();gctx.arc(cx,cy,W/2-1,0,2*Math.PI);gctx.fill();
   gctx.strokeStyle='rgba(60,90,160,0.45)';gctx.lineWidth=0.5;gctx.beginPath();gctx.arc(cx,cy,W/2-1,0,2*Math.PI);gctx.stroke();
   function tv(vx,vy,vz){return[mat[0]*vx+mat[3]*vy+mat[6]*vz,mat[1]*vx+mat[4]*vy+mat[7]*vz,mat[2]*vx+mat[5]*vy+mat[8]*vz];}
-  const axes=[{v:[1,0,0],c:'#ff6b6b',l:'X'},{v:[0,1,0],c:'#69f0ae',l:'Y'},{v:[0,0,-1],c:'#64b5f6',l:'Z'}];
+  const axes=[{v:[1,0,0],c:'#22d3ee',l:'X'},{v:[0,1,0],c:'#e879f9',l:'Y'},{v:[0,0,-1],c:'#facc15',l:'Z'}];
   const proj=axes.map(a=>{const r=tv(...a.v);return{sx:cx+r[0]*L,sy:cy-r[1]*L,depth:r[2],c:a.c,l:a.l,neg:false};});
   const neg=axes.map(a=>{const r=tv(-a.v[0],-a.v[1],-a.v[2]);return{sx:cx+r[0]*L,sy:cy-r[1]*L,depth:r[2],c:a.c,l:'',neg:true};});
   [...neg,...proj].sort((a,b)=>a.depth-b.depth).forEach(ax=>{
@@ -388,57 +487,175 @@ function compileSurf(terms){
   return new Function('x','y','z','var v=0;'+body+'return v;');
 }
 function isSolid(fn,x,y,z){const v=fn(x,y,z);return shellMode?(Math.abs(v-offsetVal)<wallVal):(v>offsetVal);}
-function runHomogenization(N,Es,nu,nexp){
-  const fn=compileSurf(terms);const H=Math.PI,step=2*H/N,N2=N*N,N3=N*N*N;
-  const vox=new Uint8Array(N3);let nSolid=0;
-  for(let ix=0;ix<N;ix++){const x=-H+(ix+0.5)*step;for(let iy=0;iy<N;iy++){const y=-H+(iy+0.5)*step;for(let iz=0;iz<N;iz++){const z=-H+(iz+0.5)*step;if(isSolid(fn,x,y,z)){vox[ix*N2+iy*N+iz]=1;nSolid++;}}}}
-  const rho=nSolid/N3;
-  function mil(axis){let trans=0;for(let a=0;a<N;a++)for(let b=0;b<N;b++){let prev=255;for(let c=0;c<N;c++){const idx=axis===0?c*N2+a*N+b:axis===1?a*N2+c*N+b:a*N2+b*N+c;const curr=vox[idx];if(prev!==255&&curr!==prev)trans++;prev=curr;}}return trans===0?N*3:(N*N*N)/(trans*0.5);}
-  const milX=mil(0),milY=mil(1),milZ=mil(2);
-  const hx=1/(milX*milX),hy=1/(milY*milY),hz=1/(milZ*milZ),hsum=hx+hy+hz;
-  const rhoN=Math.pow(Math.max(rho,1e-4),nexp);
-  const Ex=Es*rhoN*(hx/hsum)*3,Ey=Es*rhoN*(hy/hsum)*3,Ez=Es*rhoN*(hz/hsum)*3;
-  const nuEff=nu*(1-rho),Gxy=Es*rhoN/(2*(1+nu));
-  const aniso=Math.max(Ex,Ey,Ez)/Math.max(Math.min(Ex,Ey,Ez),0.001);
-  return{rho,Ex,Ey,Ez,Gxy,nuEff,aniso};
+// ── MIL: raw intercept lengths ────────────────────────────────────────────────
+function computeMIL(vox,N){
+  const N2=N*N;
+  function mil(ax){let t=0;
+    for(let a=0;a<N;a++)for(let b=0;b<N;b++){let p=255;
+      for(let c=0;c<N;c++){const i=ax===0?c*N2+a*N+b:ax===1?a*N2+c*N+b:a*N2+b*N+c;
+        const v=vox[i];if(p!==255&&v!==p)t++;p=v;}}
+    return t===0?N*1e6:(N*N*N)/(t*0.5);}
+  return{milX:mil(0),milY:mil(1),milZ:mil(2)};
 }
+
+// ── Hashin-Shtrikman+ bound ───────────────────────────────────────────────────
+function hsPlus(Es,nu,rho){
+  const K1=Es/(3*(1-2*nu)),G1=Es/(2*(1+nu));
+  const Kp=K1*rho/(1+(1-rho)*3*K1/(3*K1+4*G1));
+  const Gp=G1*rho/(1+(1-rho)*6*(K1+2*G1)/(5*G1*(3*K1+4*G1)));
+  return{Ehsp:9*Kp*Gp/(3*Kp+Gp),Gp};
+}
+
+// ── Surface area density (supersampled + π/2 correction) ─────────────────────
+function surfaceAreaDensity(surfFn,offset,N){
+  const Nhi=Math.min(N*3,96),H=Math.PI,step=2*H/Nhi,N2hi=Nhi*Nhi,N3hi=Nhi*Nhi*Nhi;
+  const vhi=new Uint8Array(N3hi);
+  for(let ix=0;ix<Nhi;ix++){const x=-H+(ix+.5)*step;
+    for(let iy=0;iy<Nhi;iy++){const y=-H+(iy+.5)*step;
+      for(let iz=0;iz<Nhi;iz++){const z=-H+(iz+.5)*step;
+        if(surfFn(x,y,z)>offset)vhi[ix*N2hi+iy*Nhi+iz]=1;}}}
+  let ifaces=0;
+  for(let ix=0;ix<Nhi;ix++)for(let iy=0;iy<Nhi;iy++)for(let iz=0;iz<Nhi;iz++){
+    const v=vhi[ix*N2hi+iy*Nhi+iz];
+    if(v!==vhi[((ix+1)%Nhi)*N2hi+iy*Nhi+iz])ifaces++;
+    if(v!==vhi[ix*N2hi+((iy+1)%Nhi)*Nhi+iz])ifaces++;
+    if(v!==vhi[ix*N2hi+iy*Nhi+(iz+1)%Nhi])ifaces++;
+  }
+  return(ifaces/(Nhi*Nhi*2*Math.PI))*(Math.PI/2);
+}
+
+// ── MIL-HS homogenization ─────────────────────────────────────────────────────
+function runHomogenization(N,Es,nu){
+  const fn=compileSurf(terms);
+  const H=Math.PI,step=2*H/N,N2=N*N,N3=N*N*N;
+  const vox=new Uint8Array(N3);let nSolid=0;
+  for(let ix=0;ix<N;ix++){const x=-H+(ix+.5)*step;
+    for(let iy=0;iy<N;iy++){const y=-H+(iy+.5)*step;
+      for(let iz=0;iz<N;iz++){const z=-H+(iz+.5)*step;
+        if(isSolid(fn,x,y,z)){vox[ix*N2+iy*N+iz]=1;nSolid++;}}}}
+  const rho=nSolid/N3;
+  const{milX,milY,milZ}=computeMIL(vox,N);
+  const hx=1/(milX*milX),hy=1/(milY*milY),hz=1/(milZ*milZ),hmean=(hx+hy+hz)/3;
+  const wx=hx/hmean,wy=hy/hmean,wz=hz/hmean;
+  const{Ehsp,Gp}=hsPlus(Es,nu,rho);
+  const Ex=Ehsp*wx,Ey=Ehsp*wy,Ez=Ehsp*wz;
+  const Gxy=Gp*Math.sqrt(wx*wy);
+  const nuEff=nu*(1-rho);
+  const aniso=Math.max(Ex,Ey,Ez)/Math.max(Math.min(Ex,Ey,Ez),1e-9);
+  // Surface complexity
+  const surfFn=(x,y,z)=>fn(x,y,z);
+  const savRaw=surfaceAreaDensity(surfFn,offsetVal,N);
+  const savNorm=Math.min(savRaw/1.55,1.0);
+  return{rho,Ex,Ey,Ez,Gxy,nuEff,aniso,Ehsp,savNorm};
+}
+
+// ── Bar chart (no value labels above bars) ────────────────────────────────────
 function drawBars(res){
-  const cv=document.getElementById('barcv');const w=cv.parentElement.clientWidth-16;cv.width=w;cv.height=110;
-  const ctx=cv.getContext('2d');ctx.clearRect(0,0,w,110);
-  const textCol='#888',maxE=Math.max(res.Ex,res.Ey,res.Ez,0.01);
-  [{v:res.Ex,c:'#ff6b6b',l:'Ex'},{v:res.Ey,c:'#69f0ae',l:'Ey'},{v:res.Ez,c:'#64b5f6',l:'Ez'}].forEach((b,i)=>{
-    const pad=10,bw=Math.floor((w-pad*4)/3),maxH=72,bh=Math.max(4,Math.round(b.v/maxE*maxH)),bx=pad+i*(bw+pad),by=82-bh;
-    ctx.fillStyle=b.c+'33';ctx.strokeStyle=b.c;ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(bx,by,bw,bh,3);ctx.fill();ctx.stroke();
-    ctx.fillStyle=b.c;ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.fillText(b.v.toFixed(1),bx+bw/2,by-3);
-    ctx.fillStyle=textCol;ctx.font='11px system-ui';ctx.fillText(b.l,bx+bw/2,96);
+  const cv=document.getElementById('barcv');const w=cv.parentElement.clientWidth-16;cv.width=w;cv.height=80;
+  const ctx=cv.getContext('2d');ctx.clearRect(0,0,w,80);
+  const maxE=Math.max(res.Ex,res.Ey,res.Ez,0.01);
+  [{v:res.Ex,c:'#22d3ee',l:'Ex'},{v:res.Ey,c:'#e879f9',l:'Ey'},{v:res.Ez,c:'#facc15',l:'Ez'}].forEach((b,i)=>{
+    const pad=10,bw=Math.floor((w-pad*4)/3),mH=58,bh=Math.max(4,Math.round(b.v/maxE*mH));
+    const bx=pad+i*(bw+pad),by=66-bh;
+    ctx.fillStyle=b.c+'33';ctx.strokeStyle=b.c;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.roundRect(bx,by,bw,bh,3);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#888';ctx.font='11px system-ui';ctx.textAlign='center';ctx.fillText(b.l,bx+bw/2,78);
   });
 }
+
+// ── Stiffness ellipsoid ───────────────────────────────────────────────────────
 function drawEllipsoid(res){
-  const cv=document.getElementById('ellcv');const w=cv.parentElement.clientWidth-16;cv.width=w;cv.height=110;
-  const ctx=cv.getContext('2d');ctx.clearRect(0,0,w,110);
-  const maxE=Math.max(res.Ex,res.Ey,res.Ez,0.01),r=38;
-  [{cx:w*0.17,cy:54,a:res.Ex/maxE*r,b:res.Ey/maxE*r,ca:'#ff6b6b',cb:'#69f0ae',l:'xy'},
-   {cx:w*0.50,cy:54,a:res.Ex/maxE*r,b:res.Ez/maxE*r,ca:'#ff6b6b',cb:'#64b5f6',l:'xz'},
-   {cx:w*0.83,cy:54,a:res.Ey/maxE*r,b:res.Ez/maxE*r,ca:'#69f0ae',cb:'#64b5f6',l:'yz'}].forEach(p=>{
+  const cv=document.getElementById('ellcv');const w=cv.parentElement.clientWidth-16;cv.width=w;cv.height=80;
+  const ctx=cv.getContext('2d');ctx.clearRect(0,0,w,80);
+  const maxE=Math.max(res.Ex,res.Ey,res.Ez,0.01),r=28;
+  [{cx:w*0.17,cy:40,a:res.Ex/maxE*r,b:res.Ey/maxE*r,ca:'#22d3ee',cb:'#e879f9',l:'xy'},
+   {cx:w*0.50,cy:40,a:res.Ex/maxE*r,b:res.Ez/maxE*r,ca:'#22d3ee',cb:'#facc15',l:'xz'},
+   {cx:w*0.83,cy:40,a:res.Ey/maxE*r,b:res.Ez/maxE*r,ca:'#e879f9',cb:'#facc15',l:'yz'}].forEach(p=>{
     ctx.strokeStyle='#1a2a3a';ctx.lineWidth=0.5;ctx.beginPath();ctx.ellipse(p.cx,p.cy,r,r,0,0,2*Math.PI);ctx.stroke();
     const grad=ctx.createLinearGradient(p.cx-p.a,p.cy,p.cx+p.a,p.cy);grad.addColorStop(0,p.ca+'55');grad.addColorStop(1,p.cb+'55');
     ctx.fillStyle=grad;ctx.strokeStyle='#88a';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(p.cx,p.cy,p.a,p.b,0,0,2*Math.PI);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#888';ctx.font='10px system-ui';ctx.textAlign='center';ctx.fillText(p.l,p.cx,104);
+    ctx.fillStyle='#888';ctx.font='10px system-ui';ctx.textAlign='center';ctx.fillText(p.l,p.cx,76);
   });
 }
+
+// ── Bell curve renderer ───────────────────────────────────────────────────────
+function renderBells(axes,vals,N){
+  const container=document.getElementById('bell-rows');
+  container.innerHTML='';
+  const sigFrac=Math.sqrt(0.18*0.18+(8/N)*(8/N));
+  const W=220,H=44,pad=10;
+  axes.forEach(({label,color},i)=>{
+    const mu=vals[i],sigma=mu*sigFrac;
+    if(mu<=0)return;
+    const xMin=Math.max(0,mu-3.2*sigma),xMax=mu+3.2*sigma,range=xMax-xMin;
+    function tx(v){return pad+(v-xMin)/range*(W-2*pad);}
+    function g(x){const z=(x-mu)/sigma;return Math.exp(-0.5*z*z);}
+    const nPts=80,pts=[];
+    for(let k=0;k<=nPts;k++){const x=xMin+k/nPts*range;pts.push([tx(x),H-6-g(x)*(H-14)]);}
+    const curve=pts.map((p,k)=>(k===0?'M':'L')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+    function fillBand(lo,hi){
+      const fp=[];
+      for(let k=0;k<=nPts;k++){const x=xMin+k/nPts*range;if(x<lo||x>hi)continue;fp.push([tx(x),H-6-g(x)*(H-14)]);}
+      if(fp.length<2)return'';
+      return'M'+fp[0][0].toFixed(1)+' '+(H-6)+' L'+fp.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+' L'+fp[fp.length-1][0].toFixed(1)+' '+(H-6)+' Z';
+    }
+    function hexAlpha(hex,a){const r=parseInt(hex.slice(1,3),16),g2=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g2},${b},${a})`;}
+    const px=tx(mu).toFixed(1),baseY=(H-6).toFixed(1);
+    const s1lx=tx(mu-sigma).toFixed(1),s1rx=tx(mu+sigma).toFixed(1);
+    const svg=`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}">
+      <rect width="${W}" height="${H}" fill="#0e0e1a" rx="4"/>
+      <path d="${fillBand(mu-2*sigma,mu+2*sigma)}" fill="${hexAlpha(color,0.12)}"/>
+      <path d="${fillBand(mu-sigma,mu+sigma)}" fill="${hexAlpha(color,0.28)}"/>
+      <path d="${curve}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.9"/>
+      <line x1="${px}" y1="${H-6}" x2="${px}" y2="4" stroke="${color}" stroke-width="1" opacity="0.6" stroke-dasharray="2 2"/>
+      <line x1="${pad}" y1="${baseY}" x2="${W-pad}" y2="${baseY}" stroke="#333" stroke-width="0.5"/>
+      <text x="${px}" y="${H-1}" text-anchor="middle" font-size="8" fill="${color}" opacity="0.8">${mu.toFixed(1)}</text>
+      <text x="${s1lx}" y="${H-1}" text-anchor="middle" font-size="7" fill="#444">${(mu-sigma).toFixed(1)}</text>
+      <text x="${s1rx}" y="${H-1}" text-anchor="middle" font-size="7" fill="#444">${(mu+sigma).toFixed(1)}</text>
+    </svg>`;
+    const row=document.createElement('div');row.className='bell-row';
+    const lbl=document.createElement('div');lbl.className='bell-lbl';lbl.style.color=color;lbl.textContent=label;
+    const svgWrap=document.createElement('div');svgWrap.style.cssText='width:100%;overflow:hidden;border-radius:4px';
+    svgWrap.innerHTML=svg;svgWrap.querySelector('svg').setAttribute('width','100%');
+    const valDiv=document.createElement('div');valDiv.className='bell-val';valDiv.style.color=color;
+    valDiv.innerHTML=mu.toFixed(1)+'<br><span style="font-size:9px;color:#555">±'+sigma.toFixed(1)+'</span>';
+    row.append(lbl,svgWrap,valDiv);container.appendChild(row);
+  });
+}
+
 document.getElementById('runBtn').addEventListener('click',async function(){
   this.disabled=true;this.textContent='Running...';
   document.getElementById('homo-status').textContent='Voxelizing...';
   await new Promise(r=>setTimeout(r,10));
-  const N=parseInt(document.getElementById('gridsize').value),Es=parseFloat(document.getElementById('Es').value)||100,nu=parseFloat(document.getElementById('nu').value)||0.3,nexp=parseFloat(document.getElementById('nexp').value)||1.5;
-  const res=runHomogenization(N,Es,nu,nexp);
-  document.getElementById('homo-status').textContent=N+'³ · '+(shellMode?'shell t='+wallVal.toFixed(2):'solid')+' · ρ='+(res.rho*100).toFixed(1)+'%';
+  const N=parseInt(document.getElementById('gridsize').value);
+  const Es=parseFloat(document.getElementById('Es').value)||100;
+  const nu=parseFloat(document.getElementById('nu').value)||0.3;
+  const res=runHomogenization(N,Es,nu);
+  document.getElementById('homo-status').textContent=
+    N+'³ · '+(shellMode?'shell t='+wallVal.toFixed(2):'solid')+' · ρ='+(res.rho*100).toFixed(1)+'%';
   document.getElementById('rv').textContent=(res.rho*100).toFixed(1)+'%';
-  document.getElementById('rex').textContent=res.Ex.toFixed(1);document.getElementById('rey').textContent=res.Ey.toFixed(1);document.getElementById('rez').textContent=res.Ez.toFixed(1);
-  document.getElementById('rani').textContent=res.aniso.toFixed(2);document.getElementById('rgxy').textContent=res.Gxy.toFixed(1);document.getElementById('rnu').textContent=res.nuEff.toFixed(3);
+  document.getElementById('rex').textContent=res.Ex.toFixed(1);
+  document.getElementById('rey').textContent=res.Ey.toFixed(1);
+  document.getElementById('rez').textContent=res.Ez.toFixed(1);
+  document.getElementById('rani').textContent=res.aniso.toFixed(2);
+  document.getElementById('rgxy').textContent=res.Gxy.toFixed(1);
+  document.getElementById('rnu').textContent=res.nuEff.toFixed(3);
+  // Surface complexity
+  const savColor=res.savNorm<0.5?'#60a5fa':res.savNorm<0.7?'#2dd4bf':res.savNorm<0.85?'#22c55e':'#4ade80';
+  const savLabel=res.savNorm<0.5?'low':res.savNorm<0.7?'moderate':res.savNorm<0.85?'high':'very high';
+  document.getElementById('rsav').textContent=res.savNorm.toFixed(2);
+  document.getElementById('rsav').style.color=savColor;
+  document.getElementById('sav-bar').style.width=(res.savNorm*100).toFixed(1)+'%';
+  document.getElementById('sav-bar').style.background=savColor;
+  document.getElementById('sav-note').textContent=savLabel;
+  document.getElementById('sav-note').style.color=savColor;
   document.getElementById('homo-results').style.display='block';
   await new Promise(r=>setTimeout(r,10));
   drawBars(res);drawEllipsoid(res);
+  renderBells(
+    [{label:'Ex',color:'#22d3ee'},{label:'Ey',color:'#e879f9'},{label:'Ez',color:'#facc15'}],
+    [res.Ex,res.Ey,res.Ez],N
+  );
   this.disabled=false;this.textContent='Run homogenization';
 });
 

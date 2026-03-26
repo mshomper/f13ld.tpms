@@ -33,10 +33,12 @@ canvas#c{display:block;width:100%}
 .del-term{font-size:15px;background:none;border:none;color:#555;cursor:pointer;padding:0 2px;line-height:1;margin-left:auto}
 .del-term:hover{color:#e24b4a}
 #toolbar{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
-#toolbar button,.pb{font-size:12px;padding:3px 10px;border:0.5px solid #3a3a5a;border-radius:20px;background:transparent;color:#888;cursor:pointer}
-#toolbar button:hover,.pb:hover{background:#1a1a2e;color:#e0e0ff}
-#eqbar{font-size:12px;font-family:monospace;color:#888;padding:6px 10px;background:#0e0e1a;border:0.5px solid #2a2a3a;border-radius:6px;margin-bottom:7px;line-height:1.8;word-break:break-all;min-height:28px}
-#eqbar b{color:#e0e0ff}
+#toolbar button{font-size:12px;padding:3px 10px;border:0.5px solid #3a3a5a;border-radius:20px;background:transparent;color:#888;cursor:pointer}
+#toolbar button:hover{background:#1a1a2e;color:#e0e0ff}
+#eqbar-wrap{margin-bottom:8px}
+#eqbar-label{font-size:10px;color:#18f370;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px}
+#eqbar{font-size:14px;font-family:monospace;color:#aaa;padding:10px 12px;background:#060e0a;border:0.5px solid #0fa855;border-radius:8px;line-height:2;word-break:break-all;min-height:36px;box-shadow:0 0 12px rgba(24,243,112,0.07)}
+#eqbar b{color:#e0e0ff;font-weight:600}
 .divider{border:none;border-top:0.5px solid #2a2a3a;margin:10px 0}
 .surf-controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:8px}
 .sc-group{display:flex;align-items:center;gap:6px}
@@ -94,16 +96,10 @@ canvas.vcv{width:100%;display:block}
     <canvas id="gizmo" width="72" height="72"></canvas>
   </div>
   <div id="panel">
-    <div id="toolbar">
-      <button id="addBtn">+ term</button>
-      <span style="font-size:11px;color:#555">presets:</span>
-      <span class="pb" data-p="gyroid">gyroid</span>
-      <span class="pb" data-p="schwarzP">schwarz P</span>
-      <span class="pb" data-p="schwarzD">schwarz D</span>
-      <span class="pb" data-p="neovius">neovius</span>
-      <span class="pb" data-p="iwp">I-WP</span>
+    <div id="eqbar-wrap">
+      <div id="eqbar-label">implicit equation</div>
+      <div id="eqbar"></div>
     </div>
-    <div id="eqbar"></div>
     <div class="surf-controls">
       <div class="sc-group">
         <label>mode</label>
@@ -157,6 +153,24 @@ canvas.vcv{width:100%;display:block}
       </div>
     </div>
     <hr class="divider">
+    <div style="margin-bottom:6px">
+      <div style="font-size:10px;color:#18f370;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">preset surfaces</div>
+      <select id="presetSel" style="width:100%;font-size:11px;padding:4px 8px;border:0.5px solid #3a3a5a;border-radius:6px;background:#0e0e1a;color:#aaa;cursor:pointer">
+        <optgroup label="cubic symmetry">
+          <option value="gyroid">gyroid</option>
+          <option value="schwarzP">schwarz P</option>
+          <option value="schwarzD">schwarz D</option>
+          <option value="neovius">neovius</option>
+          <option value="iwp">I-WP</option>
+          <option value="splitP">split-P</option>
+          <option value="frd">F-RD</option>
+          <option value="fks">Fischer-Koch S</option>
+        </optgroup>
+        <optgroup label="threefold symmetry">
+          <option value="lidinoid">lidinoid</option>
+        </optgroup>
+      </select>
+    </div>
     <div id="termlist"></div>
     <hr class="divider">
     <div class="homo-controls">
@@ -167,33 +181,48 @@ canvas.vcv{width:100%;display:block}
     </div>
     <div id="homo-status"></div>
     <div id="homo-results">
-      <div class="metrics">
-        <div class="metric"><div class="mv" id="rv">—</div><div class="ml">volume fraction ρ</div></div>
-        <div class="metric"><div class="mv" id="rex" style="color:#22d3ee">—</div><div class="ml">E<sub>x</sub></div><div class="mu">GPa</div></div>
-        <div class="metric"><div class="mv" id="rey" style="color:#e879f9">—</div><div class="ml">E<sub>y</sub></div><div class="mu">GPa</div></div>
-        <div class="metric"><div class="mv" id="rez" style="color:#facc15">—</div><div class="ml">E<sub>z</sub></div><div class="mu">GPa</div></div>
-      </div>
-      <div id="viz-row">
-        <div class="viz-card"><div class="viz-title">directional stiffness (GPa)</div><canvas class="vcv" id="barcv" height="80"></canvas></div>
-        <div class="viz-card"><div class="viz-title">stiffness ellipsoid (xy · xz · yz)</div><canvas class="vcv" id="ellcv" height="80"></canvas></div>
-      </div>
-      <div class="metrics" style="margin-top:8px;grid-template-columns:repeat(3,1fr)">
-        <div class="metric"><div class="mv" id="rani">—</div><div class="ml">anisotropy</div></div>
-        <div class="metric"><div class="mv" id="rgxy" style="color:#a78bfa">—</div><div class="ml">G<sub>xy</sub></div><div class="mu">GPa</div></div>
-        <div class="metric"><div class="mv" id="rnu">—</div><div class="ml">ν_eff</div></div>
+      <div id="viz-row" style="display:grid;grid-template-columns:1fr 86px;gap:6px;margin-bottom:8px">
+        <div class="viz-card" style="padding:8px">
+          <div class="viz-title">directional stiffness surface</div>
+          <canvas id="ellcv" style="width:100%;aspect-ratio:1;display:block;border-radius:6px;cursor:default"></canvas>
+          <div style="margin-top:5px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+              <div style="font-size:12px;color:#555;white-space:nowrap">A =</div>
+              <div id="zener-val" style="font-size:15px;font-weight:500;color:#888;min-width:32px">—</div>
+              <div id="zener-label" style="font-size:12px;color:#555;flex:1;text-align:right">—</div>
+            </div>
+            <div style="position:relative;height:5px;background:#1a1a2a;border-radius:3px;margin-bottom:3px">
+              <div style="position:absolute;left:0;top:0;bottom:0;width:100%;border-radius:3px;background:linear-gradient(90deg,#e879f9 0%,#555 40%,#555 60%,#22d3ee 100%);opacity:0.4"></div>
+              <div style="position:absolute;left:40%;top:-1px;width:1px;height:7px;background:#555;opacity:0.8"></div>
+              <div id="zener-marker" style="position:absolute;top:-2px;width:2px;height:9px;background:#e0e0ff;border-radius:1px;left:40%;transition:left 0.4s"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;color:#aaa;font-weight:500">
+              <span>axial</span><span>A=1</span><span>diagonal</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rv" style="font-size:22px">—</div><div class="ml" style="font-size:13px">vol. fraction</div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rex" style="color:#22d3ee;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>x</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rey" style="color:#e879f9;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>y</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rez" style="color:#facc15;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>z</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rani" style="font-size:22px">—</div><div class="ml" style="font-size:13px">Zener A</div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rgxy" style="color:#a78bfa;font-size:22px">—</div><div class="ml" style="font-size:13px">G<sub>xy</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rnu" style="font-size:22px">—</div><div class="ml" style="font-size:13px">Poisson's ratio</div></div>
+        </div>
       </div>
       <!-- Surface complexity -->
       <div class="metrics" style="margin-top:6px;grid-template-columns:1fr">
         <div class="metric" style="background:#0d1520;border-color:#1a2a40">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
             <div style="text-align:left">
-              <div class="mv" id="rsav" style="font-size:14px">—</div>
-              <div class="ml">surface complexity (0–1)</div>
+              <div class="mv" id="rsav" style="font-size:22px">—</div>
+              <div class="ml" style="font-size:13px">surface complexity (0–1)</div>
             </div>
             <div id="sav-bar-wrap" style="flex:1;height:8px;background:#0e0e1a;border-radius:4px;overflow:hidden">
               <div id="sav-bar" style="height:100%;width:0%;border-radius:4px;transition:width 0.4s,background 0.4s"></div>
             </div>
-            <div style="text-align:right;font-size:10px;min-width:54px;font-weight:500" id="sav-note">—</div>
+            <div style="text-align:right;font-size:13px;min-width:54px;font-weight:500" id="sav-note">—</div>
           </div>
         </div>
       </div>
@@ -205,6 +234,7 @@ canvas.vcv{width:100%;display:block}
       </div>
       <div class="method-note">MIL-HS method: MIL fabric eigenvalues give anisotropy ratios · HS+ bound gives isotropic stiffness ceiling from ρ · directional E_i = E_HS+ × normalized MIL weight · surface complexity = SA/V normalized to [0,1] · bell curves show combined uncertainty.</div>
     </div>
+    <button id="exportBtn" style="width:100%;margin-top:8px;font-size:12px;padding:6px 14px;border:0.5px solid #3a3a5a;border-radius:20px;background:transparent;color:#888;cursor:pointer">Export JSON</button>
     <div id="footer">Drag to rotate · Scroll to zoom · Color = surface normal direction · Trackball rotation</div>
   </div>
 </div>
@@ -242,13 +272,46 @@ const PRESETS={
   schwarzP:[mk([mkF('cos(x)')],1),mk([mkF('cos(y)')],1),mk([mkF('cos(z)')],1)],
   schwarzD:[mk([mkF('sin(x)'),mkF('sin(y)')],1),mk([mkF('sin(x)'),mkF('cos(z)')],-1),mk([mkF('cos(x)'),mkF('sin(z)')],1),mk([mkF('cos(y)'),mkF('cos(z)')],-1)],
   neovius:[mk([mkF('cos(x)')],3),mk([mkF('cos(y)')],3),mk([mkF('cos(z)')],3),mk([mkF('cos(x)'),mkF('cos(y)'),mkF('cos(z)')],4)],
-  iwp:[mk([mkF('cos(x)'),mkF('cos(y)')],2),mk([mkF('cos(y)'),mkF('cos(z)')],2),mk([mkF('cos(z)'),mkF('cos(x)')],2),mk([mkF('cos(x)',2,1,1)],-1),mk([mkF('cos(y)',1,2,1)],-1),mk([mkF('cos(z)',1,1,2)],-1)]
+  iwp:[mk([mkF('cos(x)'),mkF('cos(y)')],2),mk([mkF('cos(y)'),mkF('cos(z)')],2),mk([mkF('cos(z)'),mkF('cos(x)')],2),mk([mkF('cos(x)',2,1,1)],-1),mk([mkF('cos(y)',1,2,1)],-1),mk([mkF('cos(z)',1,1,2)],-1)],
+  splitP:{_fn:(x,y,z)=>Math.sin(x)*Math.sin(y)*Math.cos(z)+Math.sin(y)*Math.sin(z)*Math.cos(x)+Math.sin(z)*Math.sin(x)*Math.cos(y)-0.3,
+    _glsl:'sin(gx)*sin(gy)*cos(gz)+sin(gy)*sin(gz)*cos(gx)+sin(gz)*sin(gx)*cos(gy)-0.3',
+    _label:'split-P'},
+  frd:{_fn:(x,y,z)=>Math.sin(2*x)*Math.cos(y)*Math.sin(z)+Math.sin(x)*Math.sin(2*y)*Math.cos(z)+Math.cos(x)*Math.sin(y)*Math.sin(2*z)-Math.cos(2*x)*Math.cos(2*y)-Math.cos(2*y)*Math.cos(2*z)-Math.cos(2*z)*Math.cos(2*x)+0.3,
+    _glsl:'sin(2.*gx)*cos(gy)*sin(gz)+sin(gx)*sin(2.*gy)*cos(gz)+cos(gx)*sin(gy)*sin(2.*gz)-cos(2.*gx)*cos(2.*gy)-cos(2.*gy)*cos(2.*gz)-cos(2.*gz)*cos(2.*gx)+0.3',
+    _label:'F-RD'},
+  fks:{_fn:(x,y,z)=>Math.cos(2*x)*Math.sin(y)*Math.cos(z)+Math.cos(2*y)*Math.sin(z)*Math.cos(x)+Math.cos(2*z)*Math.sin(x)*Math.cos(y),
+    _glsl:'cos(2.*gx)*sin(gy)*cos(gz)+cos(2.*gy)*sin(gz)*cos(gx)+cos(2.*gz)*sin(gx)*cos(gy)',
+    _label:'Fischer-Koch S'},
+  lidinoid:{_fn:(x,y,z)=>1.1*(Math.sin(2*x)*Math.cos(y)*Math.sin(z)+Math.sin(x)*Math.sin(2*y)*Math.cos(z)+Math.cos(x)*Math.sin(y)*Math.sin(2*z))-0.2*(Math.cos(2*x)*Math.cos(2*y)+Math.cos(2*y)*Math.cos(2*z)+Math.cos(2*z)*Math.cos(2*x))-0.4*(Math.cos(2*x)+Math.cos(2*y)+Math.cos(2*z)),
+    _glsl:'1.1*(sin(2.*gx)*cos(gy)*sin(gz)+sin(gx)*sin(2.*gy)*cos(gz)+cos(gx)*sin(gy)*sin(2.*gz))-0.2*(cos(2.*gx)*cos(2.*gy)+cos(2.*gy)*cos(2.*gz)+cos(2.*gz)*cos(2.*gx))-0.4*(cos(2.*gx)+cos(2.*gy)+cos(2.*gz))',
+    _label:'lidinoid'}
 };
-function loadPreset(name){terms=PRESETS[name].map(t=>({...t,id:tid++,factors:t.factors.map(f=>({...f}))}));renderList();rebuildShader();}
+
+// Raw-function preset: stores fn directly, renders equation as read-only label
+let rawPresetFn=null;
+
+function loadPreset(name){
+  const p=PRESETS[name];
+  if(p&&p._fn){
+    rawPresetFn={fn:p._fn,glsl:p._glsl,label:p._label};
+    terms=[];renderList();rebuildShader();
+  } else {
+    rawPresetFn=null;
+    terms=p.map(t=>({...t,id:tid++,factors:t.factors.map(f=>({...f}))}));
+    renderList();rebuildShader();
+  }
+}
 function dn(v){return parseFloat(parseFloat(v).toFixed(3)).toString();}
 
 function renderList(){
   const el=document.getElementById('termlist');el.innerHTML='';
+  if(rawPresetFn){
+    const note=document.createElement('div');
+    note.style.cssText='font-size:11px;color:#555;padding:8px 4px;font-style:italic';
+    note.textContent=rawPresetFn.label+' — uses double-frequency terms (sin 2x, cos 2x). Switch to a standard preset or clear to use the equation editor.';
+    el.appendChild(note);
+    updateEq();return;
+  }
   terms.forEach(t=>{
     const card=document.createElement('div');card.className='termcard'+(t.on?'':' off');
     let html='<div class="term-hdr">'+
@@ -268,6 +331,13 @@ function renderList(){
     html+='<button class="addf-btn" data-id="'+t.id+'" data-act="addf">+ factor</button>';
     card.innerHTML=html;el.appendChild(card);
   });
+  // + term button lives at the bottom of the list
+  const addBtn=document.createElement('button');
+  addBtn.id='addBtn';
+  addBtn.textContent='+ term';
+  addBtn.style.cssText='margin-top:6px;width:100%';
+  addBtn.addEventListener('click',function(){terms.push(mk([mkF('sin(x)'),mkF('cos(y)')],1));renderList();rebuildShader();onSurfaceChange();});
+  el.appendChild(addBtn);
   updateEq();
 }
 document.getElementById('termlist').addEventListener('change',function(e){
@@ -276,7 +346,7 @@ document.getElementById('termlist').addEventListener('change',function(e){
   const t=terms.find(x=>x.id===id);if(!t)return;
   if(f==='coef'){const v=parseFloat(e.target.value);if(!isNaN(v))t.coef=v;}
   else if(fi!==null&&fi>=0){const fac=t.factors[fi];if(!fac)return;if(f==='trig')fac.trig=e.target.value;else{const v=parseFloat(e.target.value);if(!isNaN(v))fac[f]=v;}}
-  updateEq();rebuildShader();
+  updateEq();rebuildShader();onSurfaceChange();
 });
 document.getElementById('termlist').addEventListener('click',function(e){
   const btn=e.target.closest('[data-act]');if(!btn)return;
@@ -288,8 +358,7 @@ document.getElementById('termlist').addEventListener('click',function(e){
   if(act==='addf'&&t)t.factors.push(mkF('sin(x)'));
   renderList();rebuildShader();
 });
-document.getElementById('addBtn').addEventListener('click',function(){terms.push(mk([mkF('sin(x)'),mkF('cos(y)')],1));renderList();rebuildShader();});
-document.querySelectorAll('.pb').forEach(b=>b.addEventListener('click',()=>loadPreset(b.dataset.p)));
+document.getElementById('presetSel').addEventListener('change',function(){loadPreset(this.value);onSurfaceChange();});
 
 function updateEq(){
   const a=terms.filter(t=>t.on&&t.factors&&t.factors.length);
@@ -338,11 +407,15 @@ document.getElementById('sCells').addEventListener('input',function(){cellMult=p
 const VERT='attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
 function buildFrag(terms,shellMode,offsetVal,wallVal,cellMult){
   const active=terms.filter(t=>t.on&&t.factors&&t.factors.length);
-  const lines=active.map(t=>{
-    const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');
-    return'  v+='+toFloat(t.coef)+'*'+parts.join('*')+';';
-  }).join('\n');
-  const implicit=shellMode?'abs(v-'+toFloat(offsetVal)+')-'+toFloat(wallVal):'v-'+toFloat(offsetVal);
+  const lines=rawPresetFn
+    ? '  v='+rawPresetFn.glsl+';'
+    : active.map(t=>{
+        const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');
+        return'  v+='+toFloat(t.coef)+'*'+parts.join('*')+';';
+      }).join('\n');
+  const offS=toFloat(offsetVal);
+  const wallS=toFloat(wallVal);
+  const implicit=shellMode?'abs(v-('+offS+'))-'+wallS:'v-('+offS+')';
   const H=toFloat(Math.PI*cellMult);
   // gradient frequency: mix between lo and hi based on normalized position in [-H,H] -> [0,1]
   const gxLoS=toFloat(gxLo),gxHiS=toFloat(gxHi);
@@ -361,7 +434,7 @@ function buildFrag(terms,shellMode,offsetVal,wallVal,cellMult){
 'uniform vec2 res;uniform mat3 rot;uniform float zoom;',
 'float base(vec3 p,float H){float v=0.0;\n'+gradLines.join('\n')+'\n'+lines+'\nreturn v;}',
 'float implicit(vec3 p,float H){float v=base(p,H);return '+implicit+';}',
-'vec3 nrm(vec3 p,float H){float e=0.005;return normalize(vec3(implicit(p+vec3(e,0,0),H)-implicit(p-vec3(e,0,0),H),implicit(p+vec3(0,e,0),H)-implicit(p-vec3(0,e,0),H),implicit(p+vec3(0,0,e),H)-implicit(p-vec3(0,0,e),H)));}',
+'vec3 nrm(vec3 p,float H){float e=0.005;return normalize(vec3(implicit(p+vec3(e,0.0,0.0),H)-implicit(p-vec3(e,0.0,0.0),H),implicit(p+vec3(0.0,e,0.0),H)-implicit(p-vec3(0.0,e,0.0),H),implicit(p+vec3(0.0,0.0,e),H)-implicit(p-vec3(0.0,0.0,e),H)));}',
 'vec3 palette(float t){vec3 a=vec3(0.5,0.5,0.5),b=vec3(0.5,0.5,0.5),c=vec3(1.0,1.0,1.0),d=vec3(0.0,0.33,0.67);return a+b*cos(6.28318*(c*t+d));}',
 'void main(){',
 '  vec2 uv=(gl_FragCoord.xy-res*0.5)/min(res.x,res.y);',
@@ -392,13 +465,13 @@ function buildFrag(terms,shellMode,offsetVal,wallVal,cellMult){
 '  }',
 '  vec3 pos=ro+rd*hit,n=nrm(pos,H);',
 '  if(dot(n,-rd)<0.0)n=-n;',
-'  float azimuth=atan(n.z,n.x)/(2.0*3.14159)+0.5;',
-'  float elevation=n.y*0.5+0.5;',
-'  float hue=azimuth*0.65+elevation*0.35;',
+'  float dx=dot(n,vec3(1.0,0.0,0.0)),dy=dot(n,vec3(0.0,1.0,0.0)),dz=dot(n,vec3(0.0,0.0,1.0));',
+'  float hue=dy*dy*0.33+dz*dz*0.67;',
 '  vec3 iridBase=palette(hue);',
 '  vec3 iridShift=palette(hue+0.5);',
 '  vec3 l1=normalize(vec3(1.0,1.8,2.0)),l2=normalize(vec3(-0.8,-0.3,0.6));',
-'  float diff=0.15+max(dot(n,l1),0.0)+max(dot(n,l2),0.0)*0.25;',
+'  float l3fill=max(dot(n,normalize(vec3(-0.5,-1.0,-1.5))),0.0)*0.3;',
+'  float diff=0.35+max(dot(n,l1),0.0)*0.7+max(dot(n,l2),0.0)*0.25+l3fill;',
 '  float spec1=pow(max(dot(reflect(-l1,n),-rd),0.0),120.0)*1.5;',
 '  float spec2=pow(max(dot(reflect(-l1,n),-rd),0.0),20.0)*0.4;',
 '  float rim=pow(1.0-max(dot(n,-rd),0.0),2.5)*0.8;',
@@ -433,8 +506,14 @@ function rotAxisAngle(ax,ay,az,angle){
   return[t2*ax*ax+c,t2*ax*ay+s*az,t2*ax*az-s*ay,t2*ax*ay-s*az,t2*ay*ay+c,t2*ay*az+s*ax,t2*ax*az+s*ay,t2*ay*az-s*ax,t2*az*az+c];
 }
 function applyDelta(dx,dy){
+  // Turntable: horizontal drag always spins around world Y (up stays up)
+  // Vertical drag tilts around screen-space right axis (current rotMat row 0)
+  // Negate dy to correct browser Y-down vs 3D Y-up convention
   if(Math.abs(dx)>0.001)rotMat=mat3Mul(rotAxisAngle(0,1,0,dx*0.007),rotMat);
-  if(Math.abs(dy)>0.001)rotMat=mat3Mul(rotAxisAngle(1,0,0,dy*0.007),rotMat);
+  if(Math.abs(dy)>0.001){
+    const rx=rotMat[0],ry=rotMat[1],rz=rotMat[2];
+    rotMat=mat3Mul(rotAxisAngle(rx,ry,rz,-dy*0.007),rotMat);
+  }
 }
 function orthonormalize(m){
   let x=[m[0],m[1],m[2]],y=[m[3],m[4],m[5]],z=[m[6],m[7],m[8]];
@@ -481,6 +560,7 @@ function drawGizmo(mat){
 }
 
 function compileSurf(terms){
+  if(rawPresetFn)return rawPresetFn.fn;
   const active=terms.filter(t=>t.on&&t.factors&&t.factors.length);
   if(!active.length)return()=>0;
   const body=active.map(t=>{const parts=t.factors.map(f=>'('+jsTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');return'v+='+toFloat(t.coef)+'*'+parts.join('*')+';';}).join('');
@@ -545,37 +625,134 @@ function runHomogenization(N,Es,nu){
   // Surface complexity
   const surfFn=(x,y,z)=>fn(x,y,z);
   const savRaw=surfaceAreaDensity(surfFn,offsetVal,N);
-  const savNorm=Math.min(savRaw/1.55,1.0);
+  const savNorm=Math.min(savRaw/2.5,1.0);
   return{rho,Ex,Ey,Ez,Gxy,nuEff,aniso,Ehsp,savNorm};
 }
 
 // ── Bar chart (no value labels above bars) ────────────────────────────────────
-function drawBars(res){
-  const cv=document.getElementById('barcv');const w=cv.parentElement.clientWidth-16;cv.width=w;cv.height=80;
-  const ctx=cv.getContext('2d');ctx.clearRect(0,0,w,80);
-  const maxE=Math.max(res.Ex,res.Ey,res.Ez,0.01);
-  [{v:res.Ex,c:'#22d3ee',l:'Ex'},{v:res.Ey,c:'#e879f9',l:'Ey'},{v:res.Ez,c:'#facc15',l:'Ez'}].forEach((b,i)=>{
-    const pad=10,bw=Math.floor((w-pad*4)/3),mH=58,bh=Math.max(4,Math.round(b.v/maxE*mH));
-    const bx=pad+i*(bw+pad),by=66-bh;
-    ctx.fillStyle=b.c+'33';ctx.strokeStyle=b.c;ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.roundRect(bx,by,bw,bh,3);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#888';ctx.font='11px system-ui';ctx.textAlign='center';ctx.fillText(b.l,bx+bw/2,78);
-  });
+// ── Stiffness ellipsoid ───────────────────────────────────────────────────────
+// ── Directional stiffness surface (WebGL) ─────────────────────────────────────
+let sgl=null,sprog=null,squadBuf=null,suRes,suRot,suZoom;
+let sRotMat=[1,0,0,0,1,0,0,0,1];
+let sInitialized=false;
+
+const SVERT='attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
+
+function buildStiffFrag(Ex,Ey,Ez,Gxy,nu){
+  const E=(Ex+Ey+Ez)/3;
+  const S11=1/E,S12=-nu/E,S44=1/Gxy;
+  const d=(S11-S12)*(S11+2*S12);
+  const C11=(S11+S12)/d,C12=-S12/d,C44=1/S44;
+  const A=2*C44/(C11-C12);
+  const Gamma=2*S11-2*S12-S44;
+  const E100=1/S11;
+  const E111=Math.abs(S11-Gamma/3)>1e-9?1/(S11-Gamma/3):E100;
+  const Emax=Math.max(E100,E111,Ex,Ey,Ez)*1.08;
+
+  // Update Zener display
+  document.getElementById('zener-val').textContent=A.toFixed(3);
+  const Aclamp=Math.min(Math.max(A,0.3),2.5);
+  const pct=((Aclamp-0.3)/(2.5-0.3)*100).toFixed(1);
+  document.getElementById('zener-marker').style.left=pct+'%';
+  const Acol=A<0.8?'#e879f9':A<1.2?'#888':A<2.0?'#22d3ee':'#aaff00';
+  document.getElementById('zener-val').style.color=Acol;
+  const Albl=A<0.7?'strongly axial':A<0.9?'axial dominant':A<1.1?'near-isotropic':A<1.5?'diagonal dominant':'strongly diagonal';
+  document.getElementById('zener-label').textContent=Albl;
+  document.getElementById('zener-label').style.color=Acol;
+
+  function f(v){const s=v.toFixed(8);return s.includes('.')?s:s+'.0';}
+  return`precision highp float;
+uniform vec2 res;uniform mat3 rot;uniform float zoom;
+float S11=${f(S11)};float Gamma=${f(Gamma)};float Emax=${f(Emax)};
+float Edir(vec3 n){float w=n.x*n.x*n.y*n.y+n.y*n.y*n.z*n.z+n.z*n.z*n.x*n.x;return 1.0/max(abs(S11-(Gamma*0.5)*w),1e-6);}
+float implicit(vec3 P){float r=length(P);if(r<0.001)return -1.0;return r-Edir(P/r)/Emax;}
+vec3 nrm(vec3 P){float e=0.004;return normalize(vec3(implicit(P+vec3(e,0.0,0.0))-implicit(P-vec3(e,0.0,0.0)),implicit(P+vec3(0.0,e,0.0))-implicit(P-vec3(0.0,e,0.0)),implicit(P+vec3(0.0,0.0,e))-implicit(P-vec3(0.0,0.0,e))));}
+vec3 palette(float t){vec3 a=vec3(0.5,0.5,0.5),b=vec3(0.5,0.5,0.5),c=vec3(1.0,1.0,1.0),d=vec3(0.0,0.33,0.67);return a+b*cos(6.28318*(c*t+d));}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-res*0.5)/min(res.x,res.y);
+  vec3 ro=rot*vec3(0.0,0.0,zoom);vec3 rd=normalize(rot*vec3(uv.x,uv.y,-1.6));
+  float r=clamp(length(uv)*1.1,0.0,1.0);
+  vec3 bgCol=mix(vec3(0.07,0.09,0.22),vec3(0.01,0.01,0.04),r*r);vec4 bg=vec4(bgCol,1.0);
+  float bR=1.15;float b2=dot(ro,rd),c2=dot(ro,ro)-bR*bR;float disc=b2*b2-c2;
+  if(disc<0.0){gl_FragColor=bg;return;}
+  float sq=sqrt(disc);float tEn=max(-b2-sq,0.0),tEx=-b2+sq;
+  if(tEx<0.0){gl_FragColor=bg;return;}
+  float t=tEn,hit=-1.0,ss=0.018;float prev=implicit(ro+rd*t);
+  for(int i=0;i<280;i++){t+=ss;if(t>tEx)break;float g=implicit(ro+rd*t);if(prev*g<0.0){hit=t-ss*(g/(g-prev));break;}prev=g;}
+  if(hit<0.0){gl_FragColor=bg;return;}
+  vec3 pos=ro+rd*hit;vec3 n=nrm(pos);if(dot(n,-rd)<0.0)n=-n;
+  float Eval=Edir(normalize(pos));float Enorm=clamp(Eval/Emax,0.0,1.0);
+  float dx=dot(n,vec3(1.0,0.0,0.0)),dy=dot(n,vec3(0.0,1.0,0.0)),dz=dot(n,vec3(0.0,0.0,1.0));
+  float hue=dy*dy*0.33+dz*dz*0.67+Enorm*0.15;
+  vec3 iridBase=palette(hue);vec3 iridShift=palette(hue+0.5);
+  vec3 l1=normalize(vec3(1.0,1.8,2.0)),l2=normalize(vec3(-0.8,-0.3,0.6));
+  float l3=max(dot(n,normalize(vec3(-0.5,-1.0,-1.5))),0.0)*0.3;
+  float diff=0.35+max(dot(n,l1),0.0)*0.7+max(dot(n,l2),0.0)*0.25+l3;
+  float spec1=pow(max(dot(reflect(-l1,n),-rd),0.0),120.0)*1.5;
+  float spec2=pow(max(dot(reflect(-l1,n),-rd),0.0),20.0)*0.4;
+  float rim=pow(1.0-max(dot(n,-rd),0.0),2.5)*0.8;float fresnel=pow(1.0-max(dot(n,-rd),0.0),3.0);
+  vec3 col=mix(iridBase,iridShift,Enorm*0.35)*diff;
+  col+=iridShift*fresnel*0.6;col+=vec3(spec1+spec2);col+=iridShift*rim*0.45;
+  col*=(0.7+Enorm*0.4);
+  gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);
+}`;}
+
+function mkSShader(type,src){
+  const s=sgl.createShader(type);sgl.shaderSource(s,src);sgl.compileShader(s);
+  if(!sgl.getShaderParameter(s,sgl.COMPILE_STATUS))console.error(sgl.getShaderInfoLog(s));
+  return s;
 }
 
-// ── Stiffness ellipsoid ───────────────────────────────────────────────────────
-function drawEllipsoid(res){
-  const cv=document.getElementById('ellcv');const w=cv.parentElement.clientWidth-16;cv.width=w;cv.height=80;
-  const ctx=cv.getContext('2d');ctx.clearRect(0,0,w,80);
-  const maxE=Math.max(res.Ex,res.Ey,res.Ez,0.01),r=28;
-  [{cx:w*0.17,cy:40,a:res.Ex/maxE*r,b:res.Ey/maxE*r,ca:'#22d3ee',cb:'#e879f9',l:'xy'},
-   {cx:w*0.50,cy:40,a:res.Ex/maxE*r,b:res.Ez/maxE*r,ca:'#22d3ee',cb:'#facc15',l:'xz'},
-   {cx:w*0.83,cy:40,a:res.Ey/maxE*r,b:res.Ez/maxE*r,ca:'#e879f9',cb:'#facc15',l:'yz'}].forEach(p=>{
-    ctx.strokeStyle='#1a2a3a';ctx.lineWidth=0.5;ctx.beginPath();ctx.ellipse(p.cx,p.cy,r,r,0,0,2*Math.PI);ctx.stroke();
-    const grad=ctx.createLinearGradient(p.cx-p.a,p.cy,p.cx+p.a,p.cy);grad.addColorStop(0,p.ca+'55');grad.addColorStop(1,p.cb+'55');
-    ctx.fillStyle=grad;ctx.strokeStyle='#88a';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(p.cx,p.cy,p.a,p.b,0,0,2*Math.PI);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#888';ctx.font='10px system-ui';ctx.textAlign='center';ctx.fillText(p.l,p.cx,76);
-  });
+let sZoom=2.6;
+
+function initStiffnessGL(){
+  const cv=document.getElementById('ellcv');
+  // aspect-ratio:1 CSS makes height = width; read actual rendered size
+  const w=cv.offsetWidth||180;
+  cv.width=w;cv.height=w;
+  sgl=cv.getContext('webgl');
+  if(!sgl){cv.style.display='none';return false;}
+  if(!squadBuf){
+    squadBuf=sgl.createBuffer();sgl.bindBuffer(sgl.ARRAY_BUFFER,squadBuf);
+    sgl.bufferData(sgl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),sgl.STATIC_DRAW);
+  }
+  sRotMat=mat3Mul(rotAxisAngle(0,1,0,0.6),rotAxisAngle(1,0,0,-0.3));
+  sInitialized=true;
+  return true;
+}
+
+function rebuildStiffnessShader(Ex,Ey,Ez,Gxy,nu){
+  if(!sInitialized&&!initStiffnessGL())return;
+  // Auto-scale zoom: base 3.4, scale up for anisotropic surfaces
+  const Emean=(Ex+Ey+Ez)/3;
+  const EmaxVal=Math.max(Ex,Ey,Ez)*1.08;
+  sZoom=3.4*(EmaxVal/Emean);
+  const p=sgl.createProgram();
+  sgl.attachShader(p,mkSShader(sgl.VERTEX_SHADER,SVERT));
+  sgl.attachShader(p,mkSShader(sgl.FRAGMENT_SHADER,buildStiffFrag(Ex,Ey,Ez,Gxy,nu)));
+  sgl.linkProgram(p);
+  if(!sgl.getProgramParameter(p,sgl.LINK_STATUS)){console.error(sgl.getProgramInfoLog(p));return;}
+  if(sprog)sgl.deleteProgram(sprog);
+  sprog=p;sgl.useProgram(sprog);
+  sgl.bindBuffer(sgl.ARRAY_BUFFER,squadBuf);
+  const loc=sgl.getAttribLocation(sprog,'p');
+  sgl.enableVertexAttribArray(loc);sgl.vertexAttribPointer(loc,2,sgl.FLOAT,false,0,0);
+  suRes=sgl.getUniformLocation(sprog,'res');
+  suRot=sgl.getUniformLocation(sprog,'rot');
+  suZoom=sgl.getUniformLocation(sprog,'zoom');
+}
+
+function drawStiffnessSurface(){
+  if(!sprog||!suRes)return;
+  const cv=document.getElementById('ellcv');
+  // Slow Y-axis auto-rotation only
+  sRotMat=mat3Mul(rotAxisAngle(0,1,0,0.003),sRotMat);
+  sRotMat=orthonormalize(sRotMat);
+  sgl.viewport(0,0,cv.width,cv.height);
+  sgl.uniform2f(suRes,cv.width,cv.height);
+  sgl.uniformMatrix3fv(suRot,false,new Float32Array(sRotMat));
+  sgl.uniform1f(suZoom,sZoom);
+  sgl.drawArrays(sgl.TRIANGLE_STRIP,0,4);
 }
 
 // ── Bell curve renderer ───────────────────────────────────────────────────────
@@ -583,44 +760,55 @@ function renderBells(axes,vals,N){
   const container=document.getElementById('bell-rows');
   container.innerHTML='';
   const sigFrac=Math.sqrt(0.18*0.18+(8/N)*(8/N));
-  const W=220,H=44,pad=10;
+  const W=120,Hmax=64,pad=8;
+  const maxVal=Math.max(...vals.filter(v=>v>0),0.01);
+
+  const row=document.createElement('div');
+  row.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:4px;align-items:end';
+
   axes.forEach(({label,color},i)=>{
     const mu=vals[i],sigma=mu*sigFrac;
     if(mu<=0)return;
+    // Scale total SVG height; floor at 40% so label+curve always readable
+    const H=Math.max(Math.round(Hmax*(mu/maxVal)),Math.round(Hmax*0.40));
+    // Curve occupies middle zone: top 12px = label, bottom 10px = value+sigma, rest = curve
+    const curveTop=13,curveBot=H-11,curveH=curveBot-curveTop;
     const xMin=Math.max(0,mu-3.2*sigma),xMax=mu+3.2*sigma,range=xMax-xMin;
     function tx(v){return pad+(v-xMin)/range*(W-2*pad);}
     function g(x){const z=(x-mu)/sigma;return Math.exp(-0.5*z*z);}
-    const nPts=80,pts=[];
-    for(let k=0;k<=nPts;k++){const x=xMin+k/nPts*range;pts.push([tx(x),H-6-g(x)*(H-14)]);}
+    const nPts=60,pts=[];
+    for(let k=0;k<=nPts;k++){
+      const x=xMin+k/nPts*range;
+      pts.push([tx(x), curveBot-g(x)*curveH*0.88]);
+    }
     const curve=pts.map((p,k)=>(k===0?'M':'L')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
     function fillBand(lo,hi){
       const fp=[];
-      for(let k=0;k<=nPts;k++){const x=xMin+k/nPts*range;if(x<lo||x>hi)continue;fp.push([tx(x),H-6-g(x)*(H-14)]);}
+      for(let k=0;k<=nPts;k++){
+        const x=xMin+k/nPts*range;if(x<lo||x>hi)continue;
+        fp.push([tx(x),curveBot-g(x)*curveH*0.88]);
+      }
       if(fp.length<2)return'';
-      return'M'+fp[0][0].toFixed(1)+' '+(H-6)+' L'+fp.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+' L'+fp[fp.length-1][0].toFixed(1)+' '+(H-6)+' Z';
+      return'M'+fp[0][0].toFixed(1)+' '+curveBot+' L'+fp.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+' L'+fp[fp.length-1][0].toFixed(1)+' '+curveBot+' Z';
     }
     function hexAlpha(hex,a){const r=parseInt(hex.slice(1,3),16),g2=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g2},${b},${a})`;}
-    const px=tx(mu).toFixed(1),baseY=(H-6).toFixed(1);
-    const s1lx=tx(mu-sigma).toFixed(1),s1rx=tx(mu+sigma).toFixed(1);
-    const svg=`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}">
-      <rect width="${W}" height="${H}" fill="#0e0e1a" rx="4"/>
+    const px=tx(mu).toFixed(1);
+
+    const cell=document.createElement('div');
+    cell.style.cssText='background:#0e0e1a;border-radius:4px;overflow:hidden';
+    cell.innerHTML=`<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block">
       <path d="${fillBand(mu-2*sigma,mu+2*sigma)}" fill="${hexAlpha(color,0.12)}"/>
       <path d="${fillBand(mu-sigma,mu+sigma)}" fill="${hexAlpha(color,0.28)}"/>
       <path d="${curve}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.9"/>
-      <line x1="${px}" y1="${H-6}" x2="${px}" y2="4" stroke="${color}" stroke-width="1" opacity="0.6" stroke-dasharray="2 2"/>
-      <line x1="${pad}" y1="${baseY}" x2="${W-pad}" y2="${baseY}" stroke="#333" stroke-width="0.5"/>
-      <text x="${px}" y="${H-1}" text-anchor="middle" font-size="8" fill="${color}" opacity="0.8">${mu.toFixed(1)}</text>
-      <text x="${s1lx}" y="${H-1}" text-anchor="middle" font-size="7" fill="#444">${(mu-sigma).toFixed(1)}</text>
-      <text x="${s1rx}" y="${H-1}" text-anchor="middle" font-size="7" fill="#444">${(mu+sigma).toFixed(1)}</text>
+      <line x1="${px}" y1="${curveBot}" x2="${px}" y2="${curveTop}" stroke="${color}" stroke-width="1" opacity="0.4" stroke-dasharray="2 2"/>
+      <line x1="${pad}" y1="${curveBot}" x2="${W-pad}" y2="${curveBot}" stroke="#333" stroke-width="0.5"/>
+      <text x="${W/2}" y="9" text-anchor="middle" font-size="9" font-weight="500" fill="${color}">${label}</text>
+      <text x="${px}" y="${H-3}" text-anchor="middle" font-size="8" fill="${color}" opacity="0.85">${mu.toFixed(1)}</text>
+      <text x="${W/2}" y="${H-3}" text-anchor="middle" font-size="7" fill="#444" dx="${parseInt(px)>W/2?'-18':'18'}">±${sigma.toFixed(1)}</text>
     </svg>`;
-    const row=document.createElement('div');row.className='bell-row';
-    const lbl=document.createElement('div');lbl.className='bell-lbl';lbl.style.color=color;lbl.textContent=label;
-    const svgWrap=document.createElement('div');svgWrap.style.cssText='width:100%;overflow:hidden;border-radius:4px';
-    svgWrap.innerHTML=svg;svgWrap.querySelector('svg').setAttribute('width','100%');
-    const valDiv=document.createElement('div');valDiv.className='bell-val';valDiv.style.color=color;
-    valDiv.innerHTML=mu.toFixed(1)+'<br><span style="font-size:9px;color:#555">±'+sigma.toFixed(1)+'</span>';
-    row.append(lbl,svgWrap,valDiv);container.appendChild(row);
+    row.appendChild(cell);
   });
+  container.appendChild(row);
 }
 
 document.getElementById('runBtn').addEventListener('click',async function(){
@@ -637,12 +825,17 @@ document.getElementById('runBtn').addEventListener('click',async function(){
   document.getElementById('rex').textContent=res.Ex.toFixed(1);
   document.getElementById('rey').textContent=res.Ey.toFixed(1);
   document.getElementById('rez').textContent=res.Ez.toFixed(1);
-  document.getElementById('rani').textContent=res.aniso.toFixed(2);
+  document.getElementById('rani').textContent=(()=>{
+    const E=(res.Ex+res.Ey+res.Ez)/3,nu2=res.nuEff||0.3;
+    const S11=1/E,S12=-nu2/E,d=(S11-S12)*(S11+2*S12);
+    const C11=(S11+S12)/d,C12=-S12/d,C44=res.Gxy;
+    return (2*C44/(C11-C12)).toFixed(3);
+  })();
   document.getElementById('rgxy').textContent=res.Gxy.toFixed(1);
   document.getElementById('rnu').textContent=res.nuEff.toFixed(3);
   // Surface complexity
-  const savColor=res.savNorm<0.5?'#60a5fa':res.savNorm<0.7?'#2dd4bf':res.savNorm<0.85?'#22c55e':'#4ade80';
-  const savLabel=res.savNorm<0.5?'low':res.savNorm<0.7?'moderate':res.savNorm<0.85?'high':'very high';
+  const savColor=res.savNorm<0.42?'#60a5fa':res.savNorm<0.65?'#2dd4bf':res.savNorm<0.88?'#22c55e':'#aaff00';
+  const savLabel=res.savNorm<0.42?'low':res.savNorm<0.65?'moderate':res.savNorm<0.88?'high':'very high';
   document.getElementById('rsav').textContent=res.savNorm.toFixed(2);
   document.getElementById('rsav').style.color=savColor;
   document.getElementById('sav-bar').style.width=(res.savNorm*100).toFixed(1)+'%';
@@ -651,12 +844,102 @@ document.getElementById('runBtn').addEventListener('click',async function(){
   document.getElementById('sav-note').style.color=savColor;
   document.getElementById('homo-results').style.display='block';
   await new Promise(r=>setTimeout(r,10));
-  drawBars(res);drawEllipsoid(res);
+  rebuildStiffnessShader(res.Ex,res.Ey,res.Ez,res.Gxy,res.nuEff||0.3);
   renderBells(
     [{label:'Ex',color:'#22d3ee'},{label:'Ey',color:'#e879f9'},{label:'Ez',color:'#facc15'}],
     [res.Ex,res.Ey,res.Ez],N
   );
+  // Cache result for export
+  lastHomogResult={res,N,Es,nu};
+  document.getElementById('exportBtn').textContent='Export JSON (+ homog)';
+  document.getElementById('exportBtn').style.borderColor='#7c6ff7';
+  document.getElementById('exportBtn').style.color='#a89cf7';
   this.disabled=false;this.textContent='Run homogenization';
+});
+
+let lastHomogResult=null;
+
+// Reset export button when surface changes
+function onSurfaceChange(){
+  lastHomogResult=null;
+  const btn=document.getElementById('exportBtn');
+  btn.textContent='Export JSON';
+  btn.style.borderColor='';btn.style.color='';
+}
+
+function buildExportJSON(){
+  // Surface block
+  const presetSel=document.getElementById('presetSel');
+  const currentPreset=presetSel.value;
+  const surfaceBlock=rawPresetFn
+    ? {type:'raw_preset',preset:currentPreset,label:rawPresetFn.label}
+    : {type:'terms',preset:terms.length>0?currentPreset:'custom',
+        terms:terms.map(t=>({on:t.on,coef:t.coef,
+          factors:t.factors.map(f=>({trig:f.trig,fx:f.fx,fy:f.fy,fz:f.fz}))}))};
+
+  // Geometry block
+  const geometryBlock={
+    offset:offsetVal,
+    cell_scale:cellMult,
+    mode:shellMode?'shell':'solid',
+    wall_thickness:shellMode?wallVal:null,
+    gradient:gradOn?{enabled:true,x:{lo:gxLo,hi:gxHi},y:{lo:gyLo,hi:gyHi},z:{lo:gzLo,hi:gzHi}}:{enabled:false}
+  };
+
+  // Homogenization block (only if run)
+  let homogBlock=null;
+  if(lastHomogResult){
+    const{res,N,Es,nu}=lastHomogResult;
+    homogBlock={
+      grid:N,E_solid_GPa:Es,poisson:nu,
+      volume_fraction:parseFloat((res.rho*100).toFixed(2)),
+      Ex_GPa:parseFloat(res.Ex.toFixed(3)),
+      Ey_GPa:parseFloat(res.Ey.toFixed(3)),
+      Ez_GPa:parseFloat(res.Ez.toFixed(3)),
+      Gxy_GPa:parseFloat(res.Gxy.toFixed(3)),
+      nu_eff:parseFloat(res.nuEff.toFixed(4)),
+      anisotropy:parseFloat(res.aniso.toFixed(4)),
+      surface_complexity:parseFloat(res.savNorm.toFixed(3)),
+      method:'MIL-HS'
+    };
+  }
+
+  const out={
+    meta:{version:'0.4.0',timestamp:new Date().toISOString(),
+      preset:rawPresetFn?rawPresetFn.label:(terms.length?currentPreset:'custom')},
+    surface:surfaceBlock,
+    geometry:geometryBlock
+  };
+  if(homogBlock)out.homogenization=homogBlock;
+  return out;
+}
+
+document.getElementById('exportBtn').addEventListener('click',function(){
+  const data=buildExportJSON();
+  const json=JSON.stringify(data,null,2);
+  const ts=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  const preset=data.meta.preset.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'');
+
+  // Download
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='tpms_'+preset+'_'+ts+'.json';
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(json).catch(()=>{});
+
+  // Flash confirmation
+  const orig=this.textContent;
+  this.textContent='Copied + downloaded ✓';
+  this.style.borderColor='#69f0ae';this.style.color='#69f0ae';
+  setTimeout(()=>{
+    this.textContent=orig;
+    this.style.borderColor=lastHomogResult?'#7c6ff7':'';
+    this.style.color=lastHomogResult?'#a89cf7':'';
+  },1800);
 });
 
 let lastTs=0;
@@ -671,6 +954,7 @@ function frame(ts){
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
   }
   drawGizmo(rotMat);
+  drawStiffnessSurface();
   requestAnimationFrame(frame);
 }
 loadPreset('gyroid');

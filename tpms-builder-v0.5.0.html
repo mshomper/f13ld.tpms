@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TPMS Builder — Radial</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;background:#06080f;color:#e0e0ff;font-family:system-ui,sans-serif}
+#wrap{max-width:900px;margin:0 auto;padding:20px 16px}
+h1{font-size:13px;font-weight:500;color:#7c8aaa;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px}
+#cw{position:relative;background:#06080f;border-radius:12px 12px 0 0;overflow:hidden;border:0.5px solid #2a2a3a}
+canvas#c{display:block;width:100%}
+#gizmo{position:absolute;bottom:10px;right:10px;pointer-events:none}
+#panel{background:#111118;border:0.5px solid #2a2a3a;border-top:none;border-radius:0 0 12px 12px;padding:12px 14px}
+.termcard{background:#0e0e1a;border:0.5px solid #2a2a3a;border-radius:8px;padding:8px 10px;margin-bottom:6px}
+.termcard.off{opacity:0.35}
+.term-hdr{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.coef-lbl{font-size:11px;color:#555;white-space:nowrap}
+.coef-inp{width:58px;font-size:12px;padding:2px 4px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff;text-align:center}
+.factor-row{display:grid;grid-template-columns:14px 86px 14px 1fr 14px 1fr 14px 1fr 20px;gap:3px 4px;align-items:center;margin-bottom:3px}
+.fdot{font-size:13px;color:#555;text-align:center;font-weight:500}
+.flbl{font-size:10px;color:#555;text-align:center}
+.fsel{font-size:11px;padding:2px 2px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff;width:100%}
+.finp{font-size:12px;padding:2px 3px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff;width:100%;text-align:center}
+.delf{font-size:14px;background:none;border:none;color:#555;cursor:pointer;padding:0;text-align:center;width:100%;line-height:1}
+.delf:hover{color:#e24b4a}
+.delf:disabled{opacity:0.18;cursor:default}
+.addf-btn{font-size:11px;padding:2px 9px;border:0.5px solid #2a2a3a;border-radius:20px;background:transparent;color:#666;cursor:pointer;margin-top:4px;display:inline-block}
+.addf-btn:hover{color:#e0e0ff;border-color:#3a3a5a}
+.tog{font-size:10px;padding:2px 6px;border:0.5px solid #3a3a5a;border-radius:12px;background:transparent;color:#888;cursor:pointer}
+.tog.on{background:#7c6ff7;color:#fff;border-color:#7c6ff7}
+.del-term{font-size:15px;background:none;border:none;color:#555;cursor:pointer;padding:0 2px;line-height:1;margin-left:auto}
+.del-term:hover{color:#e24b4a}
+#toolbar{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+#toolbar button{font-size:12px;padding:3px 10px;border:0.5px solid #3a3a5a;border-radius:20px;background:transparent;color:#888;cursor:pointer}
+#toolbar button:hover{background:#1a1a2e;color:#e0e0ff}
+#eqbar-wrap{margin-bottom:8px}
+#eqbar-label{font-size:10px;color:#c8f542;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px}
+#eqbar{font-size:14px;font-family:monospace;color:#aaa;padding:10px 12px;background:#060e0a;border:0.5px solid #c8f542;border-radius:8px;line-height:2;word-break:break-all;min-height:36px;box-shadow:0 0 12px rgba(200,245,66,0.07)}
+#eqbar b{color:#e0e0ff;font-weight:600}
+.divider{border:none;border-top:0.5px solid #2a2a3a;margin:10px 0}
+.surf-controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:8px}
+.sc-group{display:flex;align-items:center;gap:6px}
+.sc-group label{font-size:12px;color:#888;white-space:nowrap}
+.sc-group input[type=range]{width:88px;accent-color:#7c6ff7}
+.sc-group .sv{font-size:12px;font-weight:500;color:#e0e0ff;min-width:38px;font-variant-numeric:tabular-nums}
+.mode-btn{font-size:11px;padding:3px 10px;border:0.5px solid #3a3a5a;border-radius:20px;background:transparent;color:#888;cursor:pointer}
+.mode-btn.active{background:#7c6ff7;color:#fff;border-color:#7c6ff7}
+/* PI-TPMS mode button gets distinct accent */
+.mode-btn.pi-active{background:#c8ff80;color:#0a1a00;border-color:#c8ff80;font-weight:600}
+.mode-strip{display:flex;gap:4px}
+/* PI-TPMS shift controls */
+#pi-controls{display:none;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:8px;padding:8px 10px;background:#0a1a0a;border:0.5px solid #1a4a1a;border-radius:8px}
+#pi-controls.visible{display:flex}
+#pi-controls label.pi-lbl{font-size:11px;color:#7aaa7a;white-space:nowrap}
+#pi-controls .pi-title{font-size:10px;color:#c8ff80;text-transform:uppercase;letter-spacing:0.08em;width:100%;margin-bottom:2px}
+.pi-snap{display:flex;flex-direction:column;gap:2px}
+.pi-snap input[type=range]{width:88px;accent-color:#c8ff80}
+.pi-snap .snap-ticks{display:flex;justify-content:space-between;width:88px}
+.pi-snap .snap-ticks span{font-size:7px;color:#3a6a3a}
+.pi-val{font-size:11px;font-weight:500;color:#c8ff80;min-width:28px;font-variant-numeric:tabular-nums}
+.homo-controls{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:10px}
+.homo-controls label{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
+.homo-controls select,.homo-controls input[type=number]{font-size:12px;padding:2px 4px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff}
+.homo-controls select{width:70px}
+.homo-controls input[type=number]{width:56px;text-align:center}
+#runBtn{font-size:12px;padding:4px 14px;border:0.5px solid #7c6ff7;border-radius:20px;background:#7c6ff7;color:#fff;cursor:pointer;font-weight:500}
+#runBtn:hover{background:#6a5ef0}
+#runBtn:disabled{opacity:0.5;cursor:default}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
+.metric{background:#0e0e1a;border:0.5px solid #2a2a3a;border-radius:8px;padding:7px 8px;text-align:center}
+.metric .mv{font-size:16px;font-weight:500;color:#e0e0ff}
+.metric .ml{font-size:10px;color:#555;margin-top:1px}
+.metric .mu{font-size:10px;color:#888}
+#viz-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.viz-card{background:#0e0e1a;border:0.5px solid #2a2a3a;border-radius:8px;padding:8px}
+.viz-title{font-size:10px;color:#555;margin-bottom:5px}
+canvas.vcv{width:100%;display:block}
+#homo-results{display:none}
+#homo-status{font-size:11px;color:#555;margin-bottom:7px;min-height:15px}
+.method-note{font-size:10px;color:#555;margin-top:8px;line-height:1.5;border-top:0.5px solid #2a2a3a;padding-top:7px}
+#footer{font-size:11px;color:#444;margin-top:7px}
+.bell-row{display:grid;grid-template-columns:26px 1fr 52px;gap:4px;align-items:center;margin-bottom:5px}
+.bell-lbl{font-size:11px;font-weight:500;text-align:center}
+.bell-val{font-size:10px;font-variant-numeric:tabular-nums;text-align:right;padding-left:4px}
+.bounds-section{margin-top:10px}
+.bounds-title{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
+.bounds-note{font-size:10px;color:#444;margin-bottom:8px;line-height:1.5}
+.bell-row{display:grid;grid-template-columns:26px 1fr 52px;gap:4px;align-items:center;margin-bottom:5px}
+.bell-lbl{font-size:11px;font-weight:500;text-align:center}
+.bell-val{font-size:10px;font-variant-numeric:tabular-nums;text-align:right;padding-left:4px;line-height:1.4}
+.grad-controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:8px}
+.grad-toggle{font-size:11px;padding:2px 8px;border:0.5px solid #3a3a5a;border-radius:12px;background:transparent;color:#888;cursor:pointer}
+.grad-toggle.on{background:#2a6a4a;color:#69f0ae;border-color:#2a6a4a}
+.grad-axis{display:flex;align-items:center;gap:5px;opacity:0.35;pointer-events:none;transition:opacity 0.2s}
+.grad-axis.enabled{opacity:1;pointer-events:all}
+.grad-axis label{font-size:11px;color:#888;min-width:14px}
+.grad-axis input[type=range]{width:72px;accent-color:#69f0ae}
+.grad-axis .sv{font-size:11px;color:#69f0ae;min-width:36px;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>TPMS surface builder <span style="font-size:10px;color:#3a3a5a;margin-left:6px">v0.5.0</span></h1>
+  <div id="cw">
+    <canvas id="c" height="420"></canvas>
+    <canvas id="gizmo" width="72" height="72"></canvas>
+  </div>
+  <div id="panel">
+    <div id="eqbar-wrap">
+      <div id="eqbar-label">implicit equation</div>
+      <div id="eqbar"></div>
+    </div>
+    <div class="surf-controls">
+      <div class="sc-group">
+        <label>mode</label>
+        <div class="mode-strip">
+          <button class="mode-btn active" id="mSolid">solid</button>
+          <button class="mode-btn" id="mShell">thin wall</button>
+          <button class="mode-btn" id="mPi">PI-TPMS</button>
+        </div>
+      </div>
+      <div class="sc-group">
+        <label>cells</label>
+        <input type="range" id="sCells" min="0.5" max="3" step="0.25" value="1">
+        <span class="sv" id="vCells">1.00×</span>
+      </div>
+      <div class="sc-group" id="grp-offset">
+        <label>offset</label>
+        <input type="range" id="sOffset" min="-2" max="2" step="0.05" value="0">
+        <span class="sv" id="vOffset">0.00</span>
+      </div>
+      <div class="sc-group" id="grp-wall">
+        <label>wall t</label>
+        <input type="range" id="sWall" min="0.02" max="1.5" step="0.02" value="0.3">
+        <span class="sv" id="vWall">0.30</span>
+      </div>
+      <div class="sc-group" id="grp-piper">
+        <label>pipe r</label>
+        <input type="range" id="sPipeR" min="0.02" max="0.8" step="0.01" value="0.18">
+        <span class="sv" id="vPipeR">0.18</span>
+      </div>
+    </div>
+
+    <!-- PI-TPMS phase shift controls -->
+    <div id="pi-controls">
+      <div class="pi-title">⬡ PI-TPMS — phase shift B (× period T)</div>
+      <div class="sc-group">
+        <label class="pi-lbl">Δx/T</label>
+        <div class="pi-snap">
+          <input type="range" id="piX" min="0" max="8" step="1" value="2">
+          <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
+        </div>
+        <span class="pi-val" id="vPiX">¼</span>
+      </div>
+      <div class="sc-group">
+        <label class="pi-lbl">Δy/T</label>
+        <div class="pi-snap">
+          <input type="range" id="piY" min="0" max="8" step="1" value="2">
+          <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
+        </div>
+        <span class="pi-val" id="vPiY">¼</span>
+      </div>
+      <div class="sc-group">
+        <label class="pi-lbl">Δz/T</label>
+        <div class="pi-snap">
+          <input type="range" id="piZ" min="0" max="8" step="1" value="0">
+          <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
+        </div>
+        <span class="pi-val" id="vPiZ">0</span>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div class="grad-controls">
+      <button class="grad-toggle" id="gradToggle">gradient: off</button>
+      <div class="grad-axis" id="gax">
+        <label style="color:#22d3ee">X</label>
+        <span style="font-size:10px;color:#555">lo</span>
+        <input type="range" id="gxLo" min="0.2" max="4" step="0.1" value="0.5" style="accent-color:#22d3ee">
+        <span style="font-size:10px;color:#555">hi</span>
+        <input type="range" id="gxHi" min="0.2" max="4" step="0.1" value="2.0" style="accent-color:#22d3ee">
+        <span class="sv" id="vgx" style="color:#22d3ee">0.5→2.0</span>
+      </div>
+      <div class="grad-axis" id="gay">
+        <label style="color:#e879f9">Y</label>
+        <span style="font-size:10px;color:#555">lo</span>
+        <input type="range" id="gyLo" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#e879f9">
+        <span style="font-size:10px;color:#555">hi</span>
+        <input type="range" id="gyHi" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#e879f9">
+        <span class="sv" id="vgy" style="color:#e879f9">1.0→1.0</span>
+      </div>
+      <div class="grad-axis" id="gaz">
+        <label style="color:#facc15">Z</label>
+        <span style="font-size:10px;color:#555">lo</span>
+        <input type="range" id="gzLo" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#facc15">
+        <span style="font-size:10px;color:#555">hi</span>
+        <input type="range" id="gzHi" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#facc15">
+        <span class="sv" id="vgz" style="color:#facc15">1.0→1.0</span>
+      </div>
+    </div>
+    <hr class="divider">
+    <div style="margin-bottom:6px">
+      <div style="font-size:10px;color:#c8f542;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">preset surfaces</div>
+      <select id="presetSel" style="width:100%;font-size:11px;padding:4px 8px;border:0.5px solid #3a3a5a;border-radius:6px;background:#0e0e1a;color:#aaa;cursor:pointer">
+        <optgroup label="cubic symmetry">
+          <option value="gyroid">gyroid</option>
+          <option value="schwarzP">schwarz P</option>
+          <option value="schwarzD">schwarz D</option>
+          <option value="neovius">neovius</option>
+          <option value="iwp">I-WP</option>
+          <option value="splitP">split-P</option>
+          <option value="frd">F-RD</option>
+          <option value="fks">Fischer-Koch S</option>
+          <option value="gyroidHarmonic">gyroid-harmonic</option>
+          <option value="primitiveC">primitive-C (G6)</option>
+          <option value="octo">octo (G8)</option>
+          <option value="pHarmonic">P-harmonic</option>
+        </optgroup>
+        <optgroup label="threefold symmetry">
+          <option value="lidinoid">lidinoid</option>
+        </optgroup>
+      </select>
+    </div>
+    <div id="termlist"></div>
+    <hr class="divider">
+    <div class="homo-controls">
+      <label>grid <select id="gridsize"><option value="32">32³</option><option value="48" selected>48³</option><option value="64">64³</option></select></label>
+      <label>E_s (GPa) <input type="number" id="Es" value="100" min="1" max="1000" step="10"></label>
+      <label>ν <input type="number" id="nu" value="0.3" min="0" max="0.49" step="0.01"></label>
+      <button id="runBtn">Run homogenization</button>
+    </div>
+    <div id="homo-status"></div>
+    <div id="homo-results">
+      <div id="viz-row" style="display:grid;grid-template-columns:1fr 86px;gap:6px;margin-bottom:8px">
+        <div class="viz-card" style="padding:8px">
+          <div class="viz-title">directional stiffness surface</div>
+          <canvas id="ellcv" style="width:100%;aspect-ratio:1;display:block;border-radius:6px;cursor:default"></canvas>
+          <div style="margin-top:5px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+              <div style="font-size:12px;color:#555;white-space:nowrap">A =</div>
+              <div id="zener-val" style="font-size:15px;font-weight:500;color:#888;min-width:32px">—</div>
+              <div id="zener-label" style="font-size:12px;color:#555;flex:1;text-align:right">—</div>
+            </div>
+            <div style="position:relative;height:5px;background:#1a1a2a;border-radius:3px;margin-bottom:3px">
+              <div style="position:absolute;left:0;top:0;bottom:0;width:100%;border-radius:3px;background:linear-gradient(90deg,#e879f9 0%,#555 40%,#555 60%,#22d3ee 100%);opacity:0.4"></div>
+              <div style="position:absolute;left:40%;top:-1px;width:1px;height:7px;background:#555;opacity:0.8"></div>
+              <div id="zener-marker" style="position:absolute;top:-2px;width:2px;height:9px;background:#e0e0ff;border-radius:1px;left:40%;transition:left 0.4s"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;color:#aaa;font-weight:500">
+              <span>axial</span><span>A=1</span><span>diagonal</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rv" style="font-size:22px">—</div><div class="ml" style="font-size:13px">vol. fraction</div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rex" style="color:#22d3ee;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>x</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rey" style="color:#e879f9;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>y</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rez" style="color:#facc15;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>z</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rani" style="font-size:22px">—</div><div class="ml" style="font-size:13px">Zener A</div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rgxy" style="color:#a78bfa;font-size:22px">—</div><div class="ml" style="font-size:13px">G<sub>xy</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rnu" style="font-size:22px">—</div><div class="ml" style="font-size:13px">Poisson's ratio</div></div>
+        </div>
+      </div>
+      <div class="metrics" style="margin-top:6px;grid-template-columns:1fr">
+        <div class="metric" style="background:#0d1520;border-color:#1a2a40">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <div style="text-align:left">
+              <div class="mv" id="rsav" style="font-size:22px">—</div>
+              <div class="ml" style="font-size:13px">surface complexity (0–1)</div>
+            </div>
+            <div id="sav-bar-wrap" style="flex:1;height:8px;background:#0e0e1a;border-radius:4px;overflow:hidden">
+              <div id="sav-bar" style="height:100%;width:0%;border-radius:4px;transition:width 0.4s,background 0.4s"></div>
+            </div>
+            <div style="text-align:right;font-size:13px;min-width:54px;font-weight:500" id="sav-note">—</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Probability distribution of true stiffness</div>
+        <div style="font-size:10px;color:#444;margin-bottom:6px;line-height:1.5">Spread combines method uncertainty (~18%) and grid resolution (~8/N).</div>
+        <div id="bell-rows"></div>
+      </div>
+      <div class="method-note">MIL-HS method: MIL fabric eigenvalues give anisotropy ratios · HS+ bound gives isotropic stiffness ceiling from ρ · directional E_i = E_HS+ × normalized MIL weight · surface complexity = SA/V normalized to [0,1] · bell curves show combined uncertainty.</div>
+    </div>
+    <button id="exportBtn" style="width:100%;margin-top:8px;font-size:12px;padding:6px 14px;border:0.5px solid #3a3a5a;border-radius:20px;background:transparent;color:#888;cursor:pointer">Export JSON</button>
+    <div id="footer">Drag to rotate · Scroll to zoom · Color = surface normal direction · Trackball rotation</div>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('c');
+const gl=canvas.getContext('webgl');
+if(!gl)canvas.parentElement.innerHTML='<p style="color:#888;padding:40px;text-align:center">WebGL unavailable</p>';
+const gizmo=document.getElementById('gizmo');
+const gctx=gizmo.getContext('2d');
+
+function resize(){const w=canvas.parentElement.clientWidth;canvas.width=w;canvas.height=420;if(gl)gl.viewport(0,0,w,420);}
+resize();window.addEventListener('resize',resize);
+
+function toFloat(v){const s=parseFloat(parseFloat(v).toFixed(6)).toString();return s.includes('.')?s:s+'.0';}
+const OPTS=['sin(x)','cos(x)','sin(y)','cos(y)','sin(z)','cos(z)'];
+function glslTrig(t,fx,fy,fz){
+  if(t==='sin(x)')return'sin('+fx+'*gx)';if(t==='cos(x)')return'cos('+fx+'*gx)';
+  if(t==='sin(y)')return'sin('+fy+'*gy)';if(t==='cos(y)')return'cos('+fy+'*gy)';
+  if(t==='sin(z)')return'sin('+fz+'*gz)';if(t==='cos(z)')return'cos('+fz+'*gz)';
+  return'1.0';
+}
+function jsTrig(t,fx,fy,fz){
+  if(t==='sin(x)')return'Math.sin('+fx+'*x)';if(t==='cos(x)')return'Math.cos('+fx+'*x)';
+  if(t==='sin(y)')return'Math.sin('+fy+'*y)';if(t==='cos(y)')return'Math.cos('+fy+'*y)';
+  if(t==='sin(z)')return'Math.sin('+fz+'*z)';if(t==='cos(z)')return'Math.cos('+fz+'*z)';
+  return'1.0';
+}
+
+let terms=[],tid=0;
+function mkF(trig,fx,fy,fz){return{trig:trig||'sin(x)',fx:fx!=null?fx:1,fy:fy!=null?fy:1,fz:fz!=null?fz:1};}
+function mk(factors,coef){return{id:tid++,on:true,coef:coef!=null?coef:1,factors:factors.map(f=>({...f}))};}
+const PRESETS={
+  gyroid:[mk([mkF('sin(x)'),mkF('cos(y)')],1),mk([mkF('sin(y)'),mkF('cos(z)')],1),mk([mkF('sin(z)'),mkF('cos(x)')],1)],
+  schwarzP:[mk([mkF('cos(x)')],1),mk([mkF('cos(y)')],1),mk([mkF('cos(z)')],1)],
+  schwarzD:[mk([mkF('sin(x)'),mkF('sin(y)')],1),mk([mkF('sin(x)'),mkF('cos(z)')],-1),mk([mkF('cos(x)'),mkF('sin(z)')],1),mk([mkF('cos(y)'),mkF('cos(z)')],-1)],
+  neovius:[mk([mkF('cos(x)')],3),mk([mkF('cos(y)')],3),mk([mkF('cos(z)')],3),mk([mkF('cos(x)'),mkF('cos(y)'),mkF('cos(z)')],4)],
+  iwp:[mk([mkF('cos(x)'),mkF('cos(y)')],2),mk([mkF('cos(y)'),mkF('cos(z)')],2),mk([mkF('cos(z)'),mkF('cos(x)')],2),mk([mkF('cos(x)',2,1,1)],-1),mk([mkF('cos(y)',1,2,1)],-1),mk([mkF('cos(z)',1,1,2)],-1)],
+  splitP:{_fn:(x,y,z)=>Math.sin(x)*Math.sin(y)*Math.cos(z)+Math.sin(y)*Math.sin(z)*Math.cos(x)+Math.sin(z)*Math.sin(x)*Math.cos(y)-0.3,
+    _glsl:'sin(gx)*sin(gy)*cos(gz)+sin(gy)*sin(gz)*cos(gx)+sin(gz)*sin(gx)*cos(gy)-0.3',
+    _label:'split-P'},
+  frd:{_fn:(x,y,z)=>Math.sin(2*x)*Math.cos(y)*Math.sin(z)+Math.sin(x)*Math.sin(2*y)*Math.cos(z)+Math.cos(x)*Math.sin(y)*Math.sin(2*z)-Math.cos(2*x)*Math.cos(2*y)-Math.cos(2*y)*Math.cos(2*z)-Math.cos(2*z)*Math.cos(2*x)+0.3,
+    _glsl:'sin(2.*gx)*cos(gy)*sin(gz)+sin(gx)*sin(2.*gy)*cos(gz)+cos(gx)*sin(gy)*sin(2.*gz)-cos(2.*gx)*cos(2.*gy)-cos(2.*gy)*cos(2.*gz)-cos(2.*gz)*cos(2.*gx)+0.3',
+    _label:'F-RD'},
+  fks:{_fn:(x,y,z)=>Math.cos(2*x)*Math.sin(y)*Math.cos(z)+Math.cos(2*y)*Math.sin(z)*Math.cos(x)+Math.cos(2*z)*Math.sin(x)*Math.cos(y),
+    _glsl:'cos(2.*gx)*sin(gy)*cos(gz)+cos(2.*gy)*sin(gz)*cos(gx)+cos(2.*gz)*sin(gx)*cos(gy)',
+    _label:'Fischer-Koch S'},
+  gyroidHarmonic:{_fn:(x,y,z)=>Math.sin(x)*Math.cos(y)+Math.sin(y)*Math.cos(z)+Math.sin(z)*Math.cos(x)+0.3*(Math.sin(2*x)*Math.cos(2*y)+Math.sin(2*y)*Math.cos(2*z)+Math.sin(2*z)*Math.cos(2*x)),
+    _glsl:'sin(gx)*cos(gy)+sin(gy)*cos(gz)+sin(gz)*cos(gx)+0.3*(sin(2.*gx)*cos(2.*gy)+sin(2.*gy)*cos(2.*gz)+sin(2.*gz)*cos(2.*gx))',
+    _label:'gyroid-harmonic'},
+  primitiveC:{_fn:(x,y,z)=>2.0*(Math.cos(x)+Math.cos(y)+Math.cos(z))-(Math.cos(2*x)+Math.cos(2*y)+Math.cos(2*z)),
+    _glsl:'2.0*(cos(gx)+cos(gy)+cos(gz))-(cos(2.*gx)+cos(2.*gy)+cos(2.*gz))',
+    _label:'primitive-C (G6)'},
+  octo:{_fn:(x,y,z)=>Math.cos(x)+Math.cos(y)+Math.cos(z)-0.5*(Math.cos(2*x)*Math.cos(2*y)+Math.cos(2*y)*Math.cos(2*z)+Math.cos(2*z)*Math.cos(2*x)),
+    _glsl:'cos(gx)+cos(gy)+cos(gz)-0.5*(cos(2.*gx)*cos(2.*gy)+cos(2.*gy)*cos(2.*gz)+cos(2.*gz)*cos(2.*gx))',
+    _label:'octo (G8)'},
+  pHarmonic:{_fn:(x,y,z)=>Math.cos(x)+Math.cos(y)+Math.cos(z)+0.25*(Math.cos(2*x)+Math.cos(2*y)+Math.cos(2*z)),
+    _glsl:'cos(gx)+cos(gy)+cos(gz)+0.25*(cos(2.*gx)+cos(2.*gy)+cos(2.*gz))',
+    _label:'P-harmonic'},
+  lidinoid:{_fn:(x,y,z)=>1.1*(Math.sin(2*x)*Math.cos(y)*Math.sin(z)+Math.sin(x)*Math.sin(2*y)*Math.cos(z)+Math.cos(x)*Math.sin(y)*Math.sin(2*z))-0.2*(Math.cos(2*x)*Math.cos(2*y)+Math.cos(2*y)*Math.cos(2*z)+Math.cos(2*z)*Math.cos(2*x))-0.4*(Math.cos(2*x)+Math.cos(2*y)+Math.cos(2*z)),
+    _glsl:'1.1*(sin(2.*gx)*cos(gy)*sin(gz)+sin(gx)*sin(2.*gy)*cos(gz)+cos(gx)*sin(gy)*sin(2.*gz))-0.2*(cos(2.*gx)*cos(2.*gy)+cos(2.*gy)*cos(2.*gz)+cos(2.*gz)*cos(2.*gx))-0.4*(cos(2.*gx)+cos(2.*gy)+cos(2.*gz))',
+    _label:'lidinoid'}
+};
+
+let rawPresetFn=null;
+
+function loadPreset(name){
+  const p=PRESETS[name];
+  if(p&&p._fn){
+    rawPresetFn={fn:p._fn,glsl:p._glsl,label:p._label};
+    terms=[];renderList();rebuildShader();
+  } else {
+    rawPresetFn=null;
+    terms=p.map(t=>({...t,id:tid++,factors:t.factors.map(f=>({...f}))}));
+    renderList();rebuildShader();
+  }
+}
+function dn(v){return parseFloat(parseFloat(v).toFixed(3)).toString();}
+
+function renderList(){
+  const el=document.getElementById('termlist');el.innerHTML='';
+  if(rawPresetFn){
+    const note=document.createElement('div');
+    note.style.cssText='font-size:11px;color:#555;padding:8px 4px;font-style:italic';
+    note.textContent=rawPresetFn.label+' — uses double-frequency terms (sin 2x, cos 2x). Switch to a standard preset or clear to use the equation editor.';
+    el.appendChild(note);
+    updateEq();return;
+  }
+  terms.forEach(t=>{
+    const card=document.createElement('div');card.className='termcard'+(t.on?'':' off');
+    let html='<div class="term-hdr">'+
+      '<button class="tog'+(t.on?' on':'')+'" data-id="'+t.id+'" data-act="tog">'+(t.on?'on':'off')+'</button>'+
+      '<span class="coef-lbl">coef</span>'+
+      '<input type="number" class="coef-inp" data-id="'+t.id+'" data-f="coef" value="'+dn(t.coef)+'" step="0.25">'+
+      '<button class="del-term" data-id="'+t.id+'" data-act="del">×</button></div>';
+    t.factors.forEach((f,fi)=>{
+      html+='<div class="factor-row">'+
+        '<span class="fdot">'+(fi===0?'':' ·')+'</span>'+
+        '<select class="fsel" data-id="'+t.id+'" data-fi="'+fi+'" data-f="trig">'+OPTS.map(o=>'<option'+(o===f.trig?' selected':'')+'>'+o+'</option>').join('')+'</select>'+
+        '<span class="flbl">x</span><input type="number" class="finp" data-id="'+t.id+'" data-fi="'+fi+'" data-f="fx" value="'+dn(f.fx)+'" step="0.5" min="0.1">'+
+        '<span class="flbl">y</span><input type="number" class="finp" data-id="'+t.id+'" data-fi="'+fi+'" data-f="fy" value="'+dn(f.fy)+'" step="0.5" min="0.1">'+
+        '<span class="flbl">z</span><input type="number" class="finp" data-id="'+t.id+'" data-fi="'+fi+'" data-f="fz" value="'+dn(f.fz)+'" step="0.5" min="0.1">'+
+        '<button class="delf" data-id="'+t.id+'" data-fi="'+fi+'" data-act="delf"'+(t.factors.length>1?'':' disabled')+'>−</button></div>';
+    });
+    html+='<button class="addf-btn" data-id="'+t.id+'" data-act="addf">+ factor</button>';
+    card.innerHTML=html;el.appendChild(card);
+  });
+  const addBtn=document.createElement('button');
+  addBtn.id='addBtn';addBtn.textContent='+ term';addBtn.style.cssText='margin-top:6px;width:100%';
+  addBtn.addEventListener('click',function(){terms.push(mk([mkF('sin(x)'),mkF('cos(y)')],1));renderList();rebuildShader();onSurfaceChange();});
+  el.appendChild(addBtn);
+  updateEq();
+}
+document.getElementById('termlist').addEventListener('change',function(e){
+  const id=parseInt(e.target.dataset.id),fi=e.target.dataset.fi!==undefined?parseInt(e.target.dataset.fi):null,f=e.target.dataset.f;
+  if(isNaN(id)||!f)return;
+  const t=terms.find(x=>x.id===id);if(!t)return;
+  if(f==='coef'){const v=parseFloat(e.target.value);if(!isNaN(v))t.coef=v;}
+  else if(fi!==null&&fi>=0){const fac=t.factors[fi];if(!fac)return;if(f==='trig')fac.trig=e.target.value;else{const v=parseFloat(e.target.value);if(!isNaN(v))fac[f]=v;}}
+  updateEq();rebuildShader();onSurfaceChange();
+});
+document.getElementById('termlist').addEventListener('click',function(e){
+  const btn=e.target.closest('[data-act]');if(!btn)return;
+  const id=parseInt(btn.dataset.id),fi=btn.dataset.fi!==undefined?parseInt(btn.dataset.fi):null,act=btn.dataset.act;
+  const t=terms.find(x=>x.id===id);
+  if(act==='del')terms=terms.filter(x=>x.id!==id);
+  if(act==='tog'&&t)t.on=!t.on;
+  if(act==='delf'&&t&&fi!==null&&t.factors.length>1)t.factors.splice(fi,1);
+  if(act==='addf'&&t)t.factors.push(mkF('sin(x)'));
+  renderList();rebuildShader();
+});
+document.getElementById('presetSel').addEventListener('change',function(){loadPreset(this.value);onSurfaceChange();});
+
+// ── PI-TPMS shift state ───────────────────────────────────────────────
+const FRAC_LABELS=['0','⅛','¼','⅜','½','⅝','¾','⅞','1'];
+const TWO_PI=2*Math.PI;
+let piShift={x:2,y:2,z:0}; // stored as integer 0-8 (eighths)
+
+function piShiftRad(axis){return(piShift[axis]/8)*TWO_PI;}
+
+['x','y','z'].forEach(ax=>{
+  const el=document.getElementById('pi'+ax.toUpperCase());
+  const vl=document.getElementById('vPi'+ax.toUpperCase());
+  el.addEventListener('input',()=>{
+    piShift[ax]=parseInt(el.value);
+    vl.textContent=FRAC_LABELS[piShift[ax]];
+    rebuildShader();onSurfaceChange();
+  });
+});
+
+// ── updateEq — adds PI-TPMS branch ───────────────────────────────────
+function updateEq(){
+  const a=terms.filter(t=>t.on&&t.factors&&t.factors.length);
+  const off=parseFloat(document.getElementById('sOffset').value);
+  const modeShell=document.getElementById('mShell').classList.contains('active');
+  const modePi=document.getElementById('mPi').classList.contains('pi-active');
+  const wall=parseFloat(document.getElementById('sWall').value);
+  const pipeR=parseFloat(document.getElementById('sPipeR').value);
+
+  if(rawPresetFn){
+    if(modePi){
+      document.getElementById('eqbar').innerHTML=
+        'max(|<b>'+rawPresetFn.label+'</b>(p)|, |<b>'+rawPresetFn.label+'</b>(p+δ)|) &lt; '+pipeR.toFixed(2);
+    } else {
+      document.getElementById('eqbar').innerHTML=
+        modeShell?'|<b>'+rawPresetFn.label+'</b>| &lt; '+wall.toFixed(2):'<b>'+rawPresetFn.label+'</b> = 0';
+    }
+    return;
+  }
+  if(!a.length){document.getElementById('eqbar').innerHTML='<i style="color:#555">no active terms</i>';return;}
+  const eq=a.map((t,i)=>{
+    const c=Math.abs(t.coef),cs=c===1?'':dn(c)+'·';
+    const sign=i===0?(t.coef<0?'−':''):(t.coef<0?' − ':' + ');
+    return sign+'<b>'+cs+t.factors.map(f=>f.trig).join('·')+'</b>';
+  }).join('');
+  if(modePi){
+    document.getElementById('eqbar').innerHTML=
+      'max(|'+eq+'(p)|, |'+eq+'(p+δ)|) &lt; '+pipeR.toFixed(2);
+  } else {
+    const offStr=off===0?'':' − '+off.toFixed(2);
+    document.getElementById('eqbar').innerHTML=
+      modeShell?'|'+eq+offStr+'| &lt; '+wall.toFixed(2):eq+offStr+' = 0';
+  }
+}
+
+// ── Mode state ────────────────────────────────────────────────────────
+let shellMode=false,piMode=false,offsetVal=0,wallVal=0.3,pipeRVal=0.18,cellMult=1.0;
+let gradOn=false,gxLo=0.5,gxHi=2.0,gyLo=1.0,gyHi=1.0,gzLo=1.0,gzHi=1.0;
+
+function syncModeUI(){
+  // show/hide controls
+  document.getElementById('grp-offset').style.display=piMode?'none':'flex';
+  document.getElementById('grp-wall').style.display=(shellMode&&!piMode)?'flex':'none';
+  document.getElementById('grp-piper').style.display=piMode?'flex':'none';
+  document.getElementById('pi-controls').classList.toggle('visible',piMode);
+  // button states
+  document.getElementById('mSolid').classList.toggle('active',!shellMode&&!piMode);
+  document.getElementById('mShell').classList.toggle('active',shellMode&&!piMode);
+  document.getElementById('mPi').classList.toggle('pi-active',piMode);
+}
+
+document.getElementById('mSolid').addEventListener('click',function(){
+  shellMode=false;piMode=false;syncModeUI();updateEq();rebuildShader();
+});
+document.getElementById('mShell').addEventListener('click',function(){
+  shellMode=true;piMode=false;syncModeUI();updateEq();rebuildShader();
+});
+document.getElementById('mPi').addEventListener('click',function(){
+  shellMode=false;piMode=true;syncModeUI();updateEq();rebuildShader();
+});
+
+document.getElementById('sOffset').addEventListener('input',function(){offsetVal=parseFloat(this.value);document.getElementById('vOffset').textContent=offsetVal.toFixed(2);updateEq();rebuildShader();});
+document.getElementById('sWall').addEventListener('input',function(){wallVal=parseFloat(this.value);document.getElementById('vWall').textContent=wallVal.toFixed(2);updateEq();rebuildShader();});
+document.getElementById('sPipeR').addEventListener('input',function(){pipeRVal=parseFloat(this.value);document.getElementById('vPipeR').textContent=pipeRVal.toFixed(2);updateEq();rebuildShader();});
+document.getElementById('sCells').addEventListener('input',function(){cellMult=parseFloat(this.value);document.getElementById('vCells').textContent=cellMult.toFixed(2)+'×';rebuildShader();});
+
+document.getElementById('gradToggle').addEventListener('click',function(){
+  gradOn=!gradOn;
+  this.textContent='gradient: '+(gradOn?'on':'off');
+  this.classList.toggle('on',gradOn);
+  ['gax','gay','gaz'].forEach(id=>document.getElementById(id).classList.toggle('enabled',gradOn));
+  rebuildShader();
+});
+['gxLo','gxHi','gyLo','gyHi','gzLo','gzHi'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',function(){
+    gxLo=parseFloat(document.getElementById('gxLo').value);
+    gxHi=parseFloat(document.getElementById('gxHi').value);
+    gyLo=parseFloat(document.getElementById('gyLo').value);
+    gyHi=parseFloat(document.getElementById('gyHi').value);
+    gzLo=parseFloat(document.getElementById('gzLo').value);
+    gzHi=parseFloat(document.getElementById('gzHi').value);
+    document.getElementById('vgx').textContent=gxLo.toFixed(1)+'→'+gxHi.toFixed(1);
+    document.getElementById('vgy').textContent=gyLo.toFixed(1)+'→'+gyHi.toFixed(1);
+    document.getElementById('vgz').textContent=gzLo.toFixed(1)+'→'+gzHi.toFixed(1);
+    rebuildShader();
+  });
+});
+
+// ── buildFrag — core shader generator with PI-TPMS branch ─────────────
+const VERT='attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
+function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
+  const active=terms.filter(t=>t.on&&t.factors&&t.factors.length);
+  const H=toFloat(Math.PI*cellMult);
+  const gxLoS=toFloat(gxLo),gxHiS=toFloat(gxHi);
+  const gyLoS=toFloat(gyLo),gyHiS=toFloat(gyHi);
+  const gzLoS=toFloat(gzLo),gzHiS=toFloat(gzHi);
+
+  // Shared field evaluation — builds the GLSL expression for φ(p)
+  // Takes a prefix so we can evaluate at both p and p+δ
+  function fieldLines(px,py,pz){
+    const coordLines=[
+      'float gx='+px+';','float gy='+py+';','float gz='+pz+';'
+    ];
+    if(gradOn){
+      // gradient modifies spatial frequency based on position
+      // for shifted version we still use the unshifted position for gradient mapping
+      // (gradient is a property of the spatial domain, not the surface)
+    }
+    if(rawPresetFn){
+      return coordLines.join('\n')+'\n  v='+rawPresetFn.glsl+';';
+    }
+    return coordLines.join('\n')+'\n'+active.map(t=>{
+      const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');
+      return'  v+='+toFloat(t.coef)+'*'+parts.join('*')+';';
+    }).join('\n');
+  }
+
+  const gradLines=gradOn?[
+    'float t01x=clamp((p.x+H)/(2.0*H),0.0,1.0);',
+    'float t01y=clamp((p.y+H)/(2.0*H),0.0,1.0);',
+    'float t01z=clamp((p.z+H)/(2.0*H),0.0,1.0);',
+    'float gxF=mix('+gxLoS+','+gxHiS+',t01x);',
+    'float gyF=mix('+gyLoS+','+gyHiS+',t01y);',
+    'float gzF=mix('+gzLoS+','+gzHiS+',t01z);',
+  ]:[];
+
+  let baseFunc, implicitExpr;
+
+  if(piMode){
+    // Phase shift in radians — period-invariant
+    const dxS=toFloat(piShiftRad('x'));
+    const dyS=toFloat(piShiftRad('y'));
+    const dzS=toFloat(piShiftRad('z'));
+    const pipeRS=toFloat(pipeRVal);
+
+    // Each helper gets its own scope — no variable redeclaration possible
+    // evalA evaluates φ at p, evalB evaluates φ at p+δ
+    function makeEvalFn(fnName, ox, oy, oz) {
+      const gxExpr = 'p.x+'+ox+(gradOn?'*gxF':'');
+      const gyExpr = 'p.y+'+oy+(gradOn?'*gyF':'');
+      const gzExpr = 'p.z+'+oz+(gradOn?'*gzF':'');
+      const body = rawPresetFn
+        ? 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; return '+rawPresetFn.glsl+';'
+        : 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; float v=0.0;'
+          + active.map(t=>{
+              const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');
+              return' v+='+toFloat(t.coef)+'*'+parts.join('*')+';';
+            }).join('')
+          + ' return v;';
+      const gradBlock = gradOn ? gradLines.join(' ')+' ' : '';
+      return `float ${fnName}(vec3 p,float H){ ${gradBlock}${body} }`;
+    }
+
+    const evalA = makeEvalFn('evalA','0.0','0.0','0.0');
+    const evalB = makeEvalFn('evalB', dxS, dyS, dzS);
+
+    baseFunc = evalA+'\n'+evalB+`
+float base(vec3 p,float H){ return evalA(p,H); }
+float piField(vec3 p,float H){ return max(abs(evalA(p,H)),abs(evalB(p,H))); }`;
+    implicitExpr='piField(p,H)-'+pipeRS;
+  } else {
+    const lines=rawPresetFn
+      ?'  v='+rawPresetFn.glsl+';'
+      :active.map(t=>{const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');return'  v+='+toFloat(t.coef)+'*'+parts.join('*')+';';}).join('\n');
+    const offS=toFloat(offsetVal);
+    const wallS=toFloat(wallVal);
+    const implicit2=shellMode?'abs(v-('+offS+'))-'+wallS:'v-('+offS+')';
+    baseFunc=`float base(vec3 p,float H){float v=0.0;\n${gradLines.join('\n')}\nfloat gx=p.x${gradOn?'*gxF':''},gy=p.y${gradOn?'*gyF':''},gz=p.z${gradOn?'*gzF':''};${lines}\nreturn v;}`;
+    implicitExpr=shellMode?'abs(base(p,H)-('+offS+'))-'+wallS:'base(p,H)-('+offS+')';
+  }
+
+  return[
+'precision highp float;',
+'uniform vec2 res;uniform mat3 rot;uniform float zoom;',
+baseFunc,
+'float implicit(vec3 p,float H){return '+implicitExpr+';}',
+// Box SDF for clipping — intersection with implicit gives solid clipped to cube
+'float boxSDF(vec3 p,float H){vec3 d=abs(p)-H;return length(max(d,0.0))+min(max(d.x,max(d.y,d.z)),0.0);}',
+'float sceneSDF(vec3 p,float H){return max(implicit(p,H),boxSDF(p,H));}',
+// Normal FD step scales with featureSize so it stays sharp across all modes and zoom levels
+'vec3 nrm(vec3 p,float H,float e){return normalize(vec3(sceneSDF(p+vec3(e,0,0),H)-sceneSDF(p-vec3(e,0,0),H),sceneSDF(p+vec3(0,e,0),H)-sceneSDF(p-vec3(0,e,0),H),sceneSDF(p+vec3(0,0,e),H)-sceneSDF(p-vec3(0,0,e),H)));}',
+'vec3 palette(float t){vec3 a=vec3(0.55,0.57,0.42),b=vec3(0.43,0.42,0.30),c=vec3(1.0,1.0,1.0),d=vec3(0.02,0.0,0.05);return clamp(a+b*cos(6.28318*(c*t+d)),0.0,1.0);}',
+'void main(){',
+'  vec2 uv=(gl_FragCoord.xy-res*0.5)/min(res.x,res.y);',
+'  vec3 ro=rot*vec3(0.0,0.0,zoom);',
+'  vec3 rd=normalize(rot*vec3(uv.x,uv.y,-1.6));',
+'  float H='+H+';',
+'  float r=clamp(length(uv)*1.1,0.0,1.0);',
+'  vec3 bgCentre=vec3(0.07,0.07,0.07);',
+'  vec3 bgEdge=vec3(0.03,0.03,0.03);',
+'  vec3 bgCol=mix(bgCentre,bgEdge,r*r);',
+'  vec4 bg=vec4(bgCol,1.0);',
+// Feature size drives thresh, maxStep, and normal e — different per mode
+'  float featureSize='+toFloat(piMode ? pipeRVal : shellMode ? wallVal : Math.PI*cellMult*0.25)+';',
+'  float camScale=clamp(zoom/16.0,0.15,1.0);',
+'  float thresh=featureSize*0.008*camScale;',
+'  float maxStep=featureSize*0.25*camScale;',
+'  float nrmE=featureSize*0.06*camScale;',
+// SDF marcher — starts at box entry, exits at box exit
+'  vec3 iv=vec3(1.0)/rd;',
+'  vec3 tb=(-vec3(H,H,H)-ro)*iv,tt=(vec3(H,H,H)-ro)*iv;',
+'  vec3 tmi=min(tb,tt),tma=max(tb,tt);',
+'  float tEn=max(max(tmi.x,tmi.y),tmi.z);',
+'  float tEx=min(min(tma.x,tma.y),tma.z);',
+'  if(tEn>tEx||tEx<0.0){gl_FragColor=bg;return;}',
+'  float t=max(tEn,0.001);bool hit=false;',
+'  for(int i=0;i<512;i++){',
+'    vec3 p=ro+rd*t;float d=sceneSDF(p,H);',
+'    if(d<thresh){hit=true;break;}',
+'    if(t>tEx+0.01)break;',
+'    t+=clamp(d*0.85,thresh*0.5,maxStep);',
+'  }',
+'  if(!hit){',
+'    if(tEn>=0.0){',
+'      vec3 pc=ro+rd*tEn,ep=abs(pc)/H;',
+'      vec2 fp;if(ep.x>ep.y&&ep.x>ep.z)fp=ep.yz;else if(ep.y>ep.z)fp=ep.xz;else fp=ep.xy;',
+'      float ed=min(1.0-fp.x,1.0-fp.y);',
+'      if(ed<0.04){float w=smoothstep(0.04,0.005,ed);gl_FragColor=mix(bg,vec4(0.78,0.96,0.26,1.0),w*0.4);return;}',
+'    }',
+'    gl_FragColor=bg;return;',
+'  }',
+'  vec3 pos=ro+rd*t,n=nrm(pos,H,nrmE);',
+'  if(dot(n,-rd)<0.0)n=-n;',
+'  float dx=dot(n,vec3(1.0,0.0,0.0)),dy=dot(n,vec3(0.0,1.0,0.0)),dz=dot(n,vec3(0.0,0.0,1.0));',
+'  float hue=dy*dy*0.33+dz*dz*0.67;',
+'  vec3 iridBase=palette(hue);',
+'  vec3 iridShift=palette(hue+0.5);',
+'  vec3 l1=normalize(vec3(1.0,1.8,2.0)),l2=normalize(vec3(-0.8,-0.3,0.6));',
+'  float l3fill=max(dot(n,normalize(vec3(-0.5,-1.0,-1.5))),0.0)*0.3;',
+'  float diff=0.35+max(dot(n,l1),0.0)*0.7+max(dot(n,l2),0.0)*0.25+l3fill;',
+'  float spec1=pow(max(dot(reflect(-l1,n),-rd),0.0),120.0)*0.7;',
+'  float spec2=pow(max(dot(reflect(-l1,n),-rd),0.0),20.0)*0.2;',
+'  float rim=pow(1.0-max(dot(n,-rd),0.0),2.5)*0.8;',
+'  vec3 green=vec3(0.784,0.961,0.259);',
+'  vec3 col=iridBase*diff+vec3(1.0,1.0,1.0)*spec1+green*spec2*0.6+green*rim*0.45;',
+'  col=mix(bgCol,col,exp(-t*0.010));',
+'  gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);',
+'}'
+  ].join('\n');
+}
+
+let prog=null,uRes,uRot,uZoom,quadBuf=null;
+function mkShader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(s));return s;}
+function rebuildShader(){
+  const p=gl.createProgram();
+  gl.attachShader(p,mkShader(gl.VERTEX_SHADER,VERT));
+  gl.attachShader(p,mkShader(gl.FRAGMENT_SHADER,buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult)));
+  gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS)){console.error(gl.getProgramInfoLog(p));return;}
+  if(prog)gl.deleteProgram(prog);
+  prog=p;gl.useProgram(prog);
+  if(!quadBuf){quadBuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,quadBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);}
+  else gl.bindBuffer(gl.ARRAY_BUFFER,quadBuf);
+  const loc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  uRes=gl.getUniformLocation(prog,'res');uRot=gl.getUniformLocation(prog,'rot');uZoom=gl.getUniformLocation(prog,'zoom');
+}
+
+let rotMat=[1,0,0,0,1,0,0,0,1];
+function mat3Mul(A,B){const r=new Array(9);for(let c=0;c<3;c++)for(let row=0;row<3;row++)r[c*3+row]=A[0*3+row]*B[c*3+0]+A[1*3+row]*B[c*3+1]+A[2*3+row]*B[c*3+2];return r;}
+function rotAxisAngle(ax,ay,az,angle){
+  const c=Math.cos(angle),s=Math.sin(angle),t2=1-c;
+  const l=Math.sqrt(ax*ax+ay*ay+az*az)||1;ax/=l;ay/=l;az/=l;
+  return[t2*ax*ax+c,t2*ax*ay+s*az,t2*ax*az-s*ay,t2*ax*ay-s*az,t2*ay*ay+c,t2*ay*az+s*ax,t2*ax*az+s*ay,t2*ay*az-s*ax,t2*az*az+c];
+}
+function applyDelta(dx,dy){
+  if(Math.abs(dx)>0.001)rotMat=mat3Mul(rotAxisAngle(0,1,0,dx*0.007),rotMat);
+  if(Math.abs(dy)>0.001){
+    const rx=rotMat[0],ry=rotMat[1],rz=rotMat[2];
+    rotMat=mat3Mul(rotAxisAngle(rx,ry,rz,-dy*0.007),rotMat);
+  }
+}
+function orthonormalize(m){
+  let x=[m[0],m[1],m[2]],y=[m[3],m[4],m[5]],z=[m[6],m[7],m[8]];
+  const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  const scl=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
+  const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+  const nrm=a=>{const l=Math.sqrt(dot(a,a))||1;return[a[0]/l,a[1]/l,a[2]/l];};
+  x=nrm(x);y=nrm(sub(y,scl(x,dot(y,x))));
+  z=nrm(sub(sub(z,scl(x,dot(z,x))),scl(y,dot(z,y))));
+  return[x[0],x[1],x[2],y[0],y[1],y[2],z[0],z[1],z[2]];
+}
+rotMat=mat3Mul(rotAxisAngle(0,1,0,0.7),rotAxisAngle(1,0,0,0.5));
+
+let drag=false,lx=0,ly=0,camZoom=16,autoRot=true;
+canvas.addEventListener('mousedown',e=>{drag=true;lx=e.clientX;ly=e.clientY;autoRot=false;});
+canvas.addEventListener('touchstart',e=>{drag=true;lx=e.touches[0].clientX;ly=e.touches[0].clientY;autoRot=false;e.preventDefault();},{passive:false});
+window.addEventListener('mouseup',()=>drag=false);window.addEventListener('touchend',()=>drag=false);
+window.addEventListener('mousemove',e=>{if(!drag)return;applyDelta(e.clientX-lx,e.clientY-ly);lx=e.clientX;ly=e.clientY;});
+window.addEventListener('touchmove',e=>{if(!drag)return;applyDelta(e.touches[0].clientX-lx,e.touches[0].clientY-ly);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();},{passive:false});
+canvas.addEventListener('wheel',e=>{camZoom=Math.max(6,Math.min(30,camZoom+e.deltaY*0.02));e.preventDefault();},{passive:false});
+
+function drawGizmo(mat){
+  const W=gizmo.width,H=gizmo.height,cx=W/2,cy=H/2,L=22;
+  gctx.clearRect(0,0,W,H);
+  gctx.fillStyle='rgba(6,8,15,0.78)';gctx.beginPath();gctx.arc(cx,cy,W/2-1,0,2*Math.PI);gctx.fill();
+  gctx.strokeStyle='rgba(80,120,20,0.5)';gctx.lineWidth=0.5;gctx.beginPath();gctx.arc(cx,cy,W/2-1,0,2*Math.PI);gctx.stroke();
+  function tv(vx,vy,vz){return[mat[0]*vx+mat[3]*vy+mat[6]*vz,mat[1]*vx+mat[4]*vy+mat[7]*vz,mat[2]*vx+mat[5]*vy+mat[8]*vz];}
+  const axes=[{v:[1,0,0],c:'#22d3ee',l:'X'},{v:[0,1,0],c:'#e879f9',l:'Y'},{v:[0,0,-1],c:'#facc15',l:'Z'}];
+  const proj=axes.map(a=>{const r=tv(...a.v);return{sx:cx+r[0]*L,sy:cy-r[1]*L,depth:r[2],c:a.c,l:a.l,neg:false};});
+  const neg=axes.map(a=>{const r=tv(-a.v[0],-a.v[1],-a.v[2]);return{sx:cx+r[0]*L,sy:cy-r[1]*L,depth:r[2],c:a.c,l:'',neg:true};});
+  [...neg,...proj].sort((a,b)=>a.depth-b.depth).forEach(ax=>{
+    gctx.strokeStyle=ax.neg?ax.c+'33':ax.c+'cc';gctx.lineWidth=ax.neg?0.8:2;
+    gctx.beginPath();gctx.moveTo(cx,cy);gctx.lineTo(ax.sx,ax.sy);gctx.stroke();
+    if(!ax.neg){
+      const dx=ax.sx-cx,dy=ax.sy-cy,len=Math.sqrt(dx*dx+dy*dy)||1,ux=dx/len,uy=dy/len;
+      gctx.fillStyle=ax.c;gctx.beginPath();gctx.moveTo(ax.sx,ax.sy);
+      gctx.lineTo(ax.sx-ux*6+uy*3,ax.sy-uy*6-ux*3);gctx.lineTo(ax.sx-ux*6-uy*3,ax.sy-uy*6+ux*3);
+      gctx.closePath();gctx.fill();
+      gctx.fillStyle=ax.c;gctx.font='bold 10px system-ui';gctx.textAlign='center';gctx.textBaseline='middle';
+      gctx.fillText(ax.l,ax.sx+ux*9,ax.sy+uy*9);
+    }
+  });
+  gctx.fillStyle='rgba(200,245,66,0.75)';gctx.beginPath();gctx.arc(cx,cy,2.5,0,2*Math.PI);gctx.fill();
+}
+
+// ── Voxelizer / homogenization — isSolid updated for PI-TPMS ─────────
+function compileSurf(terms){
+  if(rawPresetFn)return rawPresetFn.fn;
+  const active=terms.filter(t=>t.on&&t.factors&&t.factors.length);
+  if(!active.length)return()=>0;
+  const body=active.map(t=>{const parts=t.factors.map(f=>'('+jsTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');return'v+='+toFloat(t.coef)+'*'+parts.join('*')+';';}).join('');
+  return new Function('x','y','z','var v=0;'+body+'return v;');
+}
+
+function isSolid(fn,x,y,z){
+  if(piMode){
+    // PI-TPMS: solid where max(|φ(p)|, |φ(p+δ)|) < pipeR
+    // δ must be in radians — same as shader (fraction × 2π), NOT fraction of domain size
+    const dx=piShiftRad('x'), dy=piShiftRad('y'), dz=piShiftRad('z');
+    const vA=fn(x,y,z);
+    const vB=fn(x+dx,y+dy,z+dz);
+    return Math.max(Math.abs(vA),Math.abs(vB))<pipeRVal;
+  }
+  const v=fn(x,y,z);
+  return shellMode?(Math.abs(v-offsetVal)<wallVal):(v>offsetVal);
+}
+
+function computeMIL(vox,N){
+  const N2=N*N;
+  function mil(ax){let t=0;
+    for(let a=0;a<N;a++)for(let b=0;b<N;b++){let p=255;
+      for(let c=0;c<N;c++){const i=ax===0?c*N2+a*N+b:ax===1?a*N2+c*N+b:a*N2+b*N+c;
+        const v=vox[i];if(p!==255&&v!==p)t++;p=v;}}
+    return t===0?N*1e6:(N*N*N)/(t*0.5);}
+  return{milX:mil(0),milY:mil(1),milZ:mil(2)};
+}
+
+function hsPlus(Es,nu,rho){
+  const K1=Es/(3*(1-2*nu)),G1=Es/(2*(1+nu));
+  const Kp=K1*rho/(1+(1-rho)*3*K1/(3*K1+4*G1));
+  const Gp=G1*rho/(1+(1-rho)*6*(K1+2*G1)/(5*G1*(3*K1+4*G1)));
+  return{Ehsp:9*Kp*Gp/(3*Kp+Gp),Gp};
+}
+
+function surfaceAreaDensity(surfFn,offset,N){
+  const Nhi=Math.min(N*3,96),H=Math.PI,step=2*H/Nhi,N2hi=Nhi*Nhi,N3hi=Nhi*Nhi*Nhi;
+  const vhi=new Uint8Array(N3hi);
+  for(let ix=0;ix<Nhi;ix++){const x=-H+(ix+.5)*step;
+    for(let iy=0;iy<Nhi;iy++){const y=-H+(iy+.5)*step;
+      for(let iz=0;iz<Nhi;iz++){const z=-H+(iz+.5)*step;
+        if(surfFn(x,y,z)>offset)vhi[ix*N2hi+iy*Nhi+iz]=1;}}}
+  let ifaces=0;
+  for(let ix=0;ix<Nhi;ix++)for(let iy=0;iy<Nhi;iy++)for(let iz=0;iz<Nhi;iz++){
+    const v=vhi[ix*N2hi+iy*Nhi+iz];
+    if(v!==vhi[((ix+1)%Nhi)*N2hi+iy*Nhi+iz])ifaces++;
+    if(v!==vhi[ix*N2hi+((iy+1)%Nhi)*Nhi+iz])ifaces++;
+    if(v!==vhi[ix*N2hi+iy*Nhi+(iz+1)%Nhi])ifaces++;
+  }
+  return(ifaces/(Nhi*Nhi*2*Math.PI))*(Math.PI/2);
+}
+
+function runHomogenization(N,Es,nu){
+  const fn=compileSurf(terms);
+  const H=Math.PI*cellMult,step=2*H/N,N2=N*N,N3=N*N*N;
+  const vox=new Uint8Array(N3);let nSolid=0;
+  for(let ix=0;ix<N;ix++){const x=-H+(ix+.5)*step;
+    for(let iy=0;iy<N;iy++){const y=-H+(iy+.5)*step;
+      for(let iz=0;iz<N;iz++){const z=-H+(iz+.5)*step;
+        if(isSolid(fn,x,y,z)){vox[ix*N2+iy*N+iz]=1;nSolid++;}}}}
+  const rho=nSolid/N3;
+  const{milX,milY,milZ}=computeMIL(vox,N);
+  const hx=1/(milX*milX),hy=1/(milY*milY),hz=1/(milZ*milZ),hmean=(hx+hy+hz)/3;
+  const wx=hx/hmean,wy=hy/hmean,wz=hz/hmean;
+  const{Ehsp,Gp}=hsPlus(Es,nu,rho);
+  const Ex=Ehsp*wx,Ey=Ehsp*wy,Ez=Ehsp*wz;
+  const Gxy=Gp*Math.sqrt(wx*wy);
+  const nuEff=nu*(1-rho);
+  const aniso=Math.max(Ex,Ey,Ez)/Math.max(Math.min(Ex,Ey,Ez),1e-9);
+  const savFn=(x,y,z)=>fn(x,y,z);
+  const savRaw=piMode?0:surfaceAreaDensity(savFn,offsetVal,N); // SA/V not meaningful for pipes
+  const savNorm=Math.min(savRaw/2.5,1.0);
+  return{rho,Ex,Ey,Ez,Gxy,nuEff,aniso,Ehsp,savNorm};
+}
+
+// Stiffness ellipsoid (unchanged from original)
+let sgl=null,sprog=null,squadBuf=null,suRes,suRot,suZoom;
+let sRotMat=[1,0,0,0,1,0,0,0,1];
+let sInitialized=false;
+const SVERT='attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
+
+function buildStiffFrag(Ex,Ey,Ez,Gxy,nu){
+  const E=(Ex+Ey+Ez)/3;
+  const S11=1/E,S12=-nu/E,S44=1/Gxy;
+  const d=(S11-S12)*(S11+2*S12);
+  const C11=(S11+S12)/d,C12=-S12/d,C44=1/S44;
+  const A=2*C44/(C11-C12);
+  const Gamma=2*S11-2*S12-S44;
+  const E100=1/S11;
+  const E111=Math.abs(S11-Gamma/3)>1e-9?1/(S11-Gamma/3):E100;
+  const Emax=Math.max(E100,E111,Ex,Ey,Ez)*1.08;
+  document.getElementById('zener-val').textContent=A.toFixed(3);
+  const Aclamp=Math.min(Math.max(A,0.3),2.5);
+  const pct=((Aclamp-0.3)/(2.5-0.3)*100).toFixed(1);
+  document.getElementById('zener-marker').style.left=pct+'%';
+  const Acol=A<0.8?'#e879f9':A<1.2?'#888':A<2.0?'#22d3ee':'#aaff00';
+  document.getElementById('zener-val').style.color=Acol;
+  const Albl=A<0.7?'strongly axial':A<0.9?'axial dominant':A<1.1?'near-isotropic':A<1.5?'diagonal dominant':'strongly diagonal';
+  document.getElementById('zener-label').textContent=Albl;
+  document.getElementById('zener-label').style.color=Acol;
+  function f(v){const s=v.toFixed(8);return s.includes('.')?s:s+'.0';}
+  return`precision highp float;
+uniform vec2 res;uniform mat3 rot;uniform float zoom;
+float S11=${f(S11)};float Gamma=${f(Gamma)};float Emax=${f(Emax)};
+float Edir(vec3 n){float w=n.x*n.x*n.y*n.y+n.y*n.y*n.z*n.z+n.z*n.z*n.x*n.x;return 1.0/max(abs(S11-(Gamma*0.5)*w),1e-6);}
+float implicit(vec3 P){float r=length(P);if(r<0.001)return -1.0;return r-Edir(P/r)/Emax;}
+vec3 nrm(vec3 P){float e=0.004;return normalize(vec3(implicit(P+vec3(e,0.0,0.0))-implicit(P-vec3(e,0.0,0.0)),implicit(P+vec3(0.0,e,0.0))-implicit(P-vec3(0.0,e,0.0)),implicit(P+vec3(0.0,0.0,e))-implicit(P-vec3(0.0,0.0,e))));}
+vec3 palette(float t){vec3 a=vec3(0.5,0.5,0.5),b=vec3(0.5,0.5,0.5),c=vec3(1.0,1.0,1.0),d=vec3(0.0,0.33,0.67);return a+b*cos(6.28318*(c*t+d));}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-res*0.5)/min(res.x,res.y);
+  vec3 ro=rot*vec3(0.0,0.0,zoom);vec3 rd=normalize(rot*vec3(uv.x,uv.y,-1.6));
+  float r=clamp(length(uv)*1.1,0.0,1.0);
+  vec3 bgCol=mix(vec3(0.07,0.09,0.22),vec3(0.01,0.01,0.04),r*r);vec4 bg=vec4(bgCol,1.0);
+  float bR=1.15;float b2=dot(ro,rd),c2=dot(ro,ro)-bR*bR;float disc=b2*b2-c2;
+  if(disc<0.0){gl_FragColor=bg;return;}
+  float sq=sqrt(disc);float tEn=max(-b2-sq,0.0),tEx=-b2+sq;
+  if(tEx<0.0){gl_FragColor=bg;return;}
+  float t=tEn,hit=-1.0,ss=0.018;float prev=implicit(ro+rd*t);
+  for(int i=0;i<280;i++){t+=ss;if(t>tEx)break;float g=implicit(ro+rd*t);if(prev*g<0.0){hit=t-ss*(g/(g-prev));break;}prev=g;}
+  if(hit<0.0){gl_FragColor=bg;return;}
+  vec3 pos=ro+rd*hit;vec3 n=nrm(pos);if(dot(n,-rd)<0.0)n=-n;
+  float Eval=Edir(normalize(pos));float Enorm=clamp(Eval/Emax,0.0,1.0);
+  float dx=dot(n,vec3(1.0,0.0,0.0)),dy=dot(n,vec3(0.0,1.0,0.0)),dz=dot(n,vec3(0.0,0.0,1.0));
+  float hue=dy*dy*0.33+dz*dz*0.67+Enorm*0.15;
+  vec3 iridBase=palette(hue);vec3 iridShift=palette(hue+0.5);
+  vec3 l1=normalize(vec3(1.0,1.8,2.0)),l2=normalize(vec3(-0.8,-0.3,0.6));
+  float l3=max(dot(n,normalize(vec3(-0.5,-1.0,-1.5))),0.0)*0.3;
+  float diff=0.35+max(dot(n,l1),0.0)*0.7+max(dot(n,l2),0.0)*0.25+l3;
+  float spec1=pow(max(dot(reflect(-l1,n),-rd),0.0),120.0)*1.5;
+  float spec2=pow(max(dot(reflect(-l1,n),-rd),0.0),20.0)*0.4;
+  float rim=pow(1.0-max(dot(n,-rd),0.0),2.5)*0.8;float fresnel=pow(1.0-max(dot(n,-rd),0.0),3.0);
+  vec3 col=mix(iridBase,iridShift,Enorm*0.35)*diff;
+  col+=iridShift*fresnel*0.6;col+=vec3(spec1+spec2);col+=iridShift*rim*0.45;
+  col*=(0.7+Enorm*0.4);
+  gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);
+}`;}
+
+function mkSShader(type,src){
+  const s=sgl.createShader(type);sgl.shaderSource(s,src);sgl.compileShader(s);
+  if(!sgl.getShaderParameter(s,sgl.COMPILE_STATUS))console.error(sgl.getShaderInfoLog(s));
+  return s;
+}
+let sZoom=2.6;
+function initStiffnessGL(){
+  const cv=document.getElementById('ellcv');
+  const w=cv.offsetWidth||180;cv.width=w;cv.height=w;
+  sgl=cv.getContext('webgl');if(!sgl){cv.style.display='none';return false;}
+  if(!squadBuf){squadBuf=sgl.createBuffer();sgl.bindBuffer(sgl.ARRAY_BUFFER,squadBuf);sgl.bufferData(sgl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),sgl.STATIC_DRAW);}
+  sRotMat=mat3Mul(rotAxisAngle(0,1,0,0.6),rotAxisAngle(1,0,0,-0.3));
+  sInitialized=true;return true;
+}
+function rebuildStiffnessShader(Ex,Ey,Ez,Gxy,nu){
+  if(!sInitialized&&!initStiffnessGL())return;
+  const Emean=(Ex+Ey+Ez)/3;const EmaxVal=Math.max(Ex,Ey,Ez)*1.08;
+  sZoom=3.4*(EmaxVal/Emean);
+  const p=sgl.createProgram();
+  sgl.attachShader(p,mkSShader(sgl.VERTEX_SHADER,SVERT));
+  sgl.attachShader(p,mkSShader(sgl.FRAGMENT_SHADER,buildStiffFrag(Ex,Ey,Ez,Gxy,nu)));
+  sgl.linkProgram(p);
+  if(!sgl.getProgramParameter(p,sgl.LINK_STATUS)){console.error(sgl.getProgramInfoLog(p));return;}
+  if(sprog)sgl.deleteProgram(sprog);
+  sprog=p;sgl.useProgram(sprog);
+  sgl.bindBuffer(sgl.ARRAY_BUFFER,squadBuf);
+  const loc=sgl.getAttribLocation(sprog,'p');
+  sgl.enableVertexAttribArray(loc);sgl.vertexAttribPointer(loc,2,sgl.FLOAT,false,0,0);
+  suRes=sgl.getUniformLocation(sprog,'res');
+  suRot=sgl.getUniformLocation(sprog,'rot');
+  suZoom=sgl.getUniformLocation(sprog,'zoom');
+}
+function drawStiffnessSurface(){
+  if(!sprog||!suRes)return;
+  const cv=document.getElementById('ellcv');
+  sRotMat=mat3Mul(rotAxisAngle(0,1,0,0.003),sRotMat);
+  sRotMat=orthonormalize(sRotMat);
+  sgl.viewport(0,0,cv.width,cv.height);
+  sgl.uniform2f(suRes,cv.width,cv.height);
+  sgl.uniformMatrix3fv(suRot,false,new Float32Array(sRotMat));
+  sgl.uniform1f(suZoom,sZoom);
+  sgl.drawArrays(sgl.TRIANGLE_STRIP,0,4);
+}
+
+function renderBells(axes,vals,N){
+  const container=document.getElementById('bell-rows');container.innerHTML='';
+  const sigFrac=Math.sqrt(0.18*0.18+(8/N)*(8/N));
+  const W=120,Hmax=64,pad=8;
+  const maxVal=Math.max(...vals.filter(v=>v>0),0.01);
+  const row=document.createElement('div');
+  row.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:4px;align-items:end';
+  axes.forEach(({label,color},i)=>{
+    const mu=vals[i],sigma=mu*sigFrac;
+    if(mu<=0)return;
+    const H=Math.max(Math.round(Hmax*(mu/maxVal)),Math.round(Hmax*0.40));
+    const curveTop=13,curveBot=H-11,curveH=curveBot-curveTop;
+    const xMin=Math.max(0,mu-3.2*sigma),xMax=mu+3.2*sigma,range=xMax-xMin;
+    function tx(v){return pad+(v-xMin)/range*(W-2*pad);}
+    function g(x){const z=(x-mu)/sigma;return Math.exp(-0.5*z*z);}
+    const nPts=60,pts=[];
+    for(let k=0;k<=nPts;k++){const x=xMin+k/nPts*range;pts.push([tx(x),curveBot-g(x)*curveH*0.88]);}
+    const curve=pts.map((p,k)=>(k===0?'M':'L')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+    function fillBand(lo,hi){
+      const fp=[];
+      for(let k=0;k<=nPts;k++){const x=xMin+k/nPts*range;if(x<lo||x>hi)continue;fp.push([tx(x),curveBot-g(x)*curveH*0.88]);}
+      if(fp.length<2)return'';
+      return'M'+fp[0][0].toFixed(1)+' '+curveBot+' L'+fp.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+' L'+fp[fp.length-1][0].toFixed(1)+' '+curveBot+' Z';
+    }
+    function hexAlpha(hex,a){const r=parseInt(hex.slice(1,3),16),g2=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g2},${b},${a})`;}
+    const px=tx(mu).toFixed(1);
+    const cell=document.createElement('div');cell.style.cssText='background:#0e0e1a;border-radius:4px;overflow:hidden';
+    cell.innerHTML=`<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block">
+      <path d="${fillBand(mu-2*sigma,mu+2*sigma)}" fill="${hexAlpha(color,0.12)}"/>
+      <path d="${fillBand(mu-sigma,mu+sigma)}" fill="${hexAlpha(color,0.28)}"/>
+      <path d="${curve}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.9"/>
+      <line x1="${px}" y1="${curveBot}" x2="${px}" y2="${curveTop}" stroke="${color}" stroke-width="1" opacity="0.4" stroke-dasharray="2 2"/>
+      <line x1="${pad}" y1="${curveBot}" x2="${W-pad}" y2="${curveBot}" stroke="#333" stroke-width="0.5"/>
+      <text x="${W/2}" y="9" text-anchor="middle" font-size="9" font-weight="500" fill="${color}">${label}</text>
+      <text x="${px}" y="${H-3}" text-anchor="middle" font-size="8" fill="${color}" opacity="0.85">${mu.toFixed(1)}</text>
+      <text x="${W/2}" y="${H-3}" text-anchor="middle" font-size="7" fill="#444" dx="${parseInt(px)>W/2?'-18':'18'}">±${sigma.toFixed(1)}</text>
+    </svg>`;
+    row.appendChild(cell);
+  });
+  container.appendChild(row);
+}
+
+document.getElementById('runBtn').addEventListener('click',async function(){
+  this.disabled=true;this.textContent='Running...';
+  const modeLabel=piMode?'PI-TPMS r='+pipeRVal.toFixed(2):shellMode?'shell t='+wallVal.toFixed(2):'solid';
+  document.getElementById('homo-status').textContent='Voxelizing...';
+  await new Promise(r=>setTimeout(r,10));
+  const N=parseInt(document.getElementById('gridsize').value);
+  const Es=parseFloat(document.getElementById('Es').value)||100;
+  const nu=parseFloat(document.getElementById('nu').value)||0.3;
+  const res=runHomogenization(N,Es,nu);
+  document.getElementById('homo-status').textContent=N+'³ · '+modeLabel+' · ρ='+(res.rho*100).toFixed(1)+'%';
+  document.getElementById('rv').textContent=(res.rho*100).toFixed(1)+'%';
+  document.getElementById('rex').textContent=res.Ex.toFixed(1);
+  document.getElementById('rey').textContent=res.Ey.toFixed(1);
+  document.getElementById('rez').textContent=res.Ez.toFixed(1);
+  document.getElementById('rani').textContent=(()=>{
+    const E=(res.Ex+res.Ey+res.Ez)/3,nu2=res.nuEff||0.3;
+    const S11=1/E,S12=-nu2/E,d=(S11-S12)*(S11+2*S12);
+    const C11=(S11+S12)/d,C12=-S12/d,C44=res.Gxy;
+    return (2*C44/(C11-C12)).toFixed(3);
+  })();
+  document.getElementById('rgxy').textContent=res.Gxy.toFixed(1);
+  document.getElementById('rnu').textContent=res.nuEff.toFixed(3);
+  const savColor=res.savNorm<0.42?'#60a5fa':res.savNorm<0.65?'#2dd4bf':res.savNorm<0.88?'#22c55e':'#aaff00';
+  const savLabel=res.savNorm<0.42?'low':res.savNorm<0.65?'moderate':res.savNorm<0.88?'high':'very high';
+  document.getElementById('rsav').textContent=piMode?'n/a':res.savNorm.toFixed(2);
+  document.getElementById('rsav').style.color=piMode?'#555':savColor;
+  document.getElementById('sav-bar').style.width=piMode?'0%':(res.savNorm*100).toFixed(1)+'%';
+  document.getElementById('sav-bar').style.background=savColor;
+  document.getElementById('sav-note').textContent=piMode?'pipe network':savLabel;
+  document.getElementById('sav-note').style.color=piMode?'#c8ff80':savColor;
+  document.getElementById('homo-results').style.display='block';
+  await new Promise(r=>setTimeout(r,10));
+  rebuildStiffnessShader(res.Ex,res.Ey,res.Ez,res.Gxy,res.nuEff||0.3);
+  renderBells(
+    [{label:'Ex',color:'#22d3ee'},{label:'Ey',color:'#e879f9'},{label:'Ez',color:'#facc15'}],
+    [res.Ex,res.Ey,res.Ez],N
+  );
+  lastHomogResult={res,N,Es,nu};
+  document.getElementById('exportBtn').textContent='Export JSON (+ homog)';
+  document.getElementById('exportBtn').style.borderColor='#7c6ff7';
+  document.getElementById('exportBtn').style.color='#a89cf7';
+  this.disabled=false;this.textContent='Run homogenization';
+});
+
+let lastHomogResult=null;
+function onSurfaceChange(){
+  lastHomogResult=null;
+  const btn=document.getElementById('exportBtn');
+  btn.textContent='Export JSON';btn.style.borderColor='';btn.style.color='';
+}
+
+function buildExportJSON(){
+  const presetSel=document.getElementById('presetSel');
+  const currentPreset=presetSel.value;
+  const surfaceBlock=rawPresetFn
+    ?{type:'raw_preset',preset:currentPreset,label:rawPresetFn.label}
+    :{type:'terms',preset:terms.length>0?currentPreset:'custom',
+      terms:terms.map(t=>({on:t.on,coef:t.coef,factors:t.factors.map(f=>({trig:f.trig,fx:f.fx,fy:f.fy,fz:f.fz}))}))};
+  const geometryBlock={
+    offset:piMode?null:offsetVal,
+    cell_scale:cellMult,
+    mode:piMode?'pi-tpms':shellMode?'shell':'solid',
+    wall_thickness:shellMode?wallVal:null,
+    pipe_radius:piMode?pipeRVal:null,
+    phase_shift:piMode?{x:piShift.x/8,y:piShift.y/8,z:piShift.z/8}:null,
+    gradient:gradOn?{enabled:true,x:{lo:gxLo,hi:gxHi},y:{lo:gyLo,hi:gyHi},z:{lo:gzLo,hi:gzHi}}:{enabled:false}
+  };
+  let homogBlock=null;
+  if(lastHomogResult){
+    const{res,N,Es,nu}=lastHomogResult;
+    homogBlock={grid:N,E_solid_GPa:Es,poisson:nu,
+      volume_fraction:parseFloat((res.rho*100).toFixed(2)),
+      Ex_GPa:parseFloat(res.Ex.toFixed(3)),Ey_GPa:parseFloat(res.Ey.toFixed(3)),Ez_GPa:parseFloat(res.Ez.toFixed(3)),
+      Gxy_GPa:parseFloat(res.Gxy.toFixed(3)),nu_eff:parseFloat(res.nuEff.toFixed(4)),
+      anisotropy:parseFloat(res.aniso.toFixed(4)),
+      surface_complexity:piMode?null:parseFloat(res.savNorm.toFixed(3)),
+      method:'MIL-HS'};
+  }
+  const out={
+    meta:{version:'0.5.0',timestamp:new Date().toISOString(),
+      preset:rawPresetFn?rawPresetFn.label:(terms.length?currentPreset:'custom')},
+    surface:surfaceBlock,geometry:geometryBlock
+  };
+  if(homogBlock)out.homogenization=homogBlock;
+  return out;
+}
+
+document.getElementById('exportBtn').addEventListener('click',function(){
+  const data=buildExportJSON();
+  const json=JSON.stringify(data,null,2);
+  const ts=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  const preset=data.meta.preset.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'');
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='tpms_'+preset+'_'+ts+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  navigator.clipboard.writeText(json).catch(()=>{});
+  const orig=this.textContent;
+  this.textContent='Copied + downloaded ✓';this.style.borderColor='#69f0ae';this.style.color='#69f0ae';
+  setTimeout(()=>{
+    this.textContent=orig;
+    this.style.borderColor=lastHomogResult?'#7c6ff7':'';
+    this.style.color=lastHomogResult?'#a89cf7':'';
+  },1800);
+});
+
+let lastTs=0;
+function frame(ts){
+  const dt=Math.min((ts-lastTs)/1000,0.05);lastTs=ts;
+  if(autoRot)applyDelta(dt*50,0);
+  rotMat=orthonormalize(rotMat);
+  if(prog&&uRes){
+    gl.uniform2f(uRes,canvas.width,canvas.height);
+    gl.uniformMatrix3fv(uRot,false,new Float32Array(rotMat));
+    gl.uniform1f(uZoom,camZoom);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  }
+  drawGizmo(rotMat);
+  drawStiffnessSurface();
+  requestAnimationFrame(frame);
+}
+
+// Init
+syncModeUI();
+loadPreset('gyroid');
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

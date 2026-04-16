@@ -1,4 +1,4 @@
-# tpms-builder
+# f13ld.tpms
 
 **A browser-based tool for designing, visualizing, and analyzing custom Triply Periodic Minimal Surfaces (TPMS).**
 
@@ -6,13 +6,13 @@ No installation. No dependencies. Open it and go.
 
 <img width="891" height="974" alt="tpms_builder_v0 5" src="https://github.com/user-attachments/assets/3f103580-150d-4797-8e62-88e2e14817fb" />
 
-🔗 **[Launch the tool](https://mshomper.github.io/tpms-builder)**
+🔗 **[Launch the tool](https://mshomper.github.io/f13ld.tpms)**
 
 ---
 
 ## What it does
 
-TPMS Builder lets you interactively construct implicit TPMS surfaces from trigonometric terms, visualize them in real-time 3D, and run a homogenization analysis to estimate their effective elastic properties.
+f13ld.tpms lets you interactively construct implicit TPMS surfaces from trigonometric terms, visualize them in real-time 3D, and run a homogenization analysis to estimate their effective elastic properties.
 
 The surface equation takes the general form:
 
@@ -86,7 +86,7 @@ where Hᵢ are the MIL fabric tensor eigenvalues.
 
 ## Usage
 
-Open [https://mshomper.github.io/tpms-builder](https://mshomper.github.io/tpms-builder) in any modern browser with WebGL support (Chrome, Firefox, Edge, Safari).
+Open [https://mshomper.github.io/tpms-builder](https://mshomper.github.io/f13ld.tpms) in any modern browser with WebGL support (Chrome, Firefox, Edge, Safari).
 
 No login, no install, no data sent anywhere — everything runs locally in your browser.
 

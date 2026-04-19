@@ -12,6 +12,9 @@ h1{font-size:13px;font-weight:500;color:#7c8aaa;letter-spacing:0.08em;text-trans
 #cw{position:relative;background:#06080f;border-radius:12px 12px 0 0;overflow:hidden;border:0.5px solid #2a2a3a}
 canvas#c{display:block;width:100%}
 #gizmo{position:absolute;bottom:10px;right:10px;pointer-events:none}
+#qualityOverlay{position:absolute;bottom:10px;left:10px;display:flex;gap:4px;z-index:10}
+#qualityOverlay button{background:rgba(6,8,15,0.85);color:#555;border:0.5px solid #2a2a3a;border-radius:5px;font-size:10px;padding:3px 7px;cursor:pointer;transition:color 0.15s,border-color 0.15s}
+#qualityOverlay button.active{color:#c8f542;border-color:#c8f542}
 #panel{background:#111118;border:0.5px solid #2a2a3a;border-top:none;border-radius:0 0 12px 12px;padding:12px 14px}
 .termcard{background:#0e0e1a;border:0.5px solid #2a2a3a;border-radius:8px;padding:8px 10px;margin-bottom:6px}
 .termcard.off{opacity:0.35}
@@ -138,7 +141,7 @@ canvas.vcv{width:100%;display:block}
   </div>
   <div class="fh-right">
     <button class="fh-mesh-btn" onclick="openInMesh()">⬡ Open in F13LD.mesh</button>
-    <span class="fh-version">v0.5.5</span>
+    <span class="fh-version">v0.9.0</span>
     <div class="fh-icon" style="background:#E1F5EE">
       <svg width="18" height="18" viewBox="0 0 40 40">
         <path d="M0 10 Q5 2 10 10 Q15 18 20 10 Q25 2 30 10 Q35 18 40 10" stroke="#085041" stroke-width="1.9" fill="none" stroke-linecap="round"/>
@@ -151,6 +154,11 @@ canvas.vcv{width:100%;display:block}
   <div id="cw">
     <canvas id="c" height="420"></canvas>
     <canvas id="gizmo" width="72" height="72"></canvas>
+    <div id="qualityOverlay">
+      <button id="btnQLow" class="active" onclick="onQualityChange('low')">Low</button>
+      <button id="btnQMed" onclick="onQualityChange('medium')">Med</button>
+      <button id="btnQHigh" onclick="onQualityChange('high')">High</button>
+    </div>
   </div>
   <div id="panel">
     <div id="eqbar-wrap">
@@ -336,12 +344,28 @@ canvas.vcv{width:100%;display:block}
 
 <script>
 const canvas=document.getElementById('c');
-const gl=canvas.getContext('webgl');
+const gl=canvas.getContext('webgl2')||canvas.getContext('webgl');
 if(!gl)canvas.parentElement.innerHTML='<p style="color:#888;padding:40px;text-align:center">WebGL unavailable</p>';
+const isWebGL2=gl instanceof WebGL2RenderingContext;
+let currentQuality='low';
+function onQualityChange(q){
+  currentQuality=q;
+  document.getElementById('btnQLow').classList.toggle('active',q==='low');
+  document.getElementById('btnQMed').classList.toggle('active',q==='medium');
+  document.getElementById('btnQHigh').classList.toggle('active',q==='high');
+  rebuildShader();
+}
 const gizmo=document.getElementById('gizmo');
 const gctx=gizmo.getContext('2d');
 
-function resize(){const w=canvas.parentElement.clientWidth;canvas.width=w;canvas.height=420;if(gl)gl.viewport(0,0,w,420);}
+function resize(){
+  const cssW=canvas.parentElement.clientWidth;
+  const dpr=Math.min(window.devicePixelRatio||1,1.5);
+  const cssH=Math.min(cssW,420);
+  const w=Math.round(cssW*dpr),h=Math.round(cssH*dpr);
+  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
+  canvas.style.height=cssH+'px';
+}
 resize();window.addEventListener('resize',resize);
 
 function toFloat(v){const s=parseFloat(parseFloat(v).toFixed(6)).toString();return s.includes('.')?s:s+'.0';}
@@ -569,7 +593,7 @@ document.getElementById('gradToggle').addEventListener('click',function(){
 });
 
 // ── buildFrag — core shader generator with PI-TPMS branch ─────────────
-const VERT='attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
+const VERT='#version 300 es\nin vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
 function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
   const active=terms.filter(t=>t.on&&t.factors&&t.factors.length);
   const H=toFloat(Math.PI*cellMult);
@@ -652,7 +676,9 @@ float piField(vec3 p,float H){ return max(abs(evalA(p,H)),abs(evalB(p,H))); }`;
   }
 
   return[
+'#version 300 es',
 'precision highp float;',
+'out vec4 fragColor;',
 'uniform vec2 res;uniform mat3 rot;uniform float zoom;',
 baseFunc,
 'float implicit(vec3 p,float H){return '+implicitExpr+';}',
@@ -684,22 +710,22 @@ baseFunc,
 '  vec3 tmi=min(tb,tt),tma=max(tb,tt);',
 '  float tEn=max(max(tmi.x,tmi.y),tmi.z);',
 '  float tEx=min(min(tma.x,tma.y),tma.z);',
-'  if(tEn>tEx||tEx<0.0){gl_FragColor=bg;return;}',
+'  if(tEn>tEx||tEx<0.0){fragColor=bg;return;}',
 '  float t=max(tEn,0.001);bool hit=false;',
-'  for(int i=0;i<512;i++){',
+'  for(int i=0;i<'+(currentQuality==='high'?'384':currentQuality==='medium'?'192':'96')+';i++){',
 '    vec3 p=ro+rd*t;float d=sceneSDF(p,H);',
 '    if(d<thresh){hit=true;break;}',
 '    if(t>tEx+0.01)break;',
-'    t+=clamp(d*0.85,thresh*0.5,maxStep);',
+'    t+=clamp(d*0.9,thresh*0.5,maxStep);',
 '  }',
 '  if(!hit){',
 '    if(tEn>=0.0){',
 '      vec3 pc=ro+rd*tEn,ep=abs(pc)/H;',
 '      vec2 fp;if(ep.x>ep.y&&ep.x>ep.z)fp=ep.yz;else if(ep.y>ep.z)fp=ep.xz;else fp=ep.xy;',
 '      float ed=min(1.0-fp.x,1.0-fp.y);',
-'      if(ed<0.04){float w=smoothstep(0.04,0.005,ed);gl_FragColor=mix(bg,vec4(0.78,0.96,0.26,1.0),w*0.4);return;}',
+'      if(ed<0.04){float w=smoothstep(0.04,0.005,ed);fragColor=mix(bg,vec4(0.78,0.96,0.26,1.0),w*0.4);return;}',
 '    }',
-'    gl_FragColor=bg;return;',
+'    fragColor=bg;return;',
 '  }',
 '  vec3 pos=ro+rd*t,n=nrm(pos,H,nrmE);',
 '  if(dot(n,-rd)<0.0)n=-n;',
@@ -716,7 +742,7 @@ baseFunc,
 '  vec3 green=vec3(0.784,0.961,0.259);',
 '  vec3 col=iridBase*diff+vec3(1.0,1.0,1.0)*spec1+green*spec2*0.6+green*rim*0.45;',
 '  col=mix(bgCol,col,exp(-t*0.010));',
-'  gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);',
+'  fragColor=vec4(clamp(col,0.0,1.0),1.0);',
 '}'
   ].join('\n');
 }
@@ -878,7 +904,7 @@ function runHomogenization(N,Es,nu){
 let sgl=null,sprog=null,squadBuf=null,suRes,suRot,suZoom;
 let sRotMat=[1,0,0,0,1,0,0,0,1];
 let sInitialized=false;
-const SVERT='attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
+const SVERT='#version 300 es\nin vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
 
 function buildStiffFrag(Ex,Ey,Ez,Gxy,nu){
   const E=(Ex+Ey+Ez)/3;
@@ -900,7 +926,9 @@ function buildStiffFrag(Ex,Ey,Ez,Gxy,nu){
   document.getElementById('zener-label').textContent=Albl;
   document.getElementById('zener-label').style.color=Acol;
   function f(v){const s=v.toFixed(8);return s.includes('.')?s:s+'.0';}
-  return`precision highp float;
+  return`#version 300 es
+precision highp float;
+out vec4 fragColor;
 uniform vec2 res;uniform mat3 rot;uniform float zoom;
 float S11=${f(S11)};float Gamma=${f(Gamma)};float Emax=${f(Emax)};
 float Edir(vec3 n){float w=n.x*n.x*n.y*n.y+n.y*n.y*n.z*n.z+n.z*n.z*n.x*n.x;return 1.0/max(abs(S11-(Gamma*0.5)*w),1e-6);}
@@ -913,12 +941,12 @@ void main(){
   float r=clamp(length(uv)*1.1,0.0,1.0);
   vec3 bgCol=mix(vec3(0.07,0.09,0.22),vec3(0.01,0.01,0.04),r*r);vec4 bg=vec4(bgCol,1.0);
   float bR=1.15;float b2=dot(ro,rd),c2=dot(ro,ro)-bR*bR;float disc=b2*b2-c2;
-  if(disc<0.0){gl_FragColor=bg;return;}
+  if(disc<0.0){fragColor=bg;return;}
   float sq=sqrt(disc);float tEn=max(-b2-sq,0.0),tEx=-b2+sq;
-  if(tEx<0.0){gl_FragColor=bg;return;}
+  if(tEx<0.0){fragColor=bg;return;}
   float t=tEn,hit=-1.0,ss=0.018;float prev=implicit(ro+rd*t);
   for(int i=0;i<280;i++){t+=ss;if(t>tEx)break;float g=implicit(ro+rd*t);if(prev*g<0.0){hit=t-ss*(g/(g-prev));break;}prev=g;}
-  if(hit<0.0){gl_FragColor=bg;return;}
+  if(hit<0.0){fragColor=bg;return;}
   vec3 pos=ro+rd*hit;vec3 n=nrm(pos);if(dot(n,-rd)<0.0)n=-n;
   float Eval=Edir(normalize(pos));float Enorm=clamp(Eval/Emax,0.0,1.0);
   float dx=dot(n,vec3(1.0,0.0,0.0)),dy=dot(n,vec3(0.0,1.0,0.0)),dz=dot(n,vec3(0.0,0.0,1.0));
@@ -933,8 +961,9 @@ void main(){
   vec3 col=mix(iridBase,iridShift,Enorm*0.35)*diff;
   col+=iridShift*fresnel*0.6;col+=vec3(spec1+spec2);col+=iridShift*rim*0.45;
   col*=(0.7+Enorm*0.4);
-  gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);
-}`;}
+  fragColor=vec4(clamp(col,0.0,1.0),1.0);
+}
+`;}
 
 function mkSShader(type,src){
   const s=sgl.createShader(type);sgl.shaderSource(s,src);sgl.compileShader(s);
@@ -945,7 +974,7 @@ let sZoom=2.6;
 function initStiffnessGL(){
   const cv=document.getElementById('ellcv');
   const w=cv.offsetWidth||180;cv.width=w;cv.height=w;
-  sgl=cv.getContext('webgl');if(!sgl){cv.style.display='none';return false;}
+  sgl=cv.getContext('webgl2')||cv.getContext('webgl');if(!sgl){cv.style.display='none';return false;}
   if(!squadBuf){squadBuf=sgl.createBuffer();sgl.bindBuffer(sgl.ARRAY_BUFFER,squadBuf);sgl.bufferData(sgl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),sgl.STATIC_DRAW);}
   sRotMat=mat3Mul(rotAxisAngle(0,1,0,0.6),rotAxisAngle(1,0,0,-0.3));
   sInitialized=true;return true;
@@ -1101,7 +1130,7 @@ function buildExportJSON(){
       method:'MIL-HS'};
   }
   const out={
-    meta:{version:'0.5.0',timestamp:new Date().toISOString(),
+    meta:{version:'0.9.0',timestamp:new Date().toISOString(),
       preset:rawPresetFn?rawPresetFn.label:(terms.length?currentPreset:'custom')},
     surface:surfaceBlock,geometry:geometryBlock
   };
@@ -1141,6 +1170,7 @@ function frame(ts){
   if(autoRot)applyDelta(dt*50,0);
   rotMat=orthonormalize(rotMat);
   if(prog&&uRes){
+    gl.viewport(0,0,canvas.width,canvas.height);
     gl.uniform2f(uRes,canvas.width,canvas.height);
     gl.uniformMatrix3fv(uRot,false,new Float32Array(rotMat));
     gl.uniform1f(uZoom,camZoom);

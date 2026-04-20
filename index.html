@@ -11,7 +11,7 @@ html,body{min-height:100%;background:#06080f;color:#e0e0ff;font-family:system-ui
 h1{font-size:13px;font-weight:500;color:#7c8aaa;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px}
 #cw{position:relative;background:#06080f;border-radius:12px 12px 0 0;overflow:hidden;border:0.5px solid #2a2a3a}
 canvas#c{display:block;width:100%}
-#gizmo{position:absolute;bottom:10px;right:10px;pointer-events:none}
+#axisCanvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:12}
 #qualityOverlay{position:absolute;bottom:10px;left:10px;display:flex;gap:4px;z-index:10}
 #qualityOverlay button{background:rgba(6,8,15,0.85);color:#555;border:0.5px solid #2a2a3a;border-radius:5px;font-size:10px;padding:3px 7px;cursor:pointer;transition:color 0.15s,border-color 0.15s}
 #qualityOverlay button.active{color:#c8f542;border-color:#c8f542}
@@ -153,7 +153,7 @@ canvas.vcv{width:100%;display:block}
 </div>
   <div id="cw">
     <canvas id="c" height="420"></canvas>
-    <canvas id="gizmo" width="72" height="72"></canvas>
+    <canvas id="axisCanvas"></canvas>
     <div id="qualityOverlay">
       <button id="btnQLow" class="active" onclick="onQualityChange('low')">Low</button>
       <button id="btnQMed" onclick="onQualityChange('medium')">Med</button>
@@ -355,8 +355,6 @@ function onQualityChange(q){
   document.getElementById('btnQHigh').classList.toggle('active',q==='high');
   rebuildShader();
 }
-const gizmo=document.getElementById('gizmo');
-const gctx=gizmo.getContext('2d');
 
 function resize(){
   const cssW=canvas.parentElement.clientWidth;
@@ -771,7 +769,10 @@ function rotAxisAngle(ax,ay,az,angle){
   return[t2*ax*ax+c,t2*ax*ay+s*az,t2*ax*az-s*ay,t2*ax*ay-s*az,t2*ay*ay+c,t2*ay*az+s*ax,t2*ax*az+s*ay,t2*ay*az-s*ax,t2*az*az+c];
 }
 function applyDelta(dx,dy){
-  if(Math.abs(dx)>0.001)rotMat=mat3Mul(rotAxisAngle(0,1,0,dx*0.007),rotMat);
+  if(Math.abs(dx)>0.001){
+    const ux=rotMat[3],uy=rotMat[4],uz=rotMat[5];
+    rotMat=mat3Mul(rotAxisAngle(ux,uy,uz,-dx*0.007),rotMat);
+  }
   if(Math.abs(dy)>0.001){
     const rx=rotMat[0],ry=rotMat[1],rz=rotMat[2];
     rotMat=mat3Mul(rotAxisAngle(rx,ry,rz,-dy*0.007),rotMat);
@@ -797,28 +798,43 @@ window.addEventListener('mousemove',e=>{if(!drag)return;applyDelta(e.clientX-lx,
 window.addEventListener('touchmove',e=>{if(!drag)return;applyDelta(e.touches[0].clientX-lx,e.touches[0].clientY-ly);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();},{passive:false});
 canvas.addEventListener('wheel',e=>{camZoom=Math.max(6,Math.min(30,camZoom+e.deltaY*0.02));e.preventDefault();},{passive:false});
 
-function drawGizmo(mat){
-  const W=gizmo.width,H=gizmo.height,cx=W/2,cy=H/2,L=22;
-  gctx.clearRect(0,0,W,H);
-  gctx.fillStyle='rgba(6,8,15,0.78)';gctx.beginPath();gctx.arc(cx,cy,W/2-1,0,2*Math.PI);gctx.fill();
-  gctx.strokeStyle='rgba(80,120,20,0.5)';gctx.lineWidth=0.5;gctx.beginPath();gctx.arc(cx,cy,W/2-1,0,2*Math.PI);gctx.stroke();
-  function tv(vx,vy,vz){return[mat[0]*vx+mat[3]*vy+mat[6]*vz,mat[1]*vx+mat[4]*vy+mat[7]*vz,mat[2]*vx+mat[5]*vy+mat[8]*vz];}
-  const axes=[{v:[1,0,0],c:'#22d3ee',l:'X'},{v:[0,1,0],c:'#e879f9',l:'Y'},{v:[0,0,-1],c:'#facc15',l:'Z'}];
-  const proj=axes.map(a=>{const r=tv(...a.v);return{sx:cx+r[0]*L,sy:cy-r[1]*L,depth:r[2],c:a.c,l:a.l,neg:false};});
-  const neg=axes.map(a=>{const r=tv(-a.v[0],-a.v[1],-a.v[2]);return{sx:cx+r[0]*L,sy:cy-r[1]*L,depth:r[2],c:a.c,l:'',neg:true};});
-  [...neg,...proj].sort((a,b)=>a.depth-b.depth).forEach(ax=>{
-    gctx.strokeStyle=ax.neg?ax.c+'33':ax.c+'cc';gctx.lineWidth=ax.neg?0.8:2;
-    gctx.beginPath();gctx.moveTo(cx,cy);gctx.lineTo(ax.sx,ax.sy);gctx.stroke();
-    if(!ax.neg){
-      const dx=ax.sx-cx,dy=ax.sy-cy,len=Math.sqrt(dx*dx+dy*dy)||1,ux=dx/len,uy=dy/len;
-      gctx.fillStyle=ax.c;gctx.beginPath();gctx.moveTo(ax.sx,ax.sy);
-      gctx.lineTo(ax.sx-ux*6+uy*3,ax.sy-uy*6-ux*3);gctx.lineTo(ax.sx-ux*6-uy*3,ax.sy-uy*6+ux*3);
-      gctx.closePath();gctx.fill();
-      gctx.fillStyle=ax.c;gctx.font='bold 10px system-ui';gctx.textAlign='center';gctx.textBaseline='middle';
-      gctx.fillText(ax.l,ax.sx+ux*9,ax.sy+uy*9);
-    }
+function drawAxisGizmo(rotMat,canvasW,canvasH,camZoom){
+  var cv=document.getElementById('axisCanvas');
+  if(!cv)return;
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  cv.width=Math.round(canvasW*dpr);cv.height=Math.round(canvasH*dpr);
+  var ctx=cv.getContext('2d');
+  ctx.scale(dpr,dpr);ctx.clearRect(0,0,canvasW,canvasH);
+  var H=Math.PI;
+  var cx=rotMat[6],cy=rotMat[7],cz=rotMat[8];
+  function proj(p){
+    var tx=rotMat[0]*p[0]+rotMat[1]*p[1]+rotMat[2]*p[2];
+    var ty=rotMat[3]*p[0]+rotMat[4]*p[1]+rotMat[5]*p[2];
+    var tz=rotMat[6]*p[0]+rotMat[7]*p[1]+rotMat[8]*p[2];
+    var pcz=tz-camZoom;if(pcz>-0.1)return null;
+    var s=Math.min(canvasW,canvasH);
+    return[canvasW/2+(-1.6*tx/pcz)*s,canvasH/2-(-1.6*ty/pcz)*s];
+  }
+  var axes=[
+    {p:[0,H,-H],  color:'#22d3ee',label:'X', vis:Math.max(cy,-cz)},
+    {p:[-H,0,-H], color:'#e879f9',label:'Y', vis:Math.max(-cx,-cz)},
+    {p:[-H,H,0],  color:'#facc15',label:'Z', vis:Math.max(-cx,cy)}
+  ];
+  ctx.font='bold 13px system-ui,sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  axes.forEach(function(ax){
+    var alpha=Math.min(1,Math.max(0,ax.vis*4));
+    if(alpha<0.01)return;
+    var s=proj(ax.p);if(!s)return;
+    var m=16;
+    s[0]=Math.max(m,Math.min(canvasW-m,s[0]));
+    s[1]=Math.max(m,Math.min(canvasH-m,s[1]));
+    ctx.globalAlpha=alpha*0.7;ctx.fillStyle='rgba(0,0,0,1)';
+    ctx.fillText(ax.label,s[0]+1,s[1]+1);
+    ctx.globalAlpha=alpha;ctx.fillStyle=ax.color;
+    ctx.fillText(ax.label,s[0],s[1]);
+    ctx.globalAlpha=1;
   });
-  gctx.fillStyle='rgba(200,245,66,0.75)';gctx.beginPath();gctx.arc(cx,cy,2.5,0,2*Math.PI);gctx.fill();
 }
 
 // ── Voxelizer / homogenization — isSolid updated for PI-TPMS ─────────
@@ -887,7 +903,7 @@ function runHomogenization(N,Es,nu){
         if(isSolid(fn,x,y,z)){vox[ix*N2+iy*N+iz]=1;nSolid++;}}}}
   const rho=nSolid/N3;
   const{milX,milY,milZ}=computeMIL(vox,N);
-  const hx=1/(milX*milX),hy=1/(milY*milY),hz=1/(milZ*milZ),hmean=(hx+hy+hz)/3;
+  const hx=milX*milX,hy=milY*milY,hz=milZ*milZ,hmean=(hx+hy+hz)/3;
   const wx=hx/hmean,wy=hy/hmean,wz=hz/hmean;
   const{Ehsp,Gp}=hsPlus(Es,nu,rho);
   const Ex=Ehsp*wx,Ey=Ehsp*wy,Ez=Ehsp*wz;
@@ -1176,7 +1192,7 @@ function frame(ts){
     gl.uniform1f(uZoom,camZoom);
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
   }
-  drawGizmo(rotMat);
+  drawAxisGizmo(rotMat,canvas.clientWidth,canvas.clientHeight,camZoom);
   drawStiffnessSurface();
   requestAnimationFrame(frame);
 }

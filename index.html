@@ -266,6 +266,9 @@ canvas.vcv{width:100%;display:block}
           <option value="splitP">split-P</option>
           <option value="frd">F-RD</option>
           <option value="fks">Fischer-Koch S</option>
+          <option value="fkcy">Fischer-Koch CY</option>
+          <option value="cp">CP</option>
+          <option value="clp">CLP</option>
           <option value="gyroidHarmonic">gyroid-harmonic</option>
           <option value="primitiveC">primitive-C (G6)</option>
           <option value="octo">octo (G8)</option>
@@ -384,6 +387,13 @@ function jsTrig(t,fx,fy,fz){
 let terms=[],tid=0;
 function mkF(trig,fx,fy,fz){return{trig:trig||'sin(x)',fx:fx!=null?fx:1,fy:fy!=null?fy:1,fz:fz!=null?fz:1};}
 function mk(factors,coef){return{id:tid++,on:true,coef:coef!=null?coef:1,factors:factors.map(f=>({...f}))};}
+const _P8=Math.PI/8,_P4=Math.PI/4;
+
+// More information on TPMS nodal approximations:
+//   https://github.com/jwf23/Equation-Based-Lattice-Structure-Dataset/blob/main/Compiled%20Surface%20Based%20Lattice%20Catalog.pdf
+// CP and CLP were fit via least squares using similar methods described in:
+//   https://www.researchgate.net/publication/244133601_Nodal_surface_approximations_to_the_P_G_D_and_IWP_triply_periodic_minimal_surfaces
+
 const PRESETS={
   gyroid:[mk([mkF('sin(x)'),mkF('cos(y)')],1),mk([mkF('sin(y)'),mkF('cos(z)')],1),mk([mkF('sin(z)'),mkF('cos(x)')],1)],
   schwarzP:[mk([mkF('cos(x)')],1),mk([mkF('cos(y)')],1),mk([mkF('cos(z)')],1)],
@@ -399,6 +409,18 @@ const PRESETS={
   fks:{_fn:(x,y,z)=>Math.cos(2*x)*Math.sin(y)*Math.cos(z)+Math.cos(2*y)*Math.sin(z)*Math.cos(x)+Math.cos(2*z)*Math.sin(x)*Math.cos(y),
     _glsl:'cos(2.*gx)*sin(gy)*cos(gz)+cos(2.*gy)*sin(gz)*cos(gx)+cos(2.*gz)*sin(gx)*cos(gy)',
     _label:'Fischer-Koch S'},
+  fkcy:{_fn:(x,y,z)=>{const sx=Math.sin(x+_P8),cx=Math.cos(x+_P8),sy=Math.sin(y+_P8),sz=Math.sin(z+_P8),cz=Math.cos(z+_P8),s2x=Math.sin(2*x+_P4),c2y=Math.cos(2*y+_P4),s2z=Math.sin(2*z+_P4),sym=Math.sin(y-_P8),cym=Math.cos(y-_P8);return c2y*(sz-sx)-cz*(sx*sy+s2x)+s2z*(cx-sym)-cym*(s2x+cx*sz);},
+    _glslPre:'float P8=0.39269908,P4=0.78539816;float sx=sin(gx+P8),cx=cos(gx+P8),sy=sin(gy+P8),sz=sin(gz+P8),cz=cos(gz+P8),s2x=sin(2.0*gx+P4),c2y=cos(2.0*gy+P4),s2z=sin(2.0*gz+P4),sym=sin(gy-P8),cym=cos(gy-P8);',
+    _glsl:'c2y*(sz-sx)-cz*(sx*sy+s2x)+s2z*(cx-sym)-cym*(s2x+cx*sz)',
+    _label:'Fischer-Koch CY'},
+  cp:{_fn:(x,y,z)=>{const cx=Math.cos(x),cy=Math.cos(y),cz=Math.cos(z),c2x=Math.cos(2*x),c2y=Math.cos(2*y),c2z=Math.cos(2*z),c3x=Math.cos(3*x),c3y=Math.cos(3*y),c3z=Math.cos(3*z),cycz=cy*cz,czcx=cz*cx,cxcy=cx*cy;return -0.817546736530979*(cx+cy+cz)-0.007722757520906228*(cxcy+cycz+czcx)-0.0028179490711484293*(c2x+c2y+c2z)-0.004144466269601441*(c2x*c2y+c2y*c2z+c2z*c2x)-0.013911583680489501*(c2x*cycz+c2y*czcx+c2z*cxcy)-cx*cycz+0.0727654587353877*(c3x*cycz+c3y*czcx+c3z*cxcy)-0.0038506467331486864*c2x*c2y*c2z+0.026068345877921194*(c3x+c3y+c3z)+0.002005194611809562*(c2x*c3y+c2y*c3z+c2z*c3x);},
+    _glslPre:'float cx=cos(gx),cy=cos(gy),cz=cos(gz),c2x=cos(2.0*gx),c2y=cos(2.0*gy),c2z=cos(2.0*gz),c3x=cos(3.0*gx),c3y=cos(3.0*gy),c3z=cos(3.0*gz),cycz=cy*cz,czcx=cz*cx,cxcy=cx*cy;',
+    _glsl:'-0.8175467*(cx+cy+cz)-0.0077228*(cxcy+cycz+czcx)-0.0028179*(c2x+c2y+c2z)-0.0041445*(c2x*c2y+c2y*c2z+c2z*c2x)-0.0139116*(c2x*cycz+c2y*czcx+c2z*cxcy)-cx*cycz+0.0727655*(c3x*cycz+c3y*czcx+c3z*cxcy)-0.0038506*c2x*c2y*c2z+0.0260683*(c3x+c3y+c3z)+0.0020052*(c2x*c3y+c2y*c3z+c2z*c3x)',
+    _label:'CP'},
+  clp:{_fn:(x,y,z)=>{const cy=Math.cos(y),cz=Math.cos(z),c2x=Math.cos(2*x),c2y=Math.cos(2*y),c2z=Math.cos(2*z),s=1-2*(Math.abs(Math.floor(y)+Math.floor(z))%2);return 90*cy*cz+s*c2x*(3-10*(c2y+c2z));},
+    _glslPre:'float cy=cos(gy),cz=cos(gz),c2x=cos(2.0*gx),c2y=cos(2.0*gy),c2z=cos(2.0*gz);float s=1.0-2.0*mod(abs(floor(gy)+floor(gz)),2.0);',
+    _glsl:'90.0*cy*cz+s*c2x*(3.0-10.0*(c2y+c2z))',
+    _label:'CLP'},
   gyroidHarmonic:{_fn:(x,y,z)=>Math.sin(x)*Math.cos(y)+Math.sin(y)*Math.cos(z)+Math.sin(z)*Math.cos(x)+0.3*(Math.sin(2*x)*Math.cos(2*y)+Math.sin(2*y)*Math.cos(2*z)+Math.sin(2*z)*Math.cos(2*x)),
     _glsl:'sin(gx)*cos(gy)+sin(gy)*cos(gz)+sin(gz)*cos(gx)+0.3*(sin(2.*gx)*cos(2.*gy)+sin(2.*gy)*cos(2.*gz)+sin(2.*gz)*cos(2.*gx))',
     _label:'gyroid-harmonic'},
@@ -421,7 +443,7 @@ let rawPresetFn=null;
 function loadPreset(name){
   const p=PRESETS[name];
   if(p&&p._fn){
-    rawPresetFn={fn:p._fn,glsl:p._glsl,label:p._label};
+    rawPresetFn={fn:p._fn,glsl:p._glsl,glslPre:p._glslPre||'',label:p._label};
     terms=[];renderList();rebuildShader();
   } else {
     rawPresetFn=null;
@@ -611,7 +633,7 @@ function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
       // (gradient is a property of the spatial domain, not the surface)
     }
     if(rawPresetFn){
-      return coordLines.join('\n')+'\n  v='+rawPresetFn.glsl+';';
+      return coordLines.join('\n')+'\n  '+(rawPresetFn.glslPre||'')+'\n  v='+rawPresetFn.glsl+';';
     }
     return coordLines.join('\n')+'\n'+active.map(t=>{
       const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');
@@ -644,7 +666,7 @@ function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
       const gyExpr = 'p.y+'+oy+(gradOn?'*gyF':'');
       const gzExpr = 'p.z+'+oz+(gradOn?'*gzF':'');
       const body = rawPresetFn
-        ? 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; return '+rawPresetFn.glsl+';'
+        ? 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; '+(rawPresetFn.glslPre||'')+' return '+rawPresetFn.glsl+';'
         : 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; float v=0.0;'
           + active.map(t=>{
               const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');
@@ -664,7 +686,7 @@ float piField(vec3 p,float H){ return max(abs(evalA(p,H)),abs(evalB(p,H))); }`;
     implicitExpr='piField(p,H)-'+pipeRS;
   } else {
     const lines=rawPresetFn
-      ?'  v='+rawPresetFn.glsl+';'
+      ?'  '+(rawPresetFn.glslPre||'')+'\n  v='+rawPresetFn.glsl+';'
       :active.map(t=>{const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');return'  v+='+toFloat(t.coef)+'*'+parts.join('*')+';';}).join('\n');
     const offS=toFloat(offsetVal);
     const wallS=toFloat(wallVal);

@@ -115,7 +115,11 @@ No login, no install, no data sent anywhere — everything runs locally in your 
 
 Harrigan, T.P. & Mann, R.W. (1984). Characterization of microstructural anisotropy in orthotropic materials using a second rank tensor. *Journal of Materials Science*, 19, 761–767.
 
+Jones, A., Leary, M., Bateman, S., & Easton, M. (2023). Catalog of triply periodic minimal surfaces, equation-based lattice structures, and their homogenized property data. *Data in Brief*, 49, 109426.
+
 Schoen, A.H. (1970). *Infinite periodic minimal surfaces without self-intersections*. NASA Technical Note TN D-5541.
+
+von Schnering, H.G. & Nesper, R. (1991). Nodal surface approximations to the P, G, D and IWP triply periodic minimal surfaces. *Zeitschrift fur Physik B Condensed Matter*, 83, 407–412.
 
 ---
 

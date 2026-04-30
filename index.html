@@ -387,7 +387,7 @@ function jsTrig(t,fx,fy,fz){
 let terms=[],tid=0;
 function mkF(trig,fx,fy,fz){return{trig:trig||'sin(x)',fx:fx!=null?fx:1,fy:fy!=null?fy:1,fz:fz!=null?fz:1};}
 function mk(factors,coef){return{id:tid++,on:true,coef:coef!=null?coef:1,factors:factors.map(f=>({...f}))};}
-const _P8=Math.PI/8,_P4=Math.PI/4,_TWOPIREP=0.5/Math.PI;
+const _P8=Math.PI/8,_P4=Math.PI/4;
 
 // More information on TPMS nodal approximations:
 //   https://github.com/jwf23/Equation-Based-Lattice-Structure-Dataset/blob/main/Compiled%20Surface%20Based%20Lattice%20Catalog.pdf
@@ -417,8 +417,8 @@ const PRESETS={
     _glslPre:'float cx=cos(gx),cy=cos(gy),cz=cos(gz),c2x=cos(2.0*gx),c2y=cos(2.0*gy),c2z=cos(2.0*gz),c3x=cos(3.0*gx),c3y=cos(3.0*gy),c3z=cos(3.0*gz),cycz=cy*cz,czcx=cz*cx,cxcy=cx*cy;',
     _glsl:'-0.8175467*(cx+cy+cz)-0.0077228*(cxcy+cycz+czcx)-0.0028179*(c2x+c2y+c2z)-0.0041445*(c2x*c2y+c2y*c2z+c2z*c2x)-0.0139116*(c2x*cycz+c2y*czcx+c2z*cxcy)-cx*cycz+0.0727655*(c3x*cycz+c3y*czcx+c3z*cxcy)-0.0038506*c2x*c2y*c2z+0.0260683*(c3x+c3y+c3z)+0.0020052*(c2x*c3y+c2y*c3z+c2z*c3x)',
     _label:'CP'},
-  clp:{_fn:(x,y,z)=>{const syh=Math.sin(0.5*y),szh=Math.sin(0.5*z),cyh=Math.cos(0.5*y),czh=Math.cos(0.5*z),cx=Math.cos(x),cy=Math.cos(y),cz=Math.cos(z),s=((Math.floor(0.5+_TWOPIREP*y)+Math.floor(0.5+_TWOPIREP*z))&1)?-1:1;return 5*syh*szh + s*Math.abs(cyh*czh)*cx*(-0.15-0.5*(cy+cz));},
-    _glslPre:'float twopirep=0.15915494309189535,syh=sin(0.5*gy),szh=sin(0.5*gz),cyh=cos(0.5*gy),czh=cos(0.5*gz),cx=cos(gx),cy=cos(gy),cz=cos(gz);float s=abs(cyh*czh)*float(1-2*((int(floor(0.5+twopirep*gy))+int(floor(0.5+twopirep*gz)))&1));',
+  clp:{_fn:(x,y,z)=>{const syh=Math.sin(0.5*y),szh=Math.sin(0.5*z),cyh=Math.cos(0.5*y),czh=Math.cos(0.5*z),cx=Math.cos(x),cy=Math.cos(y),cz=Math.cos(z);return 5*syh*szh + cyh*czh*cx*(-0.15-0.5*(cy+cz));},
+    _glslPre:'float syh=sin(0.5*gy),szh=sin(0.5*gz),cyh=cos(0.5*gy),czh=cos(0.5*gz),cx=cos(gx),cy=cos(gy),cz=cos(gz);float s=(cyh*czh);',
     _glsl:'5.0*syh*szh+s*cx*(-0.15-0.5*(cy+cz))',
     _label:'CLP'},
   gyroidHarmonic:{_fn:(x,y,z)=>Math.sin(x)*Math.cos(y)+Math.sin(y)*Math.cos(z)+Math.sin(z)*Math.cos(x)+0.3*(Math.sin(2*x)*Math.cos(2*y)+Math.sin(2*y)*Math.cos(2*z)+Math.sin(2*z)*Math.cos(2*x)),

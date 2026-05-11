@@ -48,6 +48,9 @@ canvas#c{display:block;width:100%}
 .sc-group label{font-size:12px;color:#888;white-space:nowrap}
 .sc-group input[type=range]{width:88px;accent-color:#7c6ff7}
 .sc-group .sv{font-size:12px;font-weight:500;color:#e0e0ff;min-width:38px;font-variant-numeric:tabular-nums}
+.mm-hint{font-size:10px;color:#666;font-variant-numeric:tabular-nums;margin-left:2px;white-space:nowrap}
+.mm-hint.show{color:#7a8aaa}
+.cellsize-inp{width:50px;font-size:11px;padding:2px 4px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff;text-align:center}
 .mode-btn{font-size:11px;padding:3px 10px;border:0.5px solid #3a3a5a;border-radius:20px;background:transparent;color:#888;cursor:pointer}
 .mode-btn.active{background:#7c6ff7;color:#fff;border-color:#7c6ff7}
 /* PI-TPMS mode button gets distinct accent */
@@ -63,6 +66,10 @@ canvas#c{display:block;width:100%}
 .pi-snap .snap-ticks{display:flex;justify-content:space-between;width:88px}
 .pi-snap .snap-ticks span{font-size:7px;color:#3a6a3a}
 .pi-val{font-size:11px;font-weight:500;color:#c8ff80;min-width:28px;font-variant-numeric:tabular-nums}
+.pi-norm-toggle{font-size:11px;padding:3px 11px;border:0.5px solid #1a4a1a;border-radius:14px;background:transparent;color:#7aaa7a;cursor:pointer;font-family:inherit;transition:background 0.15s,color 0.15s,border-color 0.15s}
+.pi-norm-toggle:hover{color:#c8ff80;border-color:#2a6a2a}
+.pi-norm-toggle.on{background:#1a4a1a;color:#c8ff80;border-color:#c8ff80}
+.pi-norm-toggle.on:hover{background:#205820}
 .homo-controls{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:10px}
 .homo-controls label{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
 .homo-controls select,.homo-controls input[type=number]{font-size:12px;padding:2px 4px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff}
@@ -141,7 +148,7 @@ canvas.vcv{width:100%;display:block}
   </div>
   <div class="fh-right">
     <button class="fh-mesh-btn" onclick="openInMesh()">⬡ Open in F13LD.mesh</button>
-    <span class="fh-version">v0.9.0</span>
+    <span class="fh-version">v0.9.5</span>
     <div class="fh-icon" style="background:#E1F5EE">
       <svg width="18" height="18" viewBox="0 0 40 40">
         <path d="M0 10 Q5 2 10 10 Q15 18 20 10 Q25 2 30 10 Q35 18 40 10" stroke="#085041" stroke-width="1.9" fill="none" stroke-linecap="round"/>
@@ -178,27 +185,40 @@ canvas.vcv{width:100%;display:block}
         <label>cells</label>
         <input type="range" id="sCells" min="0.5" max="3" step="0.25" value="1">
         <span class="sv" id="vCells">1.00×</span>
+        <span class="mm-hint" id="vCells_mm"></span>
+      </div>
+      <div class="sc-group">
+        <label>cell size</label>
+        <input type="number" id="cellSizeMM" class="cellsize-inp" min="0" step="0.1" value="2" title="Real-world unit cell edge length in mm. Display-only — does not affect JSON export. Stored per-browser via localStorage.">
+        <span style="font-size:11px;color:#888">mm</span>
       </div>
       <div class="sc-group" id="grp-offset">
         <label>offset</label>
         <input type="range" id="sOffset" min="-2" max="2" step="0.05" value="0">
         <span class="sv" id="vOffset">0.00</span>
+        <span class="mm-hint" id="vOffset_mm"></span>
       </div>
       <div class="sc-group" id="grp-wall">
         <label>wall t</label>
         <input type="range" id="sWall" min="0.02" max="1.5" step="0.02" value="0.3">
         <span class="sv" id="vWall">0.30</span>
+        <span class="mm-hint" id="vWall_mm"></span>
+        <button class="pi-norm-toggle on" id="shellNormToggle" style="margin-left:6px" title="Divide |φ − offset| by |∇φ| so wall thickness is a perpendicular distance, giving uniform-thickness walls. Off = raw |φ − offset| level set, thickness varies with local gradient (retains original variation pattern).">normalize: on</button>
       </div>
       <div class="sc-group" id="grp-piper">
         <label>pipe r</label>
         <input type="range" id="sPipeR" min="0.02" max="0.8" step="0.01" value="0.18">
         <span class="sv" id="vPipeR">0.18</span>
+        <span class="mm-hint" id="vPipeR_mm"></span>
       </div>
     </div>
 
     <!-- PI-TPMS phase shift controls -->
     <div id="pi-controls">
-      <div class="pi-title">⬡ PI-TPMS — phase shift B (× period T)</div>
+      <div class="pi-title">⬡ PI-TPMS — phase shift δ (× period T)</div>
+      <div class="sc-group">
+        <button class="pi-norm-toggle on" id="piNormToggle" title="Use angle-corrected perpendicular distance to the intersection curve {φ=0 ∩ φ_δ=0}. Gives true cylindrical pipes with radius r in spatial units, independent of how the two surfaces meet. Off = raw max(|φ|, |φ_δ|) level set with axis-aligned, angle-skewed cross-sections (retains original variation pattern).">normalize: on</button>
+      </div>
       <div class="sc-group">
         <label class="pi-lbl">Δx/T</label>
         <div class="pi-snap">
@@ -266,9 +286,6 @@ canvas.vcv{width:100%;display:block}
           <option value="splitP">split-P</option>
           <option value="frd">F-RD</option>
           <option value="fks">Fischer-Koch S</option>
-          <option value="fkcy">Fischer-Koch CY</option>
-          <option value="cp">CP</option>
-          <option value="clp">CLP</option>
           <option value="gyroidHarmonic">gyroid-harmonic</option>
           <option value="primitiveC">primitive-C (G6)</option>
           <option value="octo">octo (G8)</option>
@@ -333,6 +350,11 @@ canvas.vcv{width:100%;display:block}
           </div>
         </div>
       </div>
+      <div id="homog-mm-row" style="display:none;margin-top:6px;padding:6px 10px;background:#0a141a;border:0.5px solid #1a3a3a;border-radius:6px;font-size:11px;color:#7a9aaa;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between">
+        <span>cell = <b id="mm-cellVol" style="color:#aac6c6">—</b></span>
+        <span>solid vol = <b id="mm-solidVol" style="color:#aac6c6">—</b></span>
+        <span id="mm-sav-wrap">SA/V = <b id="mm-savReal" style="color:#aac6c6">—</b></span>
+      </div>
       <div style="margin-top:8px">
         <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Probability distribution of true stiffness</div>
         <div style="font-size:10px;color:#444;margin-bottom:6px;line-height:1.5">Spread combines method uncertainty (~18%) and grid resolution (~8/N).</div>
@@ -387,13 +409,6 @@ function jsTrig(t,fx,fy,fz){
 let terms=[],tid=0;
 function mkF(trig,fx,fy,fz){return{trig:trig||'sin(x)',fx:fx!=null?fx:1,fy:fy!=null?fy:1,fz:fz!=null?fz:1};}
 function mk(factors,coef){return{id:tid++,on:true,coef:coef!=null?coef:1,factors:factors.map(f=>({...f}))};}
-const _P8=Math.PI/8,_P4=Math.PI/4;
-
-// More information on TPMS nodal approximations:
-//   https://github.com/jwf23/Equation-Based-Lattice-Structure-Dataset/blob/main/Compiled%20Surface%20Based%20Lattice%20Catalog.pdf
-// CP and CLP were fit via least squares using similar methods described in:
-//   https://www.researchgate.net/publication/244133601_Nodal_surface_approximations_to_the_P_G_D_and_IWP_triply_periodic_minimal_surfaces
-
 const PRESETS={
   gyroid:[mk([mkF('sin(x)'),mkF('cos(y)')],1),mk([mkF('sin(y)'),mkF('cos(z)')],1),mk([mkF('sin(z)'),mkF('cos(x)')],1)],
   schwarzP:[mk([mkF('cos(x)')],1),mk([mkF('cos(y)')],1),mk([mkF('cos(z)')],1)],
@@ -409,18 +424,6 @@ const PRESETS={
   fks:{_fn:(x,y,z)=>Math.cos(2*x)*Math.sin(y)*Math.cos(z)+Math.cos(2*y)*Math.sin(z)*Math.cos(x)+Math.cos(2*z)*Math.sin(x)*Math.cos(y),
     _glsl:'cos(2.*gx)*sin(gy)*cos(gz)+cos(2.*gy)*sin(gz)*cos(gx)+cos(2.*gz)*sin(gx)*cos(gy)',
     _label:'Fischer-Koch S'},
-  fkcy:{_fn:(x,y,z)=>{const sx=Math.sin(x+_P8),cx=Math.cos(x+_P8),sy=Math.sin(y+_P8),sz=Math.sin(z+_P8),cz=Math.cos(z+_P8),s2x=Math.sin(2*x+_P4),c2y=Math.cos(2*y+_P4),s2z=Math.sin(2*z+_P4),sym=Math.sin(y-_P8),cym=Math.cos(y-_P8);return c2y*(sz-sx)-cz*(sx*sy+s2x)+s2z*(cx-sym)-cym*(s2x+cx*sz);},
-    _glslPre:'float P8=0.39269908,P4=0.78539816;float sx=sin(gx+P8),cx=cos(gx+P8),sy=sin(gy+P8),sz=sin(gz+P8),cz=cos(gz+P8),s2x=sin(2.0*gx+P4),c2y=cos(2.0*gy+P4),s2z=sin(2.0*gz+P4),sym=sin(gy-P8),cym=cos(gy-P8);',
-    _glsl:'c2y*(sz-sx)-cz*(sx*sy+s2x)+s2z*(cx-sym)-cym*(s2x+cx*sz)',
-    _label:'Fischer-Koch CY'},
-  cp:{_fn:(x,y,z)=>{const cx=Math.cos(x),cy=Math.cos(y),cz=Math.cos(z),c2x=Math.cos(2*x),c2y=Math.cos(2*y),c2z=Math.cos(2*z),c3x=Math.cos(3*x),c3y=Math.cos(3*y),c3z=Math.cos(3*z),cycz=cy*cz,czcx=cz*cx,cxcy=cx*cy;return -0.817546736530979*(cx+cy+cz)-0.007722757520906228*(cxcy+cycz+czcx)-0.0028179490711484293*(c2x+c2y+c2z)-0.004144466269601441*(c2x*c2y+c2y*c2z+c2z*c2x)-0.013911583680489501*(c2x*cycz+c2y*czcx+c2z*cxcy)-cx*cycz+0.0727654587353877*(c3x*cycz+c3y*czcx+c3z*cxcy)-0.0038506467331486864*c2x*c2y*c2z+0.026068345877921194*(c3x+c3y+c3z)+0.002005194611809562*(c2x*c3y+c2y*c3z+c2z*c3x);},
-    _glslPre:'float cx=cos(gx),cy=cos(gy),cz=cos(gz),c2x=cos(2.0*gx),c2y=cos(2.0*gy),c2z=cos(2.0*gz),c3x=cos(3.0*gx),c3y=cos(3.0*gy),c3z=cos(3.0*gz),cycz=cy*cz,czcx=cz*cx,cxcy=cx*cy;',
-    _glsl:'-0.8175467*(cx+cy+cz)-0.0077228*(cxcy+cycz+czcx)-0.0028179*(c2x+c2y+c2z)-0.0041445*(c2x*c2y+c2y*c2z+c2z*c2x)-0.0139116*(c2x*cycz+c2y*czcx+c2z*cxcy)-cx*cycz+0.0727655*(c3x*cycz+c3y*czcx+c3z*cxcy)-0.0038506*c2x*c2y*c2z+0.0260683*(c3x+c3y+c3z)+0.0020052*(c2x*c3y+c2y*c3z+c2z*c3x)',
-    _label:'CP'},
-  clp:{_fn:(x,y,z)=>{const syh=Math.sin(0.5*y),szh=Math.sin(0.5*z),cyh=Math.cos(0.5*y),czh=Math.cos(0.5*z),cx=Math.cos(x),cy=Math.cos(y),cz=Math.cos(z);return 5*syh*szh + cyh*czh*cx*(-0.15-0.5*(cy+cz));},
-    _glslPre:'float syh=sin(0.5*gy),szh=sin(0.5*gz),cyh=cos(0.5*gy),czh=cos(0.5*gz),cx=cos(gx),cy=cos(gy),cz=cos(gz);float s=(cyh*czh);',
-    _glsl:'5.0*syh*szh+s*cx*(-0.15-0.5*(cy+cz))',
-    _label:'CLP'},
   gyroidHarmonic:{_fn:(x,y,z)=>Math.sin(x)*Math.cos(y)+Math.sin(y)*Math.cos(z)+Math.sin(z)*Math.cos(x)+0.3*(Math.sin(2*x)*Math.cos(2*y)+Math.sin(2*y)*Math.cos(2*z)+Math.sin(2*z)*Math.cos(2*x)),
     _glsl:'sin(gx)*cos(gy)+sin(gy)*cos(gz)+sin(gz)*cos(gx)+0.3*(sin(2.*gx)*cos(2.*gy)+sin(2.*gy)*cos(2.*gz)+sin(2.*gz)*cos(2.*gx))',
     _label:'gyroid-harmonic'},
@@ -443,7 +446,7 @@ let rawPresetFn=null;
 function loadPreset(name){
   const p=PRESETS[name];
   if(p&&p._fn){
-    rawPresetFn={fn:p._fn,glsl:p._glsl,glslPre:p._glslPre||'',label:p._label};
+    rawPresetFn={fn:p._fn,glsl:p._glsl,label:p._label};
     terms=[];renderList();rebuildShader();
   } else {
     rawPresetFn=null;
@@ -511,6 +514,8 @@ document.getElementById('presetSel').addEventListener('change',function(){loadPr
 const FRAC_LABELS=['0','⅛','¼','⅜','½','⅝','¾','⅞','1'];
 const TWO_PI=2*Math.PI;
 let piShift={x:2,y:2,z:0}; // stored as integer 0-8 (eighths)
+let piNormalize=true;       // divide |φ| by |∇φ| → cylindrical pipes (r in distance units)
+let shellNormalize=true;    // divide |φ−offset| by |∇φ| → constant-thickness walls
 
 function piShiftRad(axis){return(piShift[axis]/8)*TWO_PI;}
 
@@ -524,6 +529,20 @@ function piShiftRad(axis){return(piShift[axis]/8)*TWO_PI;}
   });
 });
 
+document.getElementById('piNormToggle').addEventListener('click',function(){
+  piNormalize=!piNormalize;
+  this.textContent='normalize: '+(piNormalize?'on':'off');
+  this.classList.toggle('on',piNormalize);
+  updateEq();updateMMHints();rebuildShader();onSurfaceChange();
+});
+
+document.getElementById('shellNormToggle').addEventListener('click',function(){
+  shellNormalize=!shellNormalize;
+  this.textContent='normalize: '+(shellNormalize?'on':'off');
+  this.classList.toggle('on',shellNormalize);
+  updateEq();updateMMHints();rebuildShader();onSurfaceChange();
+});
+
 // ── updateEq — adds PI-TPMS branch ───────────────────────────────────
 function updateEq(){
   const a=terms.filter(t=>t.on&&t.factors&&t.factors.length);
@@ -535,11 +554,16 @@ function updateEq(){
 
   if(rawPresetFn){
     if(modePi){
-      document.getElementById('eqbar').innerHTML=
-        'max(|<b>'+rawPresetFn.label+'</b>(p)|, |<b>'+rawPresetFn.label+'</b>(p+δ)|) &lt; '+pipeR.toFixed(2);
+      const left = piNormalize
+        ? 'dist(p, {<b>'+rawPresetFn.label+'</b>=0} ∩ {<b>'+rawPresetFn.label+'</b><sub>+δ</sub>=0})'
+        : 'max(|<b>'+rawPresetFn.label+'</b>(p)|, |<b>'+rawPresetFn.label+'</b>(p+δ)|)';
+      document.getElementById('eqbar').innerHTML = left + ' &lt; '+pipeR.toFixed(2);
     } else {
+      const lhs = modeShell
+        ? (shellNormalize ? '|<b>'+rawPresetFn.label+'</b>|/‖∇‖' : '|<b>'+rawPresetFn.label+'</b>|')
+        : '<b>'+rawPresetFn.label+'</b>';
       document.getElementById('eqbar').innerHTML=
-        modeShell?'|<b>'+rawPresetFn.label+'</b>| &lt; '+wall.toFixed(2):'<b>'+rawPresetFn.label+'</b> = 0';
+        modeShell?lhs+' &lt; '+wall.toFixed(2):lhs+' = 0';
     }
     return;
   }
@@ -550,12 +574,17 @@ function updateEq(){
     return sign+'<b>'+cs+t.factors.map(f=>f.trig).join('·')+'</b>';
   }).join('');
   if(modePi){
-    document.getElementById('eqbar').innerHTML=
-      'max(|'+eq+'(p)|, |'+eq+'(p+δ)|) &lt; '+pipeR.toFixed(2);
+    const left = piNormalize
+      ? 'dist(p, {φ=0} ∩ {φ<sub>+δ</sub>=0)})  φ = '+eq
+      : 'max(|'+eq+'(p)|, |'+eq+'(p+δ)|)';
+    document.getElementById('eqbar').innerHTML = left + ' &lt; '+pipeR.toFixed(2);
   } else {
     const offStr=off===0?'':' − '+off.toFixed(2);
+    const lhs = modeShell
+      ? (shellNormalize ? '|'+eq+offStr+'|/‖∇‖' : '|'+eq+offStr+'|')
+      : eq+offStr;
     document.getElementById('eqbar').innerHTML=
-      modeShell?'|'+eq+offStr+'| &lt; '+wall.toFixed(2):eq+offStr+' = 0';
+      modeShell?lhs+' &lt; '+wall.toFixed(2):lhs+' = 0';
   }
 }
 
@@ -576,19 +605,112 @@ function syncModeUI(){
 }
 
 document.getElementById('mSolid').addEventListener('click',function(){
-  shellMode=false;piMode=false;syncModeUI();updateEq();rebuildShader();
+  shellMode=false;piMode=false;syncModeUI();updateEq();updateMMHints();rebuildShader();
 });
 document.getElementById('mShell').addEventListener('click',function(){
-  shellMode=true;piMode=false;syncModeUI();updateEq();rebuildShader();
+  shellMode=true;piMode=false;syncModeUI();updateEq();updateMMHints();rebuildShader();
 });
 document.getElementById('mPi').addEventListener('click',function(){
-  shellMode=false;piMode=true;syncModeUI();updateEq();rebuildShader();
+  shellMode=false;piMode=true;syncModeUI();updateEq();updateMMHints();rebuildShader();
 });
 
-document.getElementById('sOffset').addEventListener('input',function(){offsetVal=parseFloat(this.value);document.getElementById('vOffset').textContent=offsetVal.toFixed(2);updateEq();rebuildShader();});
-document.getElementById('sWall').addEventListener('input',function(){wallVal=parseFloat(this.value);document.getElementById('vWall').textContent=wallVal.toFixed(2);updateEq();rebuildShader();});
-document.getElementById('sPipeR').addEventListener('input',function(){pipeRVal=parseFloat(this.value);document.getElementById('vPipeR').textContent=pipeRVal.toFixed(2);updateEq();rebuildShader();});
-document.getElementById('sCells').addEventListener('input',function(){cellMult=parseFloat(this.value);document.getElementById('vCells').textContent=cellMult.toFixed(2)+'×';rebuildShader();});
+document.getElementById('sOffset').addEventListener('input',function(){offsetVal=parseFloat(this.value);document.getElementById('vOffset').textContent=offsetVal.toFixed(2);updateMMHints();updateEq();rebuildShader();});
+document.getElementById('sWall').addEventListener('input',function(){wallVal=parseFloat(this.value);document.getElementById('vWall').textContent=wallVal.toFixed(2);updateMMHints();updateEq();rebuildShader();});
+document.getElementById('sPipeR').addEventListener('input',function(){pipeRVal=parseFloat(this.value);document.getElementById('vPipeR').textContent=pipeRVal.toFixed(2);updateMMHints();updateEq();rebuildShader();});
+document.getElementById('sCells').addEventListener('input',function(){cellMult=parseFloat(this.value);document.getElementById('vCells').textContent=cellMult.toFixed(2)+'×';updateMMHints();rebuildShader();});
+
+// ── Cell size (mm) display layer — does NOT affect JSON export ────────
+// Converts internal cell domain [-π, π] to user-specified physical units.
+// Conversion: 1 internal length = cellSizeMM / (2π) mm
+// Only annotates sliders where mm interpretation is unambiguous:
+//   - cells: spatial extent visible
+//   - pipe r: ONLY when piNormalize=on (otherwise r is in φ-value units, not distance)
+let cellSizeMM = parseFloat(localStorage.getItem('f13ld_tpms_cellSizeMM') || '2');
+{
+  const inp = document.getElementById('cellSizeMM');
+  inp.value = cellSizeMM;
+  inp.addEventListener('input', function(){
+    const v = parseFloat(this.value);
+    if(isNaN(v) || v < 0) return;
+    cellSizeMM = v;
+    try { localStorage.setItem('f13ld_tpms_cellSizeMM', String(v)); } catch(e){}
+    updateMMHints();
+    updateHomogMMHints();
+  });
+}
+function updateMMHints(){
+  const factor = cellSizeMM > 0 ? cellSizeMM / (2 * Math.PI) : 0;
+  // cells: spatial extent visible = cellMult × cellSizeMM (exact)
+  const cellsEl = document.getElementById('vCells_mm');
+  if(cellSizeMM > 0){
+    cellsEl.textContent = '(' + (cellMult * cellSizeMM).toFixed(2) + ' mm)';
+    cellsEl.classList.add('show');
+  } else {
+    cellsEl.textContent = '';
+    cellsEl.classList.remove('show');
+  }
+  // pipe r: exact in normalize-on, approximate (~) in normalize-off
+  const pipeEl = document.getElementById('vPipeR_mm');
+  if(cellSizeMM > 0 && piMode){
+    const prefix = piNormalize ? '' : '~';
+    pipeEl.textContent = '(' + prefix + (pipeRVal * factor).toFixed(3) + ' mm)';
+    pipeEl.classList.add('show');
+  } else {
+    pipeEl.textContent = '';
+    pipeEl.classList.remove('show');
+  }
+  // wall: exact in normalize-on, approximate (~) in normalize-off
+  const wallEl = document.getElementById('vWall_mm');
+  if(cellSizeMM > 0 && shellMode && !piMode){
+    const prefix = shellNormalize ? '' : '~';
+    wallEl.textContent = '(' + prefix + (wallVal * factor).toFixed(3) + ' mm)';
+    wallEl.classList.add('show');
+  } else {
+    wallEl.textContent = '';
+    wallEl.classList.remove('show');
+  }
+  // offset: surface displacement. In normalized shell, this is exact perpendicular
+  // distance the level set moves. In solid mode or unnormalized shell, it's φ-value
+  // units and the perpendicular displacement depends on |∇φ|, hence approximate.
+  const offEl = document.getElementById('vOffset_mm');
+  if(cellSizeMM > 0 && !piMode){
+    const prefix = (shellMode && shellNormalize) ? '' : '~';
+    offEl.textContent = '(' + prefix + (offsetVal * factor).toFixed(3) + ' mm)';
+    offEl.classList.add('show');
+  } else {
+    offEl.textContent = '';
+    offEl.classList.remove('show');
+  }
+  // Refresh homogenization mm row in case cellSizeMM changed after a run
+  updateHomogMMHints();
+}
+function updateHomogMMHints(){
+  const row = document.getElementById('homog-mm-row');
+  if(!lastHomogResult || cellSizeMM <= 0){
+    if(row) row.style.display = 'none';
+    return;
+  }
+  if(row) row.style.display = 'flex';
+  const {res} = lastHomogResult;
+  // The homog domain is one cubic cell = cellSizeMM^3 in mm^3 (cellMult only
+  // affects what's visible in the viewport, not the unit cell volume).
+  const cellVol = Math.pow(cellSizeMM, 3);
+  const solidVol = cellVol * res.rho;
+  document.getElementById('mm-cellVol').textContent = cellSizeMM.toFixed(2) + ' mm cube · ' + cellVol.toFixed(3) + ' mm³';
+  document.getElementById('mm-solidVol').textContent = solidVol.toFixed(3) + ' mm³';
+  // SA/V conversion: internal returns savRaw with units 1/internal_length.
+  // 1 internal length = cellSizeMM/(2π) mm, so 1/internal = 2π/cellSizeMM per mm.
+  const savWrap = document.getElementById('mm-sav-wrap');
+  if(piMode){
+    // surface-area-density is currently disabled in PI mode (returns 0)
+    savWrap.style.display = 'none';
+  } else {
+    savWrap.style.display = '';
+    const savRaw = res.savNorm * 2.5;  // un-normalize: savNorm = min(savRaw/2.5, 1)
+    const savReal = savRaw * 2 * Math.PI / cellSizeMM;
+    document.getElementById('mm-savReal').textContent = savReal.toFixed(2) + ' /mm';
+  }
+}
 
 document.getElementById('gradToggle').addEventListener('click',function(){
   gradOn=!gradOn;
@@ -633,7 +755,7 @@ function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
       // (gradient is a property of the spatial domain, not the surface)
     }
     if(rawPresetFn){
-      return coordLines.join('\n')+'\n  '+(rawPresetFn.glslPre||'')+'\n  v='+rawPresetFn.glsl+';';
+      return coordLines.join('\n')+'\n  v='+rawPresetFn.glsl+';';
     }
     return coordLines.join('\n')+'\n'+active.map(t=>{
       const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');
@@ -666,7 +788,7 @@ function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
       const gyExpr = 'p.y+'+oy+(gradOn?'*gyF':'');
       const gzExpr = 'p.z+'+oz+(gradOn?'*gzF':'');
       const body = rawPresetFn
-        ? 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; '+(rawPresetFn.glslPre||'')+' return '+rawPresetFn.glsl+';'
+        ? 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; return '+rawPresetFn.glsl+';'
         : 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; float v=0.0;'
           + active.map(t=>{
               const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');
@@ -680,19 +802,72 @@ function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
     const evalA = makeEvalFn('evalA','0.0','0.0','0.0');
     const evalB = makeEvalFn('evalB', dxS, dyS, dzS);
 
-    baseFunc = evalA+'\n'+evalB+`
+    if(piNormalize){
+      // Full angle-corrected distance to intersection curve.
+      // d_curve² = (d_A² − 2·cosα·d_A·d_B + d_B²) / sin²α
+      // where d_A, d_B are SIGNED perpendicular distances to each surface,
+      // and α is the angle between the surface normals at p (∇φ(p) and ∇φ(p+δ)).
+      // FD step 0.012; ε-floor 0.08 on |∇φ|; cos α clamped to ±0.95 to bound
+      // 1/sin²α (≤ ~10) when surfaces become near-parallel.
+      const gradFn = `
+vec3 gradVecA(vec3 p, float H){
+  float e = 0.012;
+  float dx = evalA(p+vec3(e,0.0,0.0),H) - evalA(p-vec3(e,0.0,0.0),H);
+  float dy = evalA(p+vec3(0.0,e,0.0),H) - evalA(p-vec3(0.0,e,0.0),H);
+  float dz = evalA(p+vec3(0.0,0.0,e),H) - evalA(p-vec3(0.0,0.0,e),H);
+  return vec3(dx, dy, dz) / (2.0*e);
+}
+vec3 gradVecB(vec3 p, float H){
+  float e = 0.012;
+  float dx = evalB(p+vec3(e,0.0,0.0),H) - evalB(p-vec3(e,0.0,0.0),H);
+  float dy = evalB(p+vec3(0.0,e,0.0),H) - evalB(p-vec3(0.0,e,0.0),H);
+  float dz = evalB(p+vec3(0.0,0.0,e),H) - evalB(p-vec3(0.0,0.0,e),H);
+  return vec3(dx, dy, dz) / (2.0*e);
+}`;
+      baseFunc = evalA+'\n'+evalB+gradFn+`
+float base(vec3 p,float H){ return evalA(p,H); }
+float piField(vec3 p,float H){
+  vec3 gA = gradVecA(p, H);
+  vec3 gB = gradVecB(p, H);
+  float magA = max(length(gA), 0.08);
+  float magB = max(length(gB), 0.08);
+  float dA = evalA(p, H) / magA;
+  float dB = evalB(p, H) / magB;
+  float cosA = clamp(dot(gA, gB) / (magA * magB), -0.95, 0.95);
+  float sin2 = 1.0 - cosA * cosA;
+  float num = dA*dA - 2.0*cosA*dA*dB + dB*dB;
+  return sqrt(max(num, 0.0) / sin2);
+}`;
+    } else {
+      baseFunc = evalA+'\n'+evalB+`
 float base(vec3 p,float H){ return evalA(p,H); }
 float piField(vec3 p,float H){ return max(abs(evalA(p,H)),abs(evalB(p,H))); }`;
+    }
     implicitExpr='piField(p,H)-'+pipeRS;
   } else {
     const lines=rawPresetFn
-      ?'  '+(rawPresetFn.glslPre||'')+'\n  v='+rawPresetFn.glsl+';'
+      ?'  v='+rawPresetFn.glsl+';'
       :active.map(t=>{const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');return'  v+='+toFloat(t.coef)+'*'+parts.join('*')+';';}).join('\n');
     const offS=toFloat(offsetVal);
     const wallS=toFloat(wallVal);
-    const implicit2=shellMode?'abs(v-('+offS+'))-'+wallS:'v-('+offS+')';
     baseFunc=`float base(vec3 p,float H){float v=0.0;\n${gradLines.join('\n')}\nfloat gx=p.x${gradOn?'*gxF':''},gy=p.y${gradOn?'*gyF':''},gz=p.z${gradOn?'*gzF':''};${lines}\nreturn v;}`;
-    implicitExpr=shellMode?'abs(base(p,H)-('+offS+'))-'+wallS:'base(p,H)-('+offS+')';
+    if(shellMode && shellNormalize){
+      // Normalize the shell distance by |∇base| so wall thickness is a real
+      // perpendicular distance independent of where on the surface we are.
+      // FD step 0.012; ε-floor 0.08 on |∇φ| guards against critical points.
+      baseFunc += `
+float gradMagBase(vec3 p, float H){
+  float e = 0.012;
+  float dx = base(p+vec3(e,0.0,0.0),H) - base(p-vec3(e,0.0,0.0),H);
+  float dy = base(p+vec3(0.0,e,0.0),H) - base(p-vec3(0.0,e,0.0),H);
+  float dz = base(p+vec3(0.0,0.0,e),H) - base(p-vec3(0.0,0.0,e),H);
+  float g = sqrt(dx*dx + dy*dy + dz*dz) / (2.0*e);
+  return max(g, 0.08);
+}`;
+      implicitExpr='abs(base(p,H)-('+offS+'))/gradMagBase(p,H)-'+wallS;
+    } else {
+      implicitExpr=shellMode?'abs(base(p,H)-('+offS+'))-'+wallS:'base(p,H)-('+offS+')';
+    }
   }
 
   return[
@@ -875,10 +1050,42 @@ function isSolid(fn,x,y,z){
     const dx=piShiftRad('x'), dy=piShiftRad('y'), dz=piShiftRad('z');
     const vA=fn(x,y,z);
     const vB=fn(x+dx,y+dy,z+dz);
+    if(piNormalize){
+      // Match shader: full angle-corrected distance to intersection curve.
+      // d_curve² = (d_A² − 2cosα·d_A·d_B + d_B²) / sin²α
+      // d_A, d_B are signed; cos α from full gradient vectors.
+      const e=0.012, EPS=0.08, COSCLAMP=0.95;
+      const gAx=(fn(x+e,y,z)-fn(x-e,y,z))/(2*e);
+      const gAy=(fn(x,y+e,z)-fn(x,y-e,z))/(2*e);
+      const gAz=(fn(x,y,z+e)-fn(x,y,z-e))/(2*e);
+      const magA=Math.max(Math.sqrt(gAx*gAx+gAy*gAy+gAz*gAz),EPS);
+      const gBx=(fn(x+dx+e,y+dy,z+dz)-fn(x+dx-e,y+dy,z+dz))/(2*e);
+      const gBy=(fn(x+dx,y+dy+e,z+dz)-fn(x+dx,y+dy-e,z+dz))/(2*e);
+      const gBz=(fn(x+dx,y+dy,z+dz+e)-fn(x+dx,y+dy,z+dz-e))/(2*e);
+      const magB=Math.max(Math.sqrt(gBx*gBx+gBy*gBy+gBz*gBz),EPS);
+      const dA=vA/magA;
+      const dB=vB/magB;
+      const cosA=Math.max(-COSCLAMP, Math.min(COSCLAMP, (gAx*gBx+gAy*gBy+gAz*gBz)/(magA*magB)));
+      const sin2=1-cosA*cosA;
+      const num=dA*dA - 2*cosA*dA*dB + dB*dB;
+      return Math.sqrt(Math.max(num,0)/sin2) < pipeRVal;
+    }
     return Math.max(Math.abs(vA),Math.abs(vB))<pipeRVal;
   }
   const v=fn(x,y,z);
-  return shellMode?(Math.abs(v-offsetVal)<wallVal):(v>offsetVal);
+  if(shellMode){
+    if(shellNormalize){
+      // Match shader: divide |φ−offset| by |∇φ| → uniform perpendicular wall thickness.
+      const e=0.012, EPS=0.08;
+      const gx=(fn(x+e,y,z)-fn(x-e,y,z))/(2*e);
+      const gy=(fn(x,y+e,z)-fn(x,y-e,z))/(2*e);
+      const gz=(fn(x,y,z+e)-fn(x,y,z-e))/(2*e);
+      const g=Math.max(Math.sqrt(gx*gx+gy*gy+gz*gz),EPS);
+      return Math.abs(v-offsetVal)/g < wallVal;
+    }
+    return Math.abs(v-offsetVal) < wallVal;
+  }
+  return v > offsetVal;
 }
 
 function computeMIL(vox,N){
@@ -1127,6 +1334,7 @@ document.getElementById('runBtn').addEventListener('click',async function(){
     [res.Ex,res.Ey,res.Ez],N
   );
   lastHomogResult={res,N,Es,nu};
+  updateHomogMMHints();
   document.getElementById('exportBtn').textContent='Export JSON (+ homog)';
   document.getElementById('exportBtn').style.borderColor='#7c6ff7';
   document.getElementById('exportBtn').style.color='#a89cf7';
@@ -1138,6 +1346,8 @@ function onSurfaceChange(){
   lastHomogResult=null;
   const btn=document.getElementById('exportBtn');
   btn.textContent='Export JSON';btn.style.borderColor='';btn.style.color='';
+  const mmRow=document.getElementById('homog-mm-row');
+  if(mmRow) mmRow.style.display='none';
 }
 
 function buildExportJSON(){
@@ -1152,7 +1362,9 @@ function buildExportJSON(){
     cell_scale:cellMult,
     mode:piMode?'pi-tpms':shellMode?'shell':'solid',
     wall_thickness:shellMode?wallVal:null,
+    shell_normalize:shellMode?shellNormalize:null,
     pipe_radius:piMode?pipeRVal:null,
+    pi_normalize:piMode?piNormalize:null,
     phase_shift:piMode?{x:piShift.x/8,y:piShift.y/8,z:piShift.z/8}:null,
     gradient:gradOn?{enabled:true,x:{lo:gxLo,hi:gxHi},y:{lo:gyLo,hi:gyHi},z:{lo:gzLo,hi:gzHi}}:{enabled:false}
   };
@@ -1168,7 +1380,7 @@ function buildExportJSON(){
       method:'MIL-HS'};
   }
   const out={
-    meta:{version:'0.9.0',timestamp:new Date().toISOString(),
+    meta:{version:'0.9.5',timestamp:new Date().toISOString(),
       preset:rawPresetFn?rawPresetFn.label:(terms.length?currentPreset:'custom')},
     surface:surfaceBlock,geometry:geometryBlock
   };
@@ -1222,6 +1434,7 @@ function frame(ts){
 // Init
 syncModeUI();
 loadPreset('gyroid');
+updateMMHints();
 requestAnimationFrame(frame);
 </script>
 </body>

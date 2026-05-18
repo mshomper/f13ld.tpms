@@ -66,10 +66,21 @@ canvas#c{display:block;width:100%}
 .pi-snap .snap-ticks{display:flex;justify-content:space-between;width:88px}
 .pi-snap .snap-ticks span{font-size:7px;color:#3a6a3a}
 .pi-val{font-size:11px;font-weight:500;color:#c8ff80;min-width:28px;font-variant-numeric:tabular-nums}
-.pi-norm-toggle{font-size:11px;padding:3px 11px;border:0.5px solid #1a4a1a;border-radius:14px;background:transparent;color:#7aaa7a;cursor:pointer;font-family:inherit;transition:background 0.15s,color 0.15s,border-color 0.15s}
-.pi-norm-toggle:hover{color:#c8ff80;border-color:#2a6a2a}
-.pi-norm-toggle.on{background:#1a4a1a;color:#c8ff80;border-color:#c8ff80}
-.pi-norm-toggle.on:hover{background:#205820}
+.pi-norm-toggle,.pi-snap-toggle{font-size:11px;padding:3px 11px;border:0.5px solid #1a4a1a;border-radius:14px;background:transparent;color:#7aaa7a;cursor:pointer;font-family:inherit;transition:background 0.15s,color 0.15s,border-color 0.15s}
+.pi-norm-toggle:hover,.pi-snap-toggle:hover{color:#c8ff80;border-color:#2a6a2a}
+.pi-norm-toggle.on,.pi-snap-toggle.on{background:#1a4a1a;color:#c8ff80;border-color:#c8ff80}
+.pi-norm-toggle.on:hover,.pi-snap-toggle.on:hover{background:#205820}
+.pi-num-inp{display:none;width:58px;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:2px 4px;background:#0e1e0e;border:0.5px solid #1a4a1a;border-radius:4px;color:#c8ff80;text-align:center;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+.pi-num-inp::-webkit-outer-spin-button,.pi-num-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.pi-num-inp:focus{outline:none;border-color:#c8ff80}
+.pi-chips{display:none;align-items:center;gap:6px;width:100%;margin-top:6px;padding-top:8px;border-top:0.5px solid #1a2a1a;flex-wrap:wrap}
+.pi-chips-label{font-size:11px;color:#7aaa7a}
+.pi-chip{font-size:11px;padding:3px 11px;border:0.5px solid #1a4a1a;border-radius:14px;background:transparent;color:#c8ff80;cursor:pointer;font-family:inherit;transition:background 0.15s,border-color 0.15s}
+.pi-chip:hover{background:#1a4a1a;border-color:#c8ff80}
+#pi-controls.snap-off .snap-ticks{display:none}
+#pi-controls.snap-off .pi-val{display:none}
+#pi-controls.snap-off .pi-num-inp{display:inline-block}
+#pi-controls.snap-off .pi-chips{display:flex}
 .homo-controls{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:10px}
 .homo-controls label{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
 .homo-controls select,.homo-controls input[type=number]{font-size:12px;padding:2px 4px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff}
@@ -148,7 +159,7 @@ canvas.vcv{width:100%;display:block}
   </div>
   <div class="fh-right">
     <button class="fh-mesh-btn" onclick="openInMesh()">⬡ Open in F13LD.mesh</button>
-    <span class="fh-version">v0.9.5</span>
+    <span class="fh-version">v0.9.6</span>
     <div class="fh-icon" style="background:#E1F5EE">
       <svg width="18" height="18" viewBox="0 0 40 40">
         <path d="M0 10 Q5 2 10 10 Q15 18 20 10 Q25 2 30 10 Q35 18 40 10" stroke="#085041" stroke-width="1.9" fill="none" stroke-linecap="round"/>
@@ -218,30 +229,42 @@ canvas.vcv{width:100%;display:block}
       <div class="pi-title">⬡ PI-TPMS — phase shift δ (× period T)</div>
       <div class="sc-group">
         <button class="pi-norm-toggle on" id="piNormToggle" title="Use angle-corrected perpendicular distance to the intersection curve {φ=0 ∩ φ_δ=0}. Gives true cylindrical pipes with radius r in spatial units, independent of how the two surfaces meet. Off = raw max(|φ|, |φ_δ|) level set with axis-aligned, angle-skewed cross-sections (retains original variation pattern).">normalize: on</button>
+        <button class="pi-snap-toggle on" id="piSnapToggle" title="Snap slider stops to eighths of one period (8 reachable phases per axis). Off lets you set any value 0–1 of T continuously, enables typed-in values, and unlocks the quick-set chips for off-grid biomimetic ratios (π/6, π/3, 2π/5, 2π/3, golden).">snap: on</button>
       </div>
       <div class="sc-group">
         <label class="pi-lbl">Δx/T</label>
         <div class="pi-snap">
-          <input type="range" id="piX" min="0" max="8" step="1" value="2">
+          <input type="range" id="piX" min="0" max="1" step="0.125" value="0.25">
           <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
         </div>
         <span class="pi-val" id="vPiX">¼</span>
+        <input type="number" class="pi-num-inp" id="iPiX" min="0" max="1" step="0.001" value="0.250">
       </div>
       <div class="sc-group">
         <label class="pi-lbl">Δy/T</label>
         <div class="pi-snap">
-          <input type="range" id="piY" min="0" max="8" step="1" value="2">
+          <input type="range" id="piY" min="0" max="1" step="0.125" value="0.25">
           <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
         </div>
         <span class="pi-val" id="vPiY">¼</span>
+        <input type="number" class="pi-num-inp" id="iPiY" min="0" max="1" step="0.001" value="0.250">
       </div>
       <div class="sc-group">
         <label class="pi-lbl">Δz/T</label>
         <div class="pi-snap">
-          <input type="range" id="piZ" min="0" max="8" step="1" value="0">
+          <input type="range" id="piZ" min="0" max="1" step="0.125" value="0">
           <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
         </div>
         <span class="pi-val" id="vPiZ">0</span>
+        <input type="number" class="pi-num-inp" id="iPiZ" min="0" max="1" step="0.001" value="0.000">
+      </div>
+      <div class="pi-chips">
+        <span class="pi-chips-label">quick set →</span>
+        <button class="pi-chip" data-frac="0.08333" title="π/6 — hexagonal symmetry">π/6</button>
+        <button class="pi-chip" data-frac="0.16667" title="π/3 — hexagonal symmetry">π/3</button>
+        <button class="pi-chip" data-frac="0.20000" title="2π/5 — pentagonal / 5-fold">2π/5</button>
+        <button class="pi-chip" data-frac="0.33333" title="2π/3 — triangulation">2π/3</button>
+        <button class="pi-chip" data-frac="0.38197" title="1/φ² — golden, quasi-periodic biomimetic">golden</button>
       </div>
     </div>
 
@@ -513,19 +536,58 @@ document.getElementById('presetSel').addEventListener('change',function(){loadPr
 // ── PI-TPMS shift state ───────────────────────────────────────────────
 const FRAC_LABELS=['0','⅛','¼','⅜','½','⅝','¾','⅞','1'];
 const TWO_PI=2*Math.PI;
-let piShift={x:2,y:2,z:0}; // stored as integer 0-8 (eighths)
+let piShift={x:0.25,y:0.25,z:0}; // fraction of period T, in [0,1]
+let piSnap=true;            // slider stops at eighths of T; off = continuous (0.001 step)
+let lastFocusedAxis='x';    // remembers last-touched axis; chip clicks apply here
 let piNormalize=true;       // divide |φ| by |∇φ| → cylindrical pipes (r in distance units)
 let shellNormalize=true;    // divide |φ−offset| by |∇φ| → constant-thickness walls
 
-function piShiftRad(axis){return(piShift[axis]/8)*TWO_PI;}
+function piShiftRad(axis){return piShift[axis]*TWO_PI;}
+
+function piValLabel(frac){
+  // exact eighth → fraction symbol; otherwise 3-decimal fraction of T
+  const k=Math.round(frac*8);
+  return (Math.abs(frac-k/8)<1e-6) ? FRAC_LABELS[k] : frac.toFixed(3);
+}
+
+function setAxisValue(axis,frac,rebuild){
+  // clamp to [0,1], round to current slider step, then sync slider / input / span / state
+  if(rebuild===undefined)rebuild=true;
+  frac=Math.max(0,Math.min(1,frac));
+  const step=piSnap?0.125:0.001;
+  frac=parseFloat((Math.round(frac/step)*step).toFixed(3));
+  piShift[axis]=frac;
+  const slider=document.getElementById('pi'+axis.toUpperCase());
+  const inp=document.getElementById('iPi'+axis.toUpperCase());
+  const span=document.getElementById('vPi'+axis.toUpperCase());
+  slider.value=frac;
+  inp.value=frac.toFixed(3);
+  span.textContent=piValLabel(frac);
+  if(rebuild){rebuildShader();onSurfaceChange();}
+}
 
 ['x','y','z'].forEach(ax=>{
-  const el=document.getElementById('pi'+ax.toUpperCase());
-  const vl=document.getElementById('vPi'+ax.toUpperCase());
-  el.addEventListener('input',()=>{
-    piShift[ax]=parseInt(el.value);
-    vl.textContent=FRAC_LABELS[piShift[ax]];
-    rebuildShader();onSurfaceChange();
+  const slider=document.getElementById('pi'+ax.toUpperCase());
+  const inp=document.getElementById('iPi'+ax.toUpperCase());
+  slider.addEventListener('input',()=>{
+    lastFocusedAxis=ax;
+    setAxisValue(ax,parseFloat(slider.value));
+  });
+  inp.addEventListener('input',()=>{
+    lastFocusedAxis=ax;
+    const v=parseFloat(inp.value);
+    if(!isNaN(v)){
+      piShift[ax]=Math.max(0,Math.min(1,v));
+      slider.value=piShift[ax];
+      document.getElementById('vPi'+ax.toUpperCase()).textContent=piValLabel(piShift[ax]);
+      rebuildShader();onSurfaceChange();
+    }
+  });
+  inp.addEventListener('focus',()=>{lastFocusedAxis=ax;});
+  inp.addEventListener('blur',()=>{
+    // re-format on blur: clamp, round to step, pad to 3 decimals
+    const v=parseFloat(inp.value);
+    setAxisValue(ax,isNaN(v)?piShift[ax]:v);
   });
 });
 
@@ -534,6 +596,28 @@ document.getElementById('piNormToggle').addEventListener('click',function(){
   this.textContent='normalize: '+(piNormalize?'on':'off');
   this.classList.toggle('on',piNormalize);
   updateEq();updateMMHints();rebuildShader();onSurfaceChange();
+});
+
+document.getElementById('piSnapToggle').addEventListener('click',function(){
+  piSnap=!piSnap;
+  this.textContent='snap: '+(piSnap?'on':'off');
+  this.classList.toggle('on',piSnap);
+  document.getElementById('pi-controls').classList.toggle('snap-off',!piSnap);
+  // update slider step; snap-on re-snaps current values to nearest eighth
+  ['x','y','z'].forEach(ax=>{
+    const slider=document.getElementById('pi'+ax.toUpperCase());
+    slider.step=piSnap?0.125:0.001;
+    const target=piSnap?(Math.round(piShift[ax]*8)/8):piShift[ax];
+    setAxisValue(ax,target,false);
+  });
+  rebuildShader();onSurfaceChange();
+});
+
+document.querySelectorAll('.pi-chip').forEach(chip=>{
+  chip.addEventListener('click',()=>{
+    const frac=parseFloat(chip.dataset.frac);
+    setAxisValue(lastFocusedAxis,frac);
+  });
 });
 
 document.getElementById('shellNormToggle').addEventListener('click',function(){
@@ -1365,7 +1449,7 @@ function buildExportJSON(){
     shell_normalize:shellMode?shellNormalize:null,
     pipe_radius:piMode?pipeRVal:null,
     pi_normalize:piMode?piNormalize:null,
-    phase_shift:piMode?{x:piShift.x/8,y:piShift.y/8,z:piShift.z/8}:null,
+    phase_shift:piMode?{x:piShift.x,y:piShift.y,z:piShift.z}:null,
     gradient:gradOn?{enabled:true,x:{lo:gxLo,hi:gxHi},y:{lo:gyLo,hi:gyHi},z:{lo:gzLo,hi:gzHi}}:{enabled:false}
   };
   let homogBlock=null;
@@ -1380,7 +1464,7 @@ function buildExportJSON(){
       method:'MIL-HS'};
   }
   const out={
-    meta:{version:'0.9.5',timestamp:new Date().toISOString(),
+    meta:{version:'0.9.6',timestamp:new Date().toISOString(),
       preset:rawPresetFn?rawPresetFn.label:(terms.length?currentPreset:'custom')},
     surface:surfaceBlock,geometry:geometryBlock
   };

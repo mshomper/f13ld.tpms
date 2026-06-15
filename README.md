@@ -4,7 +4,8 @@
 
 No installation. No dependencies. Open it and go.
 
-<img width="879" height="988" alt="f13ld tpms git image" src="https://github.com/user-attachments/assets/7840316a-0b79-4fbd-a33a-095eb75f3e34" />
+<img width="978" height="1184" alt="newtpmsscreenshot" src="https://github.com/user-attachments/assets/d391eec0-8b46-4e8d-9b04-2b9cf4049b88" />
+
 
 🔗 **[Launch the tool](https://mshomper.github.io/f13ld.tpms)**
 

@@ -1882,22 +1882,42 @@ requestAnimationFrame(frame);
 </script>
 <!-- =====================  END F13LD HELP SYSTEM  ======================= -->
   <!-- F13LD.queue integration -->
-  <script src="https://mshomper.github.io/f13ld.queue/f13ld-queue.js"></script>
   <script>
-  window.F13LD_snapshot=function(){
-    try{
-      var s=document.getElementById('c'), k=256/Math.max(s.width,s.height),
-          o=document.createElement('canvas');
-      o.width=Math.round(s.width*k); o.height=Math.round(s.height*k);
-      o.getContext('2d').drawImage(s,0,0,o.width,o.height);
-      return o.toDataURL('image/webp',0.72);
-    }catch(e){ return null; }
-  };
-  F13LDQueue.mountButton({
-    mount:'.fh-right', anchor:'.fh-mesh-btn', position:'before',
-    className:'fh-mesh-btn', text:'⊕ Add to queue',
-    getRecipe:function(){ return buildExportJSON(); }, tool:'f13ld.tpms'
-  });
+  (function(){
+    // Snapshot hook — safe to define now; the queue client calls it later.
+    window.F13LD_snapshot=function(){
+      try{
+        var s=document.getElementById('c'), k=256/Math.max(s.width,s.height),
+            o=document.createElement('canvas');
+        o.width=Math.round(s.width*k); o.height=Math.round(s.height*k);
+        o.getContext('2d').drawImage(s,0,0,o.width,o.height);
+        return o.toDataURL('image/webp',0.72);
+      }catch(e){ return null; }
+    };
+    var RIGHT='.fh-right', ANCHOR='.fh-mesh-btn', LABEL='⊕ Add to queue';
+    function mountReal(){
+      var fb=document.getElementById('f13ldq-fallback'); if(fb) fb.remove();
+      F13LDQueue.mountButton({ mount:RIGHT, anchor:ANCHOR, position:'before',
+        className:'fh-mesh-btn', text:LABEL,
+        getRecipe:function(){ return buildExportJSON(); }, tool:'f13ld.tpms' });
+    }
+    function mountFallback(){
+      if(document.getElementById('f13ldq-fallback')) return;
+      var r=document.querySelector(RIGHT), a=document.querySelector(ANCHOR); if(!r) return;
+      var b=document.createElement('button'); b.type='button'; b.id='f13ldq-fallback';
+      b.className='fh-mesh-btn'; b.textContent=LABEL;
+      b.addEventListener('click', function(){ alert('Add to queue is offline — couldn\u2019t reach the queue service. Reload the page to try again.'); });
+      if(a) r.insertBefore(b,a); else r.appendChild(b);
+    }
+    function load(retry){
+      var sc=document.createElement('script');
+      sc.src='https://mshomper.github.io/f13ld.queue/f13ld-queue.js';
+      sc.onload=function(){ if(window.F13LDQueue) mountReal(); else mountFallback(); };
+      sc.onerror=function(){ if(retry) setTimeout(function(){ load(false); }, 1500); else mountFallback(); };
+      document.head.appendChild(sc);
+    }
+    load(true);
+  })();
   </script>
 </body>
 </html>

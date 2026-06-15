@@ -392,7 +392,7 @@ canvas.vcv{width:100%;display:block}
 
 <script>
 const canvas=document.getElementById('c');
-const gl=canvas.getContext('webgl2')||canvas.getContext('webgl');
+const gl=canvas.getContext('webgl2',{preserveDrawingBuffer:true})||canvas.getContext('webgl',{preserveDrawingBuffer:true});
 if(!gl)canvas.parentElement.innerHTML='<p style="color:#888;padding:40px;text-align:center">WebGL unavailable</p>';
 const isWebGL2=gl instanceof WebGL2RenderingContext;
 let currentQuality='low';
@@ -1881,6 +1881,24 @@ requestAnimationFrame(frame);
 })();
 </script>
 <!-- =====================  END F13LD HELP SYSTEM  ======================= -->
+  <!-- F13LD.queue integration -->
+  <script src="https://mshomper.github.io/f13ld.queue/f13ld-queue.js"></script>
+  <script>
+  window.F13LD_snapshot=function(){
+    try{
+      var s=document.getElementById('c'), k=256/Math.max(s.width,s.height),
+          o=document.createElement('canvas');
+      o.width=Math.round(s.width*k); o.height=Math.round(s.height*k);
+      o.getContext('2d').drawImage(s,0,0,o.width,o.height);
+      return o.toDataURL('image/webp',0.72);
+    }catch(e){ return null; }
+  };
+  F13LDQueue.mountButton({
+    mount:'.fh-right', anchor:'.fh-mesh-btn', position:'before',
+    className:'fh-mesh-btn', text:'⊕ Add to queue',
+    getRecipe:function(){ return buildExportJSON(); }, tool:'f13ld.tpms'
+  });
+  </script>
 </body>
 </html>
 

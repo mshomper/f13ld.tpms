@@ -15,6 +15,8 @@ canvas#c{display:block;width:100%}
 #qualityOverlay{position:absolute;bottom:10px;left:10px;display:flex;gap:4px;z-index:10}
 #qualityOverlay button{background:rgba(6,8,15,0.85);color:#555;border:0.5px solid #2a2a3a;border-radius:5px;font-size:10px;padding:3px 7px;cursor:pointer;transition:color 0.15s,border-color 0.15s}
 #qualityOverlay button.active{color:#c8f542;border-color:#c8f542}
+#clipOverlay{position:absolute;bottom:44px;left:10px;display:flex;gap:6px;z-index:10}
+.clip-pill{background:rgba(6,8,15,0.85);color:#555;border:0.5px solid #2a2a3a;border-radius:5px;font-size:11px;font-weight:600;letter-spacing:0.04em;padding:4px 9px;cursor:pointer;transition:color 0.15s,border-color 0.15s;font-family:inherit;line-height:1}
 #panel{background:#111118;border:0.5px solid #2a2a3a;border-top:none;border-radius:0 0 12px 12px;padding:12px 14px}
 .termcard{background:#0e0e1a;border:0.5px solid #2a2a3a;border-radius:8px;padding:8px 10px;margin-bottom:6px}
 .termcard.off{opacity:0.35}
@@ -172,6 +174,11 @@ canvas.vcv{width:100%;display:block}
   <div id="cw">
     <canvas id="c" height="420"></canvas>
     <canvas id="axisCanvas"></canvas>
+    <div id="clipOverlay">
+      <button class="clip-pill" id="clipPillX" onclick="onClipPill(1)">X</button>
+      <button class="clip-pill" id="clipPillY" onclick="onClipPill(2)">Y</button>
+      <button class="clip-pill" id="clipPillZ" onclick="onClipPill(3)">Z</button>
+    </div>
     <div id="qualityOverlay">
       <button id="btnQLow" class="active" onclick="onQualityChange('low')">Low</button>
       <button id="btnQMed" onclick="onQualityChange('medium')">Med</button>
@@ -959,11 +966,12 @@ float gradMagBase(vec3 p, float H){
 'precision highp float;',
 'out vec4 fragColor;',
 'uniform vec2 res;uniform mat3 rot;uniform float zoom;',
+'uniform float uClipAxis;uniform float uClipPos;uniform float uClipSide;',
 baseFunc,
 'float implicit(vec3 p,float H){return '+implicitExpr+';}',
 // Box SDF for clipping — intersection with implicit gives solid clipped to cube
 'float boxSDF(vec3 p,float H){vec3 d=abs(p)-H;return length(max(d,0.0))+min(max(d.x,max(d.y,d.z)),0.0);}',
-'float sceneSDF(vec3 p,float H){return max(implicit(p,H),boxSDF(p,H));}',
+'float sceneSDF(vec3 p,float H){float s=max(implicit(p,H),boxSDF(p,H));if(uClipAxis>0.5){float coord=(uClipAxis<1.5)?p.x:((uClipAxis<2.5)?p.y:p.z);float cp=uClipPos*H;float clip=(uClipSide>0.0)?(coord-cp):(cp-coord);s=max(s,clip);}return s;}',
 // Normal FD step scales with featureSize so it stays sharp across all modes and zoom levels
 'vec3 nrm(vec3 p,float H,float e){return normalize(vec3(sceneSDF(p+vec3(e,0,0),H)-sceneSDF(p-vec3(e,0,0),H),sceneSDF(p+vec3(0,e,0),H)-sceneSDF(p-vec3(0,e,0),H),sceneSDF(p+vec3(0,0,e),H)-sceneSDF(p-vec3(0,0,e),H)));}',
 'vec3 palette(float t){vec3 a=vec3(0.55,0.57,0.42),b=vec3(0.43,0.42,0.30),c=vec3(1.0,1.0,1.0),d=vec3(0.02,0.0,0.05);return clamp(a+b*cos(6.28318*(c*t+d)),0.0,1.0);}',
@@ -1020,6 +1028,7 @@ baseFunc,
 '  float rim=pow(1.0-max(dot(n,-rd),0.0),2.5)*0.8;',
 '  vec3 green=vec3(0.784,0.961,0.259);',
 '  vec3 col=iridBase*diff+vec3(1.0,1.0,1.0)*spec1+green*spec2*0.6+green*rim*0.45;',
+'  if(uClipAxis>0.5){vec3 axM2=vec3((uClipAxis<1.5)?1.0:0.0,(uClipAxis>1.5&&uClipAxis<2.5)?1.0:0.0,(uClipAxis>2.5)?1.0:0.0);float ccp=uClipPos*H;if(abs(dot(pos,axM2)-ccp)<0.02*H&&abs(dot(n,axM2))>0.7){vec3 axisCol=uClipAxis<1.5?vec3(0.1333,0.8275,0.9333):uClipAxis<2.5?vec3(0.9098,0.4745,0.9765):vec3(0.9804,0.8000,0.0824);col=mix(col,axisCol,0.30);}}',
 '  col=mix(bgCol,col,exp(-t*0.010));',
 '  fragColor=vec4(clamp(col,0.0,1.0),1.0);',
 '}'
@@ -1039,10 +1048,10 @@ function rebuildShader(){
   if(!quadBuf){quadBuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,quadBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);}
   else gl.bindBuffer(gl.ARRAY_BUFFER,quadBuf);
   const loc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
-  uRes=gl.getUniformLocation(prog,'res');uRot=gl.getUniformLocation(prog,'rot');uZoom=gl.getUniformLocation(prog,'zoom');
+  uRes=gl.getUniformLocation(prog,'res');uRot=gl.getUniformLocation(prog,'rot');uZoom=gl.getUniformLocation(prog,'zoom');uClipAxis=gl.getUniformLocation(prog,'uClipAxis');uClipPos=gl.getUniformLocation(prog,'uClipPos');uClipSide=gl.getUniformLocation(prog,'uClipSide');
 }
 
-let rotMat=[1,0,0,0,1,0,0,0,1];
+let rotMat=[1,0,0,0,1,0,0,0,1];let clipState={axis:0,pos:0.0,side:1};let uClipAxis,uClipPos,uClipSide;
 function mat3Mul(A,B){const r=new Array(9);for(let c=0;c<3;c++)for(let row=0;row<3;row++)r[c*3+row]=A[0*3+row]*B[c*3+0]+A[1*3+row]*B[c*3+1]+A[2*3+row]*B[c*3+2];return r;}
 function rotAxisAngle(ax,ay,az,angle){
   const c=Math.cos(angle),s=Math.sin(angle),t2=1-c;
@@ -1071,14 +1080,19 @@ function orthonormalize(m){
 }
 rotMat=mat3Mul(rotAxisAngle(0,1,0,0.7),rotAxisAngle(1,0,0,0.5));
 
-let drag=false,lx=0,ly=0,camZoom=16,autoRot=true;
-canvas.addEventListener('mousedown',e=>{drag=true;lx=e.clientX;ly=e.clientY;autoRot=false;});
-canvas.addEventListener('touchstart',e=>{drag=true;lx=e.touches[0].clientX;ly=e.touches[0].clientY;autoRot=false;e.preventDefault();},{passive:false});
-window.addEventListener('mouseup',()=>drag=false);window.addEventListener('touchend',()=>drag=false);
-window.addEventListener('mousemove',e=>{if(!drag)return;applyDelta(e.clientX-lx,e.clientY-ly);lx=e.clientX;ly=e.clientY;});
-window.addEventListener('touchmove',e=>{if(!drag)return;applyDelta(e.touches[0].clientX-lx,e.touches[0].clientY-ly);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();},{passive:false});
+let drag=false,scrub=false,lx=0,ly=0,camZoom=16,autoRot=true;
+function hitHandle(cx,cy){var hs=window.__clipHandleScreen;if(!hs)return false;var rect=canvas.getBoundingClientRect();return Math.hypot((cx-rect.left)-hs.x,(cy-rect.top)-hs.y)<16;}
+function applyScrub(cx,cy){var hs=window.__clipHandleScreen;if(!hs)return;var pd=(cx-lx)*hs.dirx+(cy-ly)*hs.diry;var dPos=(pd*(hs.axisStep/(hs.len||1)))/Math.PI;clipState.pos=Math.max(-1.0,Math.min(1.0,clipState.pos+dPos));}
+canvas.addEventListener('mousedown',e=>{lx=e.clientX;ly=e.clientY;autoRot=false;if(hitHandle(e.clientX,e.clientY)){scrub=true;}else{drag=true;}});
+canvas.addEventListener('touchstart',e=>{lx=e.touches[0].clientX;ly=e.touches[0].clientY;autoRot=false;if(hitHandle(e.touches[0].clientX,e.touches[0].clientY)){scrub=true;}else{drag=true;}e.preventDefault();},{passive:false});
+window.addEventListener('mouseup',()=>{drag=false;scrub=false;});window.addEventListener('touchend',()=>{drag=false;scrub=false;});
+window.addEventListener('mousemove',e=>{if(scrub){applyScrub(e.clientX,e.clientY);lx=e.clientX;ly=e.clientY;}else if(drag){applyDelta(e.clientX-lx,e.clientY-ly);lx=e.clientX;ly=e.clientY;}});
+window.addEventListener('touchmove',e=>{if(scrub){applyScrub(e.touches[0].clientX,e.touches[0].clientY);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();}else if(drag){applyDelta(e.touches[0].clientX-lx,e.touches[0].clientY-ly);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();}},{passive:false});
 canvas.addEventListener('wheel',e=>{camZoom=Math.max(6,Math.min(30,camZoom+e.deltaY*0.02));e.preventDefault();},{passive:false});
 
+function onClipPill(axis){if(clipState.axis===axis){clipState.axis=0;}else{clipState.axis=axis;clipState.pos=0.0;clipState.side=1;}updateClipPills();}
+function updateClipPills(){var cols={1:'#22d3ee',2:'#e879f9',3:'#facc15'},nm={1:'X',2:'Y',3:'Z'};[1,2,3].forEach(function(a){var el=document.getElementById('clipPill'+nm[a]);if(!el)return;if(clipState.axis===a){el.classList.add('active');el.style.color=cols[a];el.style.borderColor=cols[a];}else{el.classList.remove('active');el.style.color='#555';el.style.borderColor='#2a2a3a';}});}
+function drawClipHandle(rotMat,canvasW,canvasH,camZoom){window.__clipHandleScreen=null;if(clipState.axis<1)return;var cv=document.getElementById('axisCanvas');if(!cv||cv.style.display==='none')return;var ctx=cv.getContext('2d');var H_HALF=Math.PI;function proj(p){var tx=rotMat[0]*p[0]+rotMat[1]*p[1]+rotMat[2]*p[2];var ty=rotMat[3]*p[0]+rotMat[4]*p[1]+rotMat[5]*p[2];var tz=rotMat[6]*p[0]+rotMat[7]*p[1]+rotMat[8]*p[2];var pcz=tz-camZoom;if(pcz>-0.1)return null;var sscl=Math.min(canvasW,canvasH);return [canvasW/2+(-1.6*tx/pcz)*sscl,canvasH/2-(-1.6*ty/pcz)*sscl];}var aIdx=clipState.axis-1,cp=clipState.pos*H_HALF;var c=[0,0,0];c[aIdx]=cp;var sc=proj(c);if(!sc)return;var col=['#22d3ee','#e879f9','#facc15'][aIdx];ctx.save();var free=[0,1,2].filter(function(k){return k!==aIdx;});var sg=[[-1,-1],[1,-1],[1,1],[-1,1]];var pts=sg.map(function(g){var p=[0,0,0];p[aIdx]=cp;p[free[0]]=g[0]*H_HALF;p[free[1]]=g[1]*H_HALF;return proj(p);});if(pts.every(Boolean)){ctx.globalAlpha=0.5;ctx.lineWidth=1.5;ctx.strokeStyle=col;ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);ctx.lineTo(pts[1][0],pts[1][1]);ctx.lineTo(pts[2][0],pts[2][1]);ctx.lineTo(pts[3][0],pts[3][1]);ctx.closePath();ctx.stroke();}ctx.globalAlpha=0.95;ctx.lineWidth=2;ctx.strokeStyle=col;ctx.beginPath();ctx.arc(sc[0],sc[1],9,0,6.2832);ctx.stroke();ctx.globalAlpha=1;ctx.fillStyle=col;ctx.beginPath();ctx.arc(sc[0],sc[1],3.2,0,6.2832);ctx.fill();ctx.restore();var e=[0,0,0];e[aIdx]=cp+0.4;var se=proj(e);var dirx=0,diry=0,len=0;if(se){var dx=se[0]-sc[0],dy=se[1]-sc[1];len=Math.hypot(dx,dy)||1;dirx=dx/len;diry=dy/len;}window.__clipHandleScreen={x:sc[0],y:sc[1],dirx:dirx,diry:diry,len:len,axisStep:0.4};}
 function drawAxisGizmo(rotMat,canvasW,canvasH,camZoom){
   var cv=document.getElementById('axisCanvas');
   if(!cv)return;
@@ -1508,9 +1522,13 @@ function frame(ts){
     gl.uniform2f(uRes,canvas.width,canvas.height);
     gl.uniformMatrix3fv(uRot,false,new Float32Array(rotMat));
     gl.uniform1f(uZoom,camZoom);
+    if(uClipAxis)gl.uniform1f(uClipAxis,clipState.axis);
+    if(uClipPos)gl.uniform1f(uClipPos,clipState.pos);
+    if(uClipSide)gl.uniform1f(uClipSide,clipState.side);
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
   }
   drawAxisGizmo(rotMat,canvas.clientWidth,canvas.clientHeight,camZoom);
+  drawClipHandle(rotMat,canvas.clientWidth,canvas.clientHeight,camZoom);
   drawStiffnessSurface();
   requestAnimationFrame(frame);
 }

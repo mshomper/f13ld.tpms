@@ -10,7 +10,7 @@ html,body{min-height:100%;background:#06080f;color:#e0e0ff;font-family:system-ui
 #wrap{max-width:1100px;margin:0 auto;padding:20px 16px}
 h1{font-size:13px;font-weight:500;color:#7c8aaa;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px}
 #cw{position:relative;background:#06080f;border-radius:12px 12px 0 0;overflow:hidden;border:0.5px solid #2a2a3a}
-canvas#c{display:block;width:100%}
+canvas#c{display:block;width:100%;touch-action:none}
 #axisCanvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:12}
 #qualityOverlay{position:absolute;bottom:10px;left:10px;display:flex;gap:4px;z-index:10}
 #qualityOverlay button{background:rgba(6,8,15,0.85);color:#555;border:0.5px solid #2a2a3a;border-radius:5px;font-size:10px;padding:3px 7px;cursor:pointer;transition:color 0.15s,border-color 0.15s}
@@ -102,6 +102,18 @@ canvas#c{display:block;width:100%}
 canvas.vcv{width:100%;display:block}
 #homo-results{display:none}
 #homo-status{font-size:11px;color:#555;margin-bottom:7px;min-height:15px}
+.homo-method{font-size:11px;line-height:1.5;margin:2px 0 8px;padding:6px 9px;border-radius:6px;border:0.5px solid #2a2a3a;background:#0e0e1a;color:#9aa0b8}
+.homo-method b{color:#e0e0ff;font-weight:600}
+.homo-method.pred{border-color:#1a4a1a;background:#0a1a0a}
+.homo-method.pred b{color:#c8ff80}
+.homo-method.bound b{color:#f0b35b}
+.homo-method .warn{color:#f0b35b}
+.vixiv-link{display:inline-flex;align-items:center;vertical-align:middle;padding:2px 7px;margin:0 3px 0 0;border:0.5px solid #2e4a2e;border-radius:5px;background:rgba(200,255,128,0.04);transition:border-color .15s,background .15s}
+.vixiv-link:hover{border-color:#c8ff80;background:rgba(200,255,128,0.1)}
+.vixiv-link:focus-visible{outline:2px solid #c8ff80;outline-offset:2px}
+.vixiv-link img{height:13px;width:auto;display:block}
+.method-note .vixiv-link{padding:1px 5px;margin:0 2px}
+.method-note .vixiv-link img{height:10px}
 .method-note{font-size:10px;color:#555;margin-top:8px;line-height:1.5;border-top:0.5px solid #2a2a3a;padding-top:7px}
 #footer{font-size:11px;color:#444;margin-top:7px}
 .bell-row{display:grid;grid-template-columns:26px 1fr 52px;gap:4px;align-items:center;margin-bottom:5px}
@@ -113,14 +125,6 @@ canvas.vcv{width:100%;display:block}
 .bell-row{display:grid;grid-template-columns:26px 1fr 52px;gap:4px;align-items:center;margin-bottom:5px}
 .bell-lbl{font-size:11px;font-weight:500;text-align:center}
 .bell-val{font-size:10px;font-variant-numeric:tabular-nums;text-align:right;padding-left:4px;line-height:1.4}
-.grad-controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:8px}
-.grad-toggle{font-size:11px;padding:2px 8px;border:0.5px solid #3a3a5a;border-radius:12px;background:transparent;color:#888;cursor:pointer}
-.grad-toggle.on{background:#2a6a4a;color:#69f0ae;border-color:#2a6a4a}
-.grad-axis{display:flex;align-items:center;gap:5px;opacity:0.35;pointer-events:none;transition:opacity 0.2s}
-.grad-axis.enabled{opacity:1;pointer-events:all}
-.grad-axis label{font-size:11px;color:#888;min-width:14px}
-.grad-axis input[type=range]{width:72px;accent-color:#69f0ae}
-.grad-axis .sv{font-size:11px;color:#69f0ae;min-width:36px;font-variant-numeric:tabular-nums}
 @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@500;700&display=swap');
 .f13ld-header{display:flex;align-items:center;justify-content:space-between;background:#06080f;border-bottom:0.5px solid #1a2a1a;padding:0 14px;height:48px;flex-shrink:0;font-family:'Exo 2',system-ui,sans-serif;}
 .fh-left{display:flex;align-items:center;gap:10px}
@@ -133,6 +137,21 @@ canvas.vcv{width:100%;display:block}
 .fh-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .fh-mesh-btn{font-size:11px;padding:4px 12px;border:0.5px solid #1D9E75;border-radius:20px;background:rgba(29,158,117,0.08);color:#1D9E75;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap;transition:background 0.15s}
 .fh-mesh-btn:hover{background:rgba(29,158,117,0.18)}
+/* ── Phones: header wraps to two rows — brand + help/version/icon on top, the two
+   action buttons as an even pair underneath. Results panel stacks in one column. ── */
+@media (max-width:560px){
+  .f13ld-header{flex-wrap:wrap;height:auto;padding:8px 12px 10px;row-gap:8px;column-gap:10px}
+  .fh-right{display:contents}
+  .fh-left{order:0;margin-right:auto}
+  .f13ld-header .f13h-trigger,.fh-version,.fh-icon{order:1}
+  .fh-mesh-btn{order:2;flex:1 1 calc(50% - 5px);min-width:0;text-align:center;padding:7px 6px;font-size:11px;overflow:hidden;text-overflow:ellipsis}
+  #viz-row{grid-template-columns:1fr !important}
+  #metric-grid{grid-template-columns:repeat(3,minmax(0,1fr)) !important}
+  .sav-row{text-align:left}
+  .sav-row #sav-bar-wrap{order:3;flex-basis:100%}
+  #metric-grid>.metric:last-child:nth-child(3n+1){grid-column:1/-1}
+  .bell-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;row-gap:6px !important}
+}
 </style>
 </head>
 <body>
@@ -161,7 +180,7 @@ canvas.vcv{width:100%;display:block}
   </div>
   <div class="fh-right">
     <button class="fh-mesh-btn" onclick="openInMesh()">⬡ Open in F13LD.mesh</button>
-    <span class="fh-version">v0.9.6</span>
+    <span class="fh-version">v1.0.1</span>
     <div class="fh-icon" style="background:#E1F5EE">
       <svg width="18" height="18" viewBox="0 0 40 40">
         <path d="M0 10 Q5 2 10 10 Q15 18 20 10 Q25 2 30 10 Q35 18 40 10" stroke="#085041" stroke-width="1.9" fill="none" stroke-linecap="round"/>
@@ -225,7 +244,7 @@ canvas.vcv{width:100%;display:block}
       </div>
       <div class="sc-group" id="grp-piper">
         <label>pipe r</label>
-        <input type="range" id="sPipeR" min="0.02" max="0.8" step="0.01" value="0.18">
+        <input type="range" id="sPipeR" min="0.02" max="1.45" step="0.01" value="0.18">
         <span class="sv" id="vPipeR">0.18</span>
         <span class="mm-hint" id="vPipeR_mm"></span>
       </div>
@@ -241,29 +260,29 @@ canvas.vcv{width:100%;display:block}
       <div class="sc-group">
         <label class="pi-lbl">Δx/T</label>
         <div class="pi-snap">
-          <input type="range" id="piX" min="0" max="1" step="0.125" value="0.25">
+          <input type="range" id="piX" min="0" max="1" step="0.125" value="0">
           <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
         </div>
-        <span class="pi-val" id="vPiX">¼</span>
-        <input type="number" class="pi-num-inp" id="iPiX" min="0" max="1" step="0.001" value="0.250">
+        <span class="pi-val" id="vPiX">0</span>
+        <input type="number" class="pi-num-inp" id="iPiX" min="0" max="1" step="0.001" value="0.000">
       </div>
       <div class="sc-group">
         <label class="pi-lbl">Δy/T</label>
         <div class="pi-snap">
-          <input type="range" id="piY" min="0" max="1" step="0.125" value="0.25">
+          <input type="range" id="piY" min="0" max="1" step="0.125" value="0.125">
           <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
         </div>
-        <span class="pi-val" id="vPiY">¼</span>
-        <input type="number" class="pi-num-inp" id="iPiY" min="0" max="1" step="0.001" value="0.250">
+        <span class="pi-val" id="vPiY">⅛</span>
+        <input type="number" class="pi-num-inp" id="iPiY" min="0" max="1" step="0.001" value="0.125">
       </div>
       <div class="sc-group">
         <label class="pi-lbl">Δz/T</label>
         <div class="pi-snap">
-          <input type="range" id="piZ" min="0" max="1" step="0.125" value="0">
+          <input type="range" id="piZ" min="0" max="1" step="0.125" value="0.5">
           <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
         </div>
-        <span class="pi-val" id="vPiZ">0</span>
-        <input type="number" class="pi-num-inp" id="iPiZ" min="0" max="1" step="0.001" value="0.000">
+        <span class="pi-val" id="vPiZ">½</span>
+        <input type="number" class="pi-num-inp" id="iPiZ" min="0" max="1" step="0.001" value="0.500">
       </div>
       <div class="pi-chips">
         <span class="pi-chips-label">quick set →</span>
@@ -275,34 +294,6 @@ canvas.vcv{width:100%;display:block}
       </div>
     </div>
 
-    <hr class="divider">
-    <div class="grad-controls">
-      <button class="grad-toggle" id="gradToggle">gradient: off</button>
-      <div class="grad-axis" id="gax">
-        <label style="color:#22d3ee">X</label>
-        <span style="font-size:10px;color:#555">lo</span>
-        <input type="range" id="gxLo" min="0.2" max="4" step="0.1" value="0.5" style="accent-color:#22d3ee">
-        <span style="font-size:10px;color:#555">hi</span>
-        <input type="range" id="gxHi" min="0.2" max="4" step="0.1" value="2.0" style="accent-color:#22d3ee">
-        <span class="sv" id="vgx" style="color:#22d3ee">0.5→2.0</span>
-      </div>
-      <div class="grad-axis" id="gay">
-        <label style="color:#e879f9">Y</label>
-        <span style="font-size:10px;color:#555">lo</span>
-        <input type="range" id="gyLo" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#e879f9">
-        <span style="font-size:10px;color:#555">hi</span>
-        <input type="range" id="gyHi" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#e879f9">
-        <span class="sv" id="vgy" style="color:#e879f9">1.0→1.0</span>
-      </div>
-      <div class="grad-axis" id="gaz">
-        <label style="color:#facc15">Z</label>
-        <span style="font-size:10px;color:#555">lo</span>
-        <input type="range" id="gzLo" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#facc15">
-        <span style="font-size:10px;color:#555">hi</span>
-        <input type="range" id="gzHi" min="0.2" max="4" step="0.1" value="1.0" style="accent-color:#facc15">
-        <span class="sv" id="vgz" style="color:#facc15">1.0→1.0</span>
-      </div>
-    </div>
     <hr class="divider">
     <div style="margin-bottom:6px">
       <div style="font-size:10px;color:#c8f542;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">preset surfaces</div>
@@ -336,10 +327,11 @@ canvas.vcv{width:100%;display:block}
     </div>
     <div id="homo-status"></div>
     <div id="homo-results">
-      <div id="viz-row" style="display:grid;grid-template-columns:1fr 86px;gap:6px;margin-bottom:8px">
+      <div id="homo-method" class="homo-method"></div>
+      <div id="viz-row" style="display:grid;grid-template-columns:minmax(180px,260px) 1fr;gap:8px;margin-bottom:8px;align-items:start">
         <div class="viz-card" style="padding:8px">
           <div class="viz-title">directional stiffness surface</div>
-          <canvas id="ellcv" style="width:100%;aspect-ratio:1;display:block;border-radius:6px;cursor:default"></canvas>
+          <canvas id="ellcv" style="width:100%;max-width:244px;aspect-ratio:1;display:block;margin:0 auto;border-radius:6px;cursor:default"></canvas>
           <div style="margin-top:5px">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
               <div style="font-size:12px;color:#555;white-space:nowrap">A =</div>
@@ -356,52 +348,54 @@ canvas.vcv{width:100%;display:block}
             </div>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:4px">
-          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rv" style="font-size:22px">—</div><div class="ml" style="font-size:13px">vol. fraction</div></div>
-          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rex" style="color:#22d3ee;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>x</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
-          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rey" style="color:#e879f9;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>y</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
-          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rez" style="color:#facc15;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>z</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
-          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rani" style="font-size:22px">—</div><div class="ml" style="font-size:13px">Zener A</div></div>
-          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rgxy" style="color:#a78bfa;font-size:22px">—</div><div class="ml" style="font-size:13px">G<sub>xy</sub><span class="mu" style="font-size:11px"> GPa</span></div></div>
-          <div class="metric" style="flex:1;min-height:0"><div class="mv" id="rnu" style="font-size:22px">—</div><div class="ml" style="font-size:13px">Poisson's ratio</div></div>
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+        <div id="metric-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;align-content:start">
+          <div class="metric"><div class="mv" id="rv" style="font-size:22px">—</div><div class="ml" style="font-size:13px">vol. fraction</div></div>
+          <div class="metric"><div class="mv" id="rex" style="color:#22d3ee;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>x</sub><span class="mu stiff-unit" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric"><div class="mv" id="rey" style="color:#e879f9;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>y</sub><span class="mu stiff-unit" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric"><div class="mv" id="rez" style="color:#facc15;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>z</sub><span class="mu stiff-unit" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric"><div class="mv" id="rani" style="font-size:22px">—</div><div class="ml" style="font-size:13px">Zener A</div></div>
+          <div class="metric"><div class="mv" id="rgxy" style="color:#a78bfa;font-size:22px">—</div><div class="ml" style="font-size:13px">G<sub>xy</sub><span class="mu stiff-unit" style="font-size:11px"> GPa</span></div></div>
+          <div class="metric"><div class="mv" id="rnu" style="font-size:22px">—</div><div class="ml" style="font-size:13px">Poisson's ratio</div></div>
         </div>
-      </div>
-      <div class="metrics" style="margin-top:6px;grid-template-columns:1fr">
-        <div class="metric" style="background:#0d1520;border-color:#1a2a40">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-            <div style="text-align:left">
-              <div class="mv" id="rsav" style="font-size:22px">—</div>
-              <div class="ml" style="font-size:13px">surface complexity (0–1)</div>
+        <div class="metrics" id="sav-block" style="grid-template-columns:1fr">
+          <div class="metric" style="background:#0d1520;border-color:#1a2a40">
+            <div class="sav-row" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px">
+              <div style="text-align:left">
+                <div class="mv" id="rsav" style="font-size:22px">—</div>
+                <div class="ml" style="font-size:13px">surface complexity (0–1)</div>
+              </div>
+              <div id="sav-bar-wrap" style="flex:1 1 120px;min-width:0;height:8px;background:#0e0e1a;border-radius:4px;overflow:hidden">
+                <div id="sav-bar" style="height:100%;width:0%;border-radius:4px;transition:width 0.4s,background 0.4s"></div>
+              </div>
+              <div style="text-align:right;font-size:13px;min-width:54px;font-weight:500" id="sav-note">—</div>
             </div>
-            <div id="sav-bar-wrap" style="flex:1;height:8px;background:#0e0e1a;border-radius:4px;overflow:hidden">
-              <div id="sav-bar" style="height:100%;width:0%;border-radius:4px;transition:width 0.4s,background 0.4s"></div>
-            </div>
-            <div style="text-align:right;font-size:13px;min-width:54px;font-weight:500" id="sav-note">—</div>
           </div>
+        </div>
+        <div id="bell-wrap">
+          <div id="bell-title" style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Likely range of true stiffness</div>
+          <div id="bell-sub" style="font-size:10px;color:#444;margin-bottom:6px;line-height:1.5"></div>
+          <div id="bell-rows"></div>
+        </div>
         </div>
       </div>
       <div id="homog-mm-row" style="display:none;margin-top:6px;padding:6px 10px;background:#0a141a;border:0.5px solid #1a3a3a;border-radius:6px;font-size:11px;color:#7a9aaa;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between">
         <span>cell = <b id="mm-cellVol" style="color:#aac6c6">—</b></span>
         <span>solid vol = <b id="mm-solidVol" style="color:#aac6c6">—</b></span>
-        <span id="mm-sav-wrap">SA/V = <b id="mm-savReal" style="color:#aac6c6">—</b></span>
+        <span id="mm-sav-wrap">area / cell vol = <b id="mm-savReal" style="color:#aac6c6">—</b></span>
       </div>
-      <div style="margin-top:8px">
-        <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Probability distribution of true stiffness</div>
-        <div style="font-size:10px;color:#444;margin-bottom:6px;line-height:1.5">Spread combines method uncertainty (~18%) and grid resolution (~8/N).</div>
-        <div id="bell-rows"></div>
-      </div>
-      <div class="method-note">MIL-HS method: MIL fabric eigenvalues give anisotropy ratios · HS+ bound gives isotropic stiffness ceiling from ρ · directional E_i = E_HS+ × normalized MIL weight · surface complexity = SA/V normalized to [0,1] · bell curves show combined uncertainty.</div>
+      <div class="method-note" id="method-note">MIL-HS method: MIL fabric eigenvalues give anisotropy ratios · HS+ bound gives isotropic stiffness ceiling from ρ · directional E_i = E_HS+ × normalized MIL weight · surface complexity = SA/V normalized to [0,1] · bell curves show combined uncertainty.</div>
     </div>
     <button id="exportBtn" style="width:100%;margin-top:8px;font-size:12px;padding:6px 14px;border:0.5px solid #3a3a5a;border-radius:20px;background:transparent;color:#888;cursor:pointer">Export JSON</button>
-    <div id="footer">Drag to rotate · Scroll to zoom · Color = surface normal direction · Trackball rotation</div>
+    <div id="footer">Drag to rotate · Scroll or pinch to zoom · Color = surface normal direction · Trackball rotation</div>
   </div>
 </div>
 
 <script>
 const canvas=document.getElementById('c');
-const gl=canvas.getContext('webgl2',{preserveDrawingBuffer:true})||canvas.getContext('webgl',{preserveDrawingBuffer:true});
-if(!gl)canvas.parentElement.innerHTML='<p style="color:#888;padding:40px;text-align:center">WebGL unavailable</p>';
-const isWebGL2=gl instanceof WebGL2RenderingContext;
+// All shaders are GLSL ES 3.00 → WebGL2 is required (a WebGL1 fallback can never compile them).
+const gl=canvas.getContext('webgl2',{preserveDrawingBuffer:true});
+if(!gl){canvas.parentElement.innerHTML='<p style="color:#888;padding:40px;text-align:center">This tool needs WebGL2, which this browser or GPU does not provide.</p>';throw new Error('WebGL2 unavailable');}
 let currentQuality='low';
 function onQualityChange(q){
   currentQuality=q;
@@ -536,14 +530,14 @@ document.getElementById('termlist').addEventListener('click',function(e){
   if(act==='tog'&&t)t.on=!t.on;
   if(act==='delf'&&t&&fi!==null&&t.factors.length>1)t.factors.splice(fi,1);
   if(act==='addf'&&t)t.factors.push(mkF('sin(x)'));
-  renderList();rebuildShader();
+  renderList();rebuildShader();onSurfaceChange();
 });
 document.getElementById('presetSel').addEventListener('change',function(){loadPreset(this.value);onSurfaceChange();});
 
 // ── PI-TPMS shift state ───────────────────────────────────────────────
 const FRAC_LABELS=['0','⅛','¼','⅜','½','⅝','¾','⅞','1'];
 const TWO_PI=2*Math.PI;
-let piShift={x:0.25,y:0.25,z:0}; // fraction of period T, in [0,1]
+let piShift={x:0,y:0.125,z:0.5}; // fraction of period T, in [0,1] — default: connected 3-D pipe network
 let piSnap=true;            // slider stops at eighths of T; off = continuous (0.001 step)
 let lastFocusedAxis='x';    // remembers last-touched axis; chip clicks apply here
 let piNormalize=true;       // divide |φ| by |∇φ| → cylindrical pipes (r in distance units)
@@ -650,9 +644,10 @@ function updateEq(){
         : 'max(|<b>'+rawPresetFn.label+'</b>(p)|, |<b>'+rawPresetFn.label+'</b>(p+δ)|)';
       document.getElementById('eqbar').innerHTML = left + ' &lt; '+pipeR.toFixed(2);
     } else {
+      const offStr=off===0?'':' − '+off.toFixed(2);
       const lhs = modeShell
-        ? (shellNormalize ? '|<b>'+rawPresetFn.label+'</b>|/‖∇‖' : '|<b>'+rawPresetFn.label+'</b>|')
-        : '<b>'+rawPresetFn.label+'</b>';
+        ? (shellNormalize ? '|<b>'+rawPresetFn.label+'</b>'+offStr+'|/‖∇‖' : '|<b>'+rawPresetFn.label+'</b>'+offStr+'|')
+        : '<b>'+rawPresetFn.label+'</b>'+offStr;
       document.getElementById('eqbar').innerHTML=
         modeShell?lhs+' &lt; '+wall.toFixed(2):lhs+' = 0';
     }
@@ -666,7 +661,7 @@ function updateEq(){
   }).join('');
   if(modePi){
     const left = piNormalize
-      ? 'dist(p, {φ=0} ∩ {φ<sub>+δ</sub>=0)})  φ = '+eq
+      ? 'dist(p, {φ=0} ∩ {φ<sub>+δ</sub>=0})  φ = '+eq
       : 'max(|'+eq+'(p)|, |'+eq+'(p+δ)|)';
     document.getElementById('eqbar').innerHTML = left + ' &lt; '+pipeR.toFixed(2);
   } else {
@@ -681,7 +676,6 @@ function updateEq(){
 
 // ── Mode state ────────────────────────────────────────────────────────
 let shellMode=false,piMode=false,offsetVal=0,wallVal=0.3,pipeRVal=0.18,cellMult=1.0;
-let gradOn=false,gxLo=0.5,gxHi=2.0,gyLo=1.0,gyHi=1.0,gzLo=1.0,gzHi=1.0;
 
 function syncModeUI(){
   // show/hide controls
@@ -696,18 +690,18 @@ function syncModeUI(){
 }
 
 document.getElementById('mSolid').addEventListener('click',function(){
-  shellMode=false;piMode=false;syncModeUI();updateEq();updateMMHints();rebuildShader();
+  shellMode=false;piMode=false;syncModeUI();updateEq();updateMMHints();rebuildShader();onSurfaceChange();
 });
 document.getElementById('mShell').addEventListener('click',function(){
-  shellMode=true;piMode=false;syncModeUI();updateEq();updateMMHints();rebuildShader();
+  shellMode=true;piMode=false;syncModeUI();updateEq();updateMMHints();rebuildShader();onSurfaceChange();
 });
 document.getElementById('mPi').addEventListener('click',function(){
-  shellMode=false;piMode=true;syncModeUI();updateEq();updateMMHints();rebuildShader();
+  shellMode=false;piMode=true;syncModeUI();updateEq();updateMMHints();rebuildShader();onSurfaceChange();
 });
 
-document.getElementById('sOffset').addEventListener('input',function(){offsetVal=parseFloat(this.value);document.getElementById('vOffset').textContent=offsetVal.toFixed(2);updateMMHints();updateEq();rebuildShader();});
-document.getElementById('sWall').addEventListener('input',function(){wallVal=parseFloat(this.value);document.getElementById('vWall').textContent=wallVal.toFixed(2);updateMMHints();updateEq();rebuildShader();});
-document.getElementById('sPipeR').addEventListener('input',function(){pipeRVal=parseFloat(this.value);document.getElementById('vPipeR').textContent=pipeRVal.toFixed(2);updateMMHints();updateEq();rebuildShader();});
+document.getElementById('sOffset').addEventListener('input',function(){offsetVal=parseFloat(this.value);document.getElementById('vOffset').textContent=offsetVal.toFixed(2);updateMMHints();updateEq();rebuildShader();onSurfaceChange();});
+document.getElementById('sWall').addEventListener('input',function(){wallVal=parseFloat(this.value);document.getElementById('vWall').textContent=wallVal.toFixed(2);updateMMHints();updateEq();rebuildShader();onSurfaceChange();});
+document.getElementById('sPipeR').addEventListener('input',function(){pipeRVal=parseFloat(this.value);document.getElementById('vPipeR').textContent=pipeRVal.toFixed(2);updateMMHints();updateEq();rebuildShader();onSurfaceChange();});
 document.getElementById('sCells').addEventListener('input',function(){cellMult=parseFloat(this.value);document.getElementById('vCells').textContent=cellMult.toFixed(2)+'×';updateMMHints();rebuildShader();});
 
 // ── Cell size (mm) display layer — does NOT affect JSON export ────────
@@ -716,7 +710,8 @@ document.getElementById('sCells').addEventListener('input',function(){cellMult=p
 // Only annotates sliders where mm interpretation is unambiguous:
 //   - cells: spatial extent visible
 //   - pipe r: ONLY when piNormalize=on (otherwise r is in φ-value units, not distance)
-let cellSizeMM = parseFloat(localStorage.getItem('f13ld_tpms_cellSizeMM') || '2');
+let cellSizeMM = 2;
+try { cellSizeMM = parseFloat(localStorage.getItem('f13ld_tpms_cellSizeMM') || '2') || 2; } catch(e){}
 {
   const inp = document.getElementById('cellSizeMM');
   inp.value = cellSizeMM;
@@ -744,7 +739,7 @@ function updateMMHints(){
   const pipeEl = document.getElementById('vPipeR_mm');
   if(cellSizeMM > 0 && piMode){
     const prefix = piNormalize ? '' : '~';
-    pipeEl.textContent = '(' + prefix + (pipeRVal * factor).toFixed(3) + ' mm)';
+    pipeEl.textContent = '(r ' + prefix + (pipeRVal * factor).toFixed(3) + ' · Ø ' + prefix + (2 * pipeRVal * factor).toFixed(3) + ' mm)';
     pipeEl.classList.add('show');
   } else {
     pipeEl.textContent = '';
@@ -753,8 +748,9 @@ function updateMMHints(){
   // wall: exact in normalize-on, approximate (~) in normalize-off
   const wallEl = document.getElementById('vWall_mm');
   if(cellSizeMM > 0 && shellMode && !piMode){
+    // t is the half-thickness (|φ−c|/|∇φ| < t) → full wall = 2t
     const prefix = shellNormalize ? '' : '~';
-    wallEl.textContent = '(' + prefix + (wallVal * factor).toFixed(3) + ' mm)';
+    wallEl.textContent = '(wall ' + prefix + (2 * wallVal * factor).toFixed(3) + ' mm)';
     wallEl.classList.add('show');
   } else {
     wallEl.textContent = '';
@@ -765,8 +761,8 @@ function updateMMHints(){
   // units and the perpendicular displacement depends on |∇φ|, hence approximate.
   const offEl = document.getElementById('vOffset_mm');
   if(cellSizeMM > 0 && !piMode){
-    const prefix = (shellMode && shellNormalize) ? '' : '~';
-    offEl.textContent = '(' + prefix + (offsetVal * factor).toFixed(3) + ' mm)';
+    // offset is applied in φ units before any |∇φ| normalization → always approximate
+    offEl.textContent = '(~' + (offsetVal * factor).toFixed(3) + ' mm)';
     offEl.classList.add('show');
   } else {
     offEl.textContent = '';
@@ -797,72 +793,16 @@ function updateHomogMMHints(){
     savWrap.style.display = 'none';
   } else {
     savWrap.style.display = '';
-    const savRaw = res.savNorm * 2.5;  // un-normalize: savNorm = min(savRaw/2.5, 1)
-    const savReal = savRaw * 2 * Math.PI / cellSizeMM;
+    const savReal = res.savRaw * 2 * Math.PI / cellSizeMM;  // area per cell volume
     document.getElementById('mm-savReal').textContent = savReal.toFixed(2) + ' /mm';
   }
 }
-
-document.getElementById('gradToggle').addEventListener('click',function(){
-  gradOn=!gradOn;
-  this.textContent='gradient: '+(gradOn?'on':'off');
-  this.classList.toggle('on',gradOn);
-  ['gax','gay','gaz'].forEach(id=>document.getElementById(id).classList.toggle('enabled',gradOn));
-  rebuildShader();
-});
-['gxLo','gxHi','gyLo','gyHi','gzLo','gzHi'].forEach(id=>{
-  document.getElementById(id).addEventListener('input',function(){
-    gxLo=parseFloat(document.getElementById('gxLo').value);
-    gxHi=parseFloat(document.getElementById('gxHi').value);
-    gyLo=parseFloat(document.getElementById('gyLo').value);
-    gyHi=parseFloat(document.getElementById('gyHi').value);
-    gzLo=parseFloat(document.getElementById('gzLo').value);
-    gzHi=parseFloat(document.getElementById('gzHi').value);
-    document.getElementById('vgx').textContent=gxLo.toFixed(1)+'→'+gxHi.toFixed(1);
-    document.getElementById('vgy').textContent=gyLo.toFixed(1)+'→'+gyHi.toFixed(1);
-    document.getElementById('vgz').textContent=gzLo.toFixed(1)+'→'+gzHi.toFixed(1);
-    rebuildShader();
-  });
-});
 
 // ── buildFrag — core shader generator with PI-TPMS branch ─────────────
 const VERT='#version 300 es\nin vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
 function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
   const active=terms.filter(t=>t.on&&t.factors&&t.factors.length);
   const H=toFloat(Math.PI*cellMult);
-  const gxLoS=toFloat(gxLo),gxHiS=toFloat(gxHi);
-  const gyLoS=toFloat(gyLo),gyHiS=toFloat(gyHi);
-  const gzLoS=toFloat(gzLo),gzHiS=toFloat(gzHi);
-
-  // Shared field evaluation — builds the GLSL expression for φ(p)
-  // Takes a prefix so we can evaluate at both p and p+δ
-  function fieldLines(px,py,pz){
-    const coordLines=[
-      'float gx='+px+';','float gy='+py+';','float gz='+pz+';'
-    ];
-    if(gradOn){
-      // gradient modifies spatial frequency based on position
-      // for shifted version we still use the unshifted position for gradient mapping
-      // (gradient is a property of the spatial domain, not the surface)
-    }
-    if(rawPresetFn){
-      return coordLines.join('\n')+'\n  v='+rawPresetFn.glsl+';';
-    }
-    return coordLines.join('\n')+'\n'+active.map(t=>{
-      const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');
-      return'  v+='+toFloat(t.coef)+'*'+parts.join('*')+';';
-    }).join('\n');
-  }
-
-  const gradLines=gradOn?[
-    'float t01x=clamp((p.x+H)/(2.0*H),0.0,1.0);',
-    'float t01y=clamp((p.y+H)/(2.0*H),0.0,1.0);',
-    'float t01z=clamp((p.z+H)/(2.0*H),0.0,1.0);',
-    'float gxF=mix('+gxLoS+','+gxHiS+',t01x);',
-    'float gyF=mix('+gyLoS+','+gyHiS+',t01y);',
-    'float gzF=mix('+gzLoS+','+gzHiS+',t01z);',
-  ]:[];
-
   let baseFunc, implicitExpr;
 
   if(piMode){
@@ -875,9 +815,9 @@ function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
     // Each helper gets its own scope — no variable redeclaration possible
     // evalA evaluates φ at p, evalB evaluates φ at p+δ
     function makeEvalFn(fnName, ox, oy, oz) {
-      const gxExpr = 'p.x+'+ox+(gradOn?'*gxF':'');
-      const gyExpr = 'p.y+'+oy+(gradOn?'*gyF':'');
-      const gzExpr = 'p.z+'+oz+(gradOn?'*gzF':'');
+      const gxExpr = 'p.x+'+ox;
+      const gyExpr = 'p.y+'+oy;
+      const gzExpr = 'p.z+'+oz;
       const body = rawPresetFn
         ? 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; return '+rawPresetFn.glsl+';'
         : 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; float v=0.0;'
@@ -886,8 +826,7 @@ function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
               return' v+='+toFloat(t.coef)+'*'+parts.join('*')+';';
             }).join('')
           + ' return v;';
-      const gradBlock = gradOn ? gradLines.join(' ')+' ' : '';
-      return `float ${fnName}(vec3 p,float H){ ${gradBlock}${body} }`;
+      return `float ${fnName}(vec3 p,float H){ ${body} }`;
     }
 
     const evalA = makeEvalFn('evalA','0.0','0.0','0.0');
@@ -941,7 +880,7 @@ float piField(vec3 p,float H){ return max(abs(evalA(p,H)),abs(evalB(p,H))); }`;
       :active.map(t=>{const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');return'  v+='+toFloat(t.coef)+'*'+parts.join('*')+';';}).join('\n');
     const offS=toFloat(offsetVal);
     const wallS=toFloat(wallVal);
-    baseFunc=`float base(vec3 p,float H){float v=0.0;\n${gradLines.join('\n')}\nfloat gx=p.x${gradOn?'*gxF':''},gy=p.y${gradOn?'*gyF':''},gz=p.z${gradOn?'*gzF':''};${lines}\nreturn v;}`;
+    baseFunc=`float base(vec3 p,float H){float v=0.0;\nfloat gx=p.x,gy=p.y,gz=p.z;${lines}\nreturn v;}`;
     if(shellMode && shellNormalize){
       // Normalize the shell distance by |∇base| so wall thickness is a real
       // perpendicular distance independent of where on the surface we are.
@@ -1029,7 +968,7 @@ baseFunc,
 '  vec3 green=vec3(0.784,0.961,0.259);',
 '  vec3 col=iridBase*diff+vec3(1.0,1.0,1.0)*spec1+green*spec2*0.6+green*rim*0.45;',
 '  if(uClipAxis>0.5){vec3 axM2=vec3((uClipAxis<1.5)?1.0:0.0,(uClipAxis>1.5&&uClipAxis<2.5)?1.0:0.0,(uClipAxis>2.5)?1.0:0.0);float ccp=uClipPos*H;if(abs(dot(pos,axM2)-ccp)<0.02*H&&abs(dot(n,axM2))>0.7){vec3 axisCol=uClipAxis<1.5?vec3(0.1333,0.8275,0.9333):uClipAxis<2.5?vec3(0.9098,0.4745,0.9765):vec3(0.9804,0.8000,0.0824);col=mix(col,axisCol,0.30);}}',
-'  col=mix(bgCol,col,exp(-t*0.010));',
+'  col=mix(bgCol,col,exp(-max(t-tEn,0.0)*0.010));',
 '  fragColor=vec4(clamp(col,0.0,1.0),1.0);',
 '}'
   ].join('\n');
@@ -1039,10 +978,11 @@ let prog=null,uRes,uRot,uZoom,quadBuf=null;
 function mkShader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(s));return s;}
 function rebuildShader(){
   const p=gl.createProgram();
-  gl.attachShader(p,mkShader(gl.VERTEX_SHADER,VERT));
-  gl.attachShader(p,mkShader(gl.FRAGMENT_SHADER,buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult)));
+  const vs=mkShader(gl.VERTEX_SHADER,VERT),fs=mkShader(gl.FRAGMENT_SHADER,buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult));
+  gl.attachShader(p,vs);gl.attachShader(p,fs);
   gl.linkProgram(p);
-  if(!gl.getProgramParameter(p,gl.LINK_STATUS)){console.error(gl.getProgramInfoLog(p));return;}
+  gl.detachShader(p,vs);gl.detachShader(p,fs);gl.deleteShader(vs);gl.deleteShader(fs);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS)){console.error(gl.getProgramInfoLog(p));gl.deleteProgram(p);return;}
   if(prog)gl.deleteProgram(prog);
   prog=p;gl.useProgram(prog);
   if(!quadBuf){quadBuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,quadBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);}
@@ -1082,17 +1022,35 @@ rotMat=mat3Mul(rotAxisAngle(0,1,0,0.7),rotAxisAngle(1,0,0,0.5));
 
 let drag=false,scrub=false,lx=0,ly=0,camZoom=16,autoRot=true;
 function hitHandle(cx,cy){var hs=window.__clipHandleScreen;if(!hs)return false;var rect=canvas.getBoundingClientRect();return Math.hypot((cx-rect.left)-hs.x,(cy-rect.top)-hs.y)<16;}
-function applyScrub(cx,cy){var hs=window.__clipHandleScreen;if(!hs)return;var pd=(cx-lx)*hs.dirx+(cy-ly)*hs.diry;var dPos=(pd*(hs.axisStep/(hs.len||1)))/Math.PI;clipState.pos=Math.max(-1.0,Math.min(1.0,clipState.pos+dPos));}
+function applyScrub(cx,cy){var hs=window.__clipHandleScreen;if(!hs)return;var pd=(cx-lx)*hs.dirx+(cy-ly)*hs.diry;var dPos=(pd*(hs.axisStep/(hs.len||1)))/(Math.PI*cellMult);clipState.pos=Math.max(-1.0,Math.min(1.0,clipState.pos+dPos));}
 canvas.addEventListener('mousedown',e=>{lx=e.clientX;ly=e.clientY;autoRot=false;if(hitHandle(e.clientX,e.clientY)){scrub=true;}else{drag=true;}});
-canvas.addEventListener('touchstart',e=>{lx=e.touches[0].clientX;ly=e.touches[0].clientY;autoRot=false;if(hitHandle(e.touches[0].clientX,e.touches[0].clientY)){scrub=true;}else{drag=true;}e.preventDefault();},{passive:false});
-window.addEventListener('mouseup',()=>{drag=false;scrub=false;});window.addEventListener('touchend',()=>{drag=false;scrub=false;});
+// Touch: one finger rotates (or scrubs the clip handle); two fingers pinch to zoom.
+let pinch=null;   // {d0, z0} while two fingers are down
+const touchDist=ts=>Math.hypot(ts[0].clientX-ts[1].clientX,ts[0].clientY-ts[1].clientY);
+canvas.addEventListener('touchstart',e=>{
+  autoRot=false;e.preventDefault();
+  if(e.touches.length>=2){pinch={d0:touchDist(e.touches)||1,z0:camZoom};drag=false;scrub=false;return;}
+  lx=e.touches[0].clientX;ly=e.touches[0].clientY;
+  if(hitHandle(lx,ly)){scrub=true;}else{drag=true;}
+},{passive:false});
+canvas.addEventListener('touchend',e=>{
+  if(e.touches.length<2)pinch=null;
+  // one finger left after a pinch: resume rotating from where it is, without a jump
+  if(e.touches.length===1){lx=e.touches[0].clientX;ly=e.touches[0].clientY;drag=true;scrub=false;}
+},{passive:true});
+window.addEventListener('mouseup',()=>{drag=false;scrub=false;});window.addEventListener('touchend',e=>{if(!e.touches||e.touches.length===0){drag=false;scrub=false;pinch=null;}});
 window.addEventListener('mousemove',e=>{if(scrub){applyScrub(e.clientX,e.clientY);lx=e.clientX;ly=e.clientY;}else if(drag){applyDelta(e.clientX-lx,e.clientY-ly);lx=e.clientX;ly=e.clientY;}});
-window.addEventListener('touchmove',e=>{if(scrub){applyScrub(e.touches[0].clientX,e.touches[0].clientY);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();}else if(drag){applyDelta(e.touches[0].clientX-lx,e.touches[0].clientY-ly);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();}},{passive:false});
-canvas.addEventListener('wheel',e=>{camZoom=Math.max(6,Math.min(30,camZoom+e.deltaY*0.02));e.preventDefault();},{passive:false});
+window.addEventListener('touchmove',e=>{
+  if(pinch&&e.touches.length>=2){camZoom=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,pinch.z0*pinch.d0/(touchDist(e.touches)||1)));e.preventDefault();return;}
+  if(scrub){applyScrub(e.touches[0].clientX,e.touches[0].clientY);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();}
+  else if(drag){applyDelta(e.touches[0].clientX-lx,e.touches[0].clientY-ly);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();}
+},{passive:false});
+const ZOOM_MIN=6,ZOOM_MAX=90;   // camera distance; was 6–30
+canvas.addEventListener('wheel',e=>{camZoom=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,camZoom*Math.exp(e.deltaY*0.0012)));e.preventDefault();},{passive:false});
 
 function onClipPill(axis){if(clipState.axis===axis){clipState.axis=0;}else{clipState.axis=axis;clipState.pos=0.0;clipState.side=1;}updateClipPills();}
 function updateClipPills(){var cols={1:'#22d3ee',2:'#e879f9',3:'#facc15'},nm={1:'X',2:'Y',3:'Z'};[1,2,3].forEach(function(a){var el=document.getElementById('clipPill'+nm[a]);if(!el)return;if(clipState.axis===a){el.classList.add('active');el.style.color=cols[a];el.style.borderColor=cols[a];}else{el.classList.remove('active');el.style.color='#555';el.style.borderColor='#2a2a3a';}});}
-function drawClipHandle(rotMat,canvasW,canvasH,camZoom){window.__clipHandleScreen=null;if(clipState.axis<1)return;var cv=document.getElementById('axisCanvas');if(!cv||cv.style.display==='none')return;var ctx=cv.getContext('2d');var H_HALF=Math.PI;function proj(p){var tx=rotMat[0]*p[0]+rotMat[1]*p[1]+rotMat[2]*p[2];var ty=rotMat[3]*p[0]+rotMat[4]*p[1]+rotMat[5]*p[2];var tz=rotMat[6]*p[0]+rotMat[7]*p[1]+rotMat[8]*p[2];var pcz=tz-camZoom;if(pcz>-0.1)return null;var sscl=Math.min(canvasW,canvasH);return [canvasW/2+(-1.6*tx/pcz)*sscl,canvasH/2-(-1.6*ty/pcz)*sscl];}var aIdx=clipState.axis-1,cp=clipState.pos*H_HALF;var c=[0,0,0];c[aIdx]=cp;var sc=proj(c);if(!sc)return;var col=['#22d3ee','#e879f9','#facc15'][aIdx];ctx.save();var free=[0,1,2].filter(function(k){return k!==aIdx;});var sg=[[-1,-1],[1,-1],[1,1],[-1,1]];var pts=sg.map(function(g){var p=[0,0,0];p[aIdx]=cp;p[free[0]]=g[0]*H_HALF;p[free[1]]=g[1]*H_HALF;return proj(p);});if(pts.every(Boolean)){ctx.globalAlpha=0.5;ctx.lineWidth=1.5;ctx.strokeStyle=col;ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);ctx.lineTo(pts[1][0],pts[1][1]);ctx.lineTo(pts[2][0],pts[2][1]);ctx.lineTo(pts[3][0],pts[3][1]);ctx.closePath();ctx.stroke();}ctx.globalAlpha=0.95;ctx.lineWidth=2;ctx.strokeStyle=col;ctx.beginPath();ctx.arc(sc[0],sc[1],9,0,6.2832);ctx.stroke();ctx.globalAlpha=1;ctx.fillStyle=col;ctx.beginPath();ctx.arc(sc[0],sc[1],3.2,0,6.2832);ctx.fill();ctx.restore();var e=[0,0,0];e[aIdx]=cp+0.4;var se=proj(e);var dirx=0,diry=0,len=0;if(se){var dx=se[0]-sc[0],dy=se[1]-sc[1];len=Math.hypot(dx,dy)||1;dirx=dx/len;diry=dy/len;}window.__clipHandleScreen={x:sc[0],y:sc[1],dirx:dirx,diry:diry,len:len,axisStep:0.4};}
+function drawClipHandle(rotMat,canvasW,canvasH,camZoom){window.__clipHandleScreen=null;if(clipState.axis<1)return;var cv=document.getElementById('axisCanvas');if(!cv||cv.style.display==='none')return;var ctx=cv.getContext('2d');var H_HALF=Math.PI*cellMult;function proj(p){var tx=rotMat[0]*p[0]+rotMat[1]*p[1]+rotMat[2]*p[2];var ty=rotMat[3]*p[0]+rotMat[4]*p[1]+rotMat[5]*p[2];var tz=rotMat[6]*p[0]+rotMat[7]*p[1]+rotMat[8]*p[2];var pcz=tz-camZoom;if(pcz>-0.1)return null;var sscl=Math.min(canvasW,canvasH);return [canvasW/2+(-1.6*tx/pcz)*sscl,canvasH/2-(-1.6*ty/pcz)*sscl];}var aIdx=clipState.axis-1,cp=clipState.pos*H_HALF;var c=[0,0,0];c[aIdx]=cp;var sc=proj(c);if(!sc)return;var col=['#22d3ee','#e879f9','#facc15'][aIdx];ctx.save();var free=[0,1,2].filter(function(k){return k!==aIdx;});var sg=[[-1,-1],[1,-1],[1,1],[-1,1]];var pts=sg.map(function(g){var p=[0,0,0];p[aIdx]=cp;p[free[0]]=g[0]*H_HALF;p[free[1]]=g[1]*H_HALF;return proj(p);});if(pts.every(Boolean)){ctx.globalAlpha=0.5;ctx.lineWidth=1.5;ctx.strokeStyle=col;ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);ctx.lineTo(pts[1][0],pts[1][1]);ctx.lineTo(pts[2][0],pts[2][1]);ctx.lineTo(pts[3][0],pts[3][1]);ctx.closePath();ctx.stroke();}ctx.globalAlpha=0.95;ctx.lineWidth=2;ctx.strokeStyle=col;ctx.beginPath();ctx.arc(sc[0],sc[1],9,0,6.2832);ctx.stroke();ctx.globalAlpha=1;ctx.fillStyle=col;ctx.beginPath();ctx.arc(sc[0],sc[1],3.2,0,6.2832);ctx.fill();ctx.restore();var e=[0,0,0];e[aIdx]=cp+0.4;var se=proj(e);var dirx=0,diry=0,len=0;if(se){var dx=se[0]-sc[0],dy=se[1]-sc[1];len=Math.hypot(dx,dy)||1;dirx=dx/len;diry=dy/len;}window.__clipHandleScreen={x:sc[0],y:sc[1],dirx:dirx,diry:diry,len:len,axisStep:0.4};}
 function drawAxisGizmo(rotMat,canvasW,canvasH,camZoom){
   var cv=document.getElementById('axisCanvas');
   if(!cv)return;
@@ -1100,7 +1058,7 @@ function drawAxisGizmo(rotMat,canvasW,canvasH,camZoom){
   cv.width=Math.round(canvasW*dpr);cv.height=Math.round(canvasH*dpr);
   var ctx=cv.getContext('2d');
   ctx.scale(dpr,dpr);ctx.clearRect(0,0,canvasW,canvasH);
-  var H=Math.PI;
+  var H=Math.PI*cellMult;
   var cx=rotMat[6],cy=rotMat[7],cz=rotMat[8];
   function proj(p){
     var tx=rotMat[0]*p[0]+rotMat[1]*p[1]+rotMat[2]*p[2];
@@ -1183,7 +1141,8 @@ function isSolid(fn,x,y,z){
     }
     return Math.abs(v-offsetVal) < wallVal;
   }
-  return v > offsetVal;
+  // Solid = φ < offset, matching the viewport (shader: implicit = φ − offset, solid where < 0)
+  return v < offsetVal;
 }
 
 function computeMIL(vox,N){
@@ -1198,18 +1157,20 @@ function computeMIL(vox,N){
 
 function hsPlus(Es,nu,rho){
   const K1=Es/(3*(1-2*nu)),G1=Es/(2*(1+nu));
-  const Kp=K1*rho/(1+(1-rho)*3*K1/(3*K1+4*G1));
-  const Gp=G1*rho/(1+(1-rho)*6*(K1+2*G1)/(5*G1*(3*K1+4*G1)));
+  // Standard HS upper bound for a porous solid (void second phase)
+  const Kp=4*G1*K1*rho/(4*G1+3*K1*(1-rho));
+  const zeta=(G1/6)*(9*K1+8*G1)/(K1+2*G1);
+  const Gp=rho>0?G1+(1-rho)/(-1/G1+rho/(G1+zeta)):0;
   return{Ehsp:9*Kp*Gp/(3*Kp+Gp),Gp};
 }
 
-function surfaceAreaDensity(surfFn,offset,N){
+function surfaceAreaDensity(solidFn,N){
   const Nhi=Math.min(N*3,96),H=Math.PI,step=2*H/Nhi,N2hi=Nhi*Nhi,N3hi=Nhi*Nhi*Nhi;
   const vhi=new Uint8Array(N3hi);
   for(let ix=0;ix<Nhi;ix++){const x=-H+(ix+.5)*step;
     for(let iy=0;iy<Nhi;iy++){const y=-H+(iy+.5)*step;
       for(let iz=0;iz<Nhi;iz++){const z=-H+(iz+.5)*step;
-        if(surfFn(x,y,z)>offset)vhi[ix*N2hi+iy*Nhi+iz]=1;}}}
+        if(solidFn(x,y,z))vhi[ix*N2hi+iy*Nhi+iz]=1;}}}
   let ifaces=0;
   for(let ix=0;ix<Nhi;ix++)for(let iy=0;iy<Nhi;iy++)for(let iz=0;iz<Nhi;iz++){
     const v=vhi[ix*N2hi+iy*Nhi+iz];
@@ -1217,18 +1178,152 @@ function surfaceAreaDensity(surfFn,offset,N){
     if(v!==vhi[ix*N2hi+((iy+1)%Nhi)*Nhi+iz])ifaces++;
     if(v!==vhi[ix*N2hi+iy*Nhi+(iz+1)%Nhi])ifaces++;
   }
-  return(ifaces/(Nhi*Nhi*2*Math.PI))*(Math.PI/2);
+  // Voxel face counting overestimates a smooth surface's area by ~π/2 on average → divide.
+  // Result: surface area per total cell volume, in 1/internal-length units.
+  return(ifaces/(Nhi*Nhi*2*Math.PI))/(Math.PI/2);
+}
+
+// ── PI-TPMS stiffness predictor (Vixiv-trained) ─────────────────────────────
+// Trained 2026-09-29 on the Vixiv homogenization dataset (difsol 0.1.39):
+// PI-gyroid and PI-Fischer–Koch S, "round" (normalized) pipes, cubic cells,
+// 18 phase shifts × 20 pipe radii (r = 0.157–1.414), solid ν = 0.403.
+// Features, measured on a 32³ voxelization of one unit cell:
+//   vf    solid volume fraction
+//   link  does one connected piece of solid join its own copy one cell along
+//         the axis? No → that direction carries ~no load (strands / layers)
+//   kn    effective scalar conductivity along the axis ÷ vf (load-path directness)
+//   milr  mean-intercept-length along the axis ÷ mean of the three axes
+// Model (log10, moduli ÷ E_s):
+//   E_i  = a0 + a1·log vf + a2·log kn_i + a3·(log kn_i)² + a4·log milr_i
+//   G_ij = b0 + b1·log vf + b2·log k̄ + b3·(log k̄)²,   k̄ = √(kn_i·kn_j)
+// Cross-validated by training on one family and testing on the other:
+//   typical error ×1.8 (E) and ×1.2 (G); 1-σ spread ≈ ×2.2 (0.35 decades).
+//   Zero-stiffness directions caught 98% of the time.
+// To update with new data: refit (pi_predict_fit.py) and replace the numbers below.
+// Vixiv logo (links to vixiv.net) — credits the homogenization data behind the PI-TPMS model
+const VIXIV_LOGO='data:image/png;base64,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';
+const vixivLink=()=>'<a class="vixiv-link" href="https://vixiv.net/" target="_blank" rel="noopener" title="Vixiv — vixiv.net"><img src="'+VIXIV_LOGO+'" alt="Vixiv"></a>';
+const PIPRED={
+  version:'1 · 2026-09-29',
+  N:32, kVoid:1e-3,
+  axial:[0.3406,1.9050,2.2503,0.2497,-1.3613],
+  shear:[-0.4869,1.5748,0.2212,-1.4876],
+  sdLog10:0.35,
+  typErrE:1.78, typErrG:1.19,          // held-out-family typical error (×)
+  families:'PI-gyroid + PI-Fischer–Koch S',
+  milrClamp:[0.69,1.57], knFloor:1e-4,
+  rTrain:[0.157,1.414], nuTrain:0.403
+};
+function piVoxelize(fn,N){
+  const H=Math.PI,step=2*H/N,v=new Uint8Array(N*N*N);let n=0;
+  for(let ix=0;ix<N;ix++){const x=-H+(ix+.5)*step;
+    for(let iy=0;iy<N;iy++){const y=-H+(iy+.5)*step;
+      for(let iz=0;iz<N;iz++){const z=-H+(iz+.5)*step;
+        if(isSolid(fn,x,y,z)){v[(ix*N+iy)*N+iz]=1;n++;}}}}
+  return{v,vf:n/(N*N*N)};
+}
+// Periodic neighbour tables for an N³ grid laid out as (ix*N+iy)*N+iz
+function piNeighbours(N){
+  const M=N*N*N,st=[N*N,N,1],nP=[],nM=[];
+  for(let d=0;d<3;d++){const a=new Int32Array(M),b=new Int32Array(M);
+    for(let i=0;i<M;i++){const c=Math.floor(i/st[d])%N;a[i]=i+(((c+1)%N)-c)*st[d];b[i]=i+(((c-1+N)%N)-c)*st[d];}
+    nP.push(a);nM.push(b);}
+  return{nP,nM};
+}
+// Effective conductivity along axis ax: solid = 1, void = kVoid, unit applied
+// gradient, periodic cell. Preconditioned conjugate gradient, matrix-free.
+function piConduction(v,N,ax,kVoid,nb){
+  const M=N*N*N,{nP,nM}=nb,k=new Float64Array(M);
+  for(let i=0;i<M;i++)k[i]=v[i]?1:kVoid;
+  const kf=[0,1,2].map(d=>{const a=new Float64Array(M),n=nP[d];for(let i=0;i<M;i++){const j=n[i];a[i]=2*k[i]*k[j]/(k[i]+k[j]);}return a;});
+  const A=(u,out)=>{for(let i=0;i<M;i++){let s=0;for(let d=0;d<3;d++){const f=kf[d],jp=nP[d][i],jm=nM[d][i];s+=f[i]*(u[jp]-u[i])-f[jm]*(u[i]-u[jm]);}out[i]=-s;}};
+  const b=new Float64Array(M),diag=new Float64Array(M);
+  for(let i=0;i<M;i++){b[i]=kf[ax][i]-kf[ax][nM[ax][i]];let s=0;for(let d=0;d<3;d++)s+=kf[d][i]+kf[d][nM[d][i]];diag[i]=s;}
+  const u=new Float64Array(M),r=Float64Array.from(b),z=new Float64Array(M),pv=new Float64Array(M),Ap=new Float64Array(M);
+  let bn=0;for(let i=0;i<M;i++)bn+=b[i]*b[i];bn=Math.sqrt(bn)+1e-30;
+  for(let i=0;i<M;i++){z[i]=r[i]/diag[i];pv[i]=z[i];}
+  let rz=0;for(let i=0;i<M;i++)rz+=r[i]*z[i];
+  for(let it=0;it<800;it++){
+    A(pv,Ap);let pAp=0;for(let i=0;i<M;i++)pAp+=pv[i]*Ap[i];
+    const al=rz/pAp;let rn=0;
+    for(let i=0;i<M;i++){u[i]+=al*pv[i];r[i]-=al*Ap[i];rn+=r[i]*r[i];}
+    if(Math.sqrt(rn)/bn<1e-6)break;
+    let rz2=0;for(let i=0;i<M;i++){z[i]=r[i]/diag[i];rz2+=r[i]*z[i];}
+    const be=rz2/rz;rz=rz2;for(let i=0;i<M;i++)pv[i]=z[i]+be*pv[i];
+  }
+  let flux=0;const f=kf[ax],n=nP[ax];for(let i=0;i<M;i++)flux+=f[i]*(u[n[i]]-u[i]+1);
+  return flux/M;
+}
+// For each axis: does a connected piece of solid join its own copy one cell
+// along that axis? Labels a 3×3×3 tiling (6-connectivity) and checks the
+// centre cell against its neighbour copies.
+function piAxisLinks(v,N){
+  const T=3*N,T2=T*T,M=T2*T,lab=new Int32Array(M),stack=new Int32Array(M);
+  const solid=i=>{const X=Math.floor(i/T2)%N,Y=Math.floor(i/T)%T%N,Z=i%T%N;return v[(X*N+Y)*N+Z]===1;};
+  let L=0;
+  for(let s=0;s<M;s++){
+    if(lab[s]!==0)continue;
+    if(!solid(s)){lab[s]=-1;continue;}
+    L++;let sp=0;stack[sp++]=s;lab[s]=L;
+    while(sp){const c=stack[--sp];const cx=Math.floor(c/T2),cy=Math.floor(c/T)%T,cz=c%T;
+      if(cx>0){const q=c-T2;if(lab[q]===0){if(solid(q)){lab[q]=L;stack[sp++]=q;}else lab[q]=-1;}}
+      if(cx<T-1){const q=c+T2;if(lab[q]===0){if(solid(q)){lab[q]=L;stack[sp++]=q;}else lab[q]=-1;}}
+      if(cy>0){const q=c-T;if(lab[q]===0){if(solid(q)){lab[q]=L;stack[sp++]=q;}else lab[q]=-1;}}
+      if(cy<T-1){const q=c+T;if(lab[q]===0){if(solid(q)){lab[q]=L;stack[sp++]=q;}else lab[q]=-1;}}
+      if(cz>0){const q=c-1;if(lab[q]===0){if(solid(q)){lab[q]=L;stack[sp++]=q;}else lab[q]=-1;}}
+      if(cz<T-1){const q=c+1;if(lab[q]===0){if(solid(q)){lab[q]=L;stack[sp++]=q;}else lab[q]=-1;}}
+    }
+  }
+  const links=[false,false,false],sh=[N*T2,N*T,N];
+  for(let x=N;x<2*N;x++)for(let y=N;y<2*N;y++)for(let z=N;z<2*N;z++){
+    const c=x*T2+y*T+z,l=lab[c];if(l<=0)continue;
+    for(let a=0;a<3;a++)if(!links[a]&&lab[c+sh[a]]===l)links[a]=true;
+    if(links[0]&&links[1]&&links[2])return links;
+  }
+  return links;
+}
+function piPredict(fn,Es,rho){
+  const P=PIPRED,N=P.N,{v,vf}=piVoxelize(fn,N);
+  const out={links:[false,false,false],Ex:0,Ey:0,Ez:0,Gxy:0,Gxz:0,Gyz:0,vf32:vf};
+  if(vf<=0||rho<=0)return out;
+  const links=piAxisLinks(v,N);out.links=links;
+  const nb=piNeighbours(N);
+  const {milX,milY,milZ}=computeMIL(v,N),mils=[milX,milY,milZ],mm=(milX+milY+milZ)/3;
+  const kn=[0,1,2].map(a=>links[a]?Math.max(piConduction(v,N,a,P.kVoid,nb)/vf,P.knFloor):P.knFloor);
+  const lg=Math.log10,A=P.axial,B=P.shear,lv=lg(rho);
+  const E=[0,1,2].map(a=>{
+    if(!links[a])return 0;
+    const milr=Math.min(Math.max(mils[a]/mm,P.milrClamp[0]),P.milrClamp[1]),lk=lg(kn[a]);
+    return Es*Math.pow(10,A[0]+A[1]*lv+A[2]*lk+A[3]*lk*lk+A[4]*lg(milr));
+  });
+  const G=(i,j)=>{
+    if(!(links[i]&&links[j]))return 0;
+    const lk=lg(Math.sqrt(kn[i]*kn[j]));
+    return Es*Math.pow(10,B[0]+B[1]*lv+B[2]*lk+B[3]*lk*lk);
+  };
+  out.Ex=E[0];out.Ey=E[1];out.Ez=E[2];out.Gxy=G(0,1);out.Gxz=G(0,2);out.Gyz=G(1,2);out.kn=kn;
+  return out;
 }
 
 function runHomogenization(N,Es,nu){
   const fn=compileSurf(terms);
-  const H=Math.PI*cellMult,step=2*H/N,N2=N*N,N3=N*N*N;
+  // Always one period (one unit cell), independent of the viewport 'cells' slider,
+  // so the voxel window is periodic and matches the mm read-outs.
+  const H=Math.PI,step=2*H/N,N2=N*N,N3=N*N*N;
   const vox=new Uint8Array(N3);let nSolid=0;
   for(let ix=0;ix<N;ix++){const x=-H+(ix+.5)*step;
     for(let iy=0;iy<N;iy++){const y=-H+(iy+.5)*step;
       for(let iz=0;iz<N;iz++){const z=-H+(iz+.5)*step;
         if(isSolid(fn,x,y,z)){vox[ix*N2+iy*N+iz]=1;nSolid++;}}}}
   const rho=nSolid/N3;
+  if(piMode){
+    // PI-TPMS: Vixiv-trained predictor (see PIPRED). Volume fraction from the chosen grid.
+    const pr=piPredict(fn,Es,rho);
+    const Es_=[pr.Ex,pr.Ey,pr.Ez].filter(v=>v>0);
+    const aniso=Es_.length===3?Math.max(...Es_)/Math.min(...Es_):null;
+    return{rho,Ex:pr.Ex,Ey:pr.Ey,Ez:pr.Ez,Gxy:pr.Gxy,Gxz:pr.Gxz,Gyz:pr.Gyz,links:pr.links,
+      nuEff:nu*(1-rho),aniso,Ehsp:null,savNorm:0,savRaw:0,method:'pi-predict'};
+  }
   const{milX,milY,milZ}=computeMIL(vox,N);
   const hx=milX*milX,hy=milY*milY,hz=milZ*milZ,hmean=(hx+hy+hz)/3;
   const wx=hx/hmean,wy=hy/hmean,wz=hz/hmean;
@@ -1237,10 +1332,10 @@ function runHomogenization(N,Es,nu){
   const Gxy=Gp*Math.sqrt(wx*wy);
   const nuEff=nu*(1-rho);
   const aniso=Math.max(Ex,Ey,Ez)/Math.max(Math.min(Ex,Ey,Ez),1e-9);
-  const savFn=(x,y,z)=>fn(x,y,z);
-  const savRaw=piMode?0:surfaceAreaDensity(savFn,offsetVal,N); // SA/V not meaningful for pipes
-  const savNorm=Math.min(savRaw/2.5,1.0);
-  return{rho,Ex,Ey,Ez,Gxy,nuEff,aniso,Ehsp,savNorm};
+  const savRaw=piMode?0:surfaceAreaDensity((x,y,z)=>isSolid(fn,x,y,z),N); // disabled for pipes (cost)
+  // Bar normalization rescaled with the π/2 correction so the 0–1 bar reads as before.
+  const savNorm=Math.min(savRaw/(2.5/Math.pow(Math.PI/2,2)),1.0);
+  return{rho,Ex,Ey,Ez,Gxy,Gxz:Gxy,Gyz:Gxy,nuEff,aniso,Ehsp,savNorm,savRaw,method:'upper-bound'};
 }
 
 // Stiffness ellipsoid (unchanged from original)
@@ -1249,32 +1344,42 @@ let sRotMat=[1,0,0,0,1,0,0,0,1];
 let sInitialized=false;
 const SVERT='#version 300 es\nin vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
 
-function buildStiffFrag(Ex,Ey,Ez,Gxy,nu){
-  const E=(Ex+Ey+Ez)/3;
-  const S11=1/E,S12=-nu/E,S44=1/Gxy;
-  const d=(S11-S12)*(S11+2*S12);
-  const C11=(S11+S12)/d,C12=-S12/d,C44=1/S44;
-  const A=2*C44/(C11-C12);
-  const Gamma=2*S11-2*S12-S44;
-  const E100=1/S11;
-  const E111=Math.abs(S11-Gamma/3)>1e-9?1/(S11-Gamma/3):E100;
-  const Emax=Math.max(E100,E111,Ex,Ey,Ez)*1.08;
-  document.getElementById('zener-val').textContent=A.toFixed(3);
-  const Aclamp=Math.min(Math.max(A,0.3),2.5);
-  const pct=((Aclamp-0.3)/(2.5-0.3)*100).toFixed(1);
-  document.getElementById('zener-marker').style.left=pct+'%';
-  const Acol=A<0.8?'#e879f9':A<1.2?'#888':A<2.0?'#22d3ee':'#aaff00';
-  document.getElementById('zener-val').style.color=Acol;
-  const Albl=A<0.7?'strongly axial':A<0.9?'axial dominant':A<1.1?'near-isotropic':A<1.5?'diagonal dominant':'strongly diagonal';
-  document.getElementById('zener-label').textContent=Albl;
-  document.getElementById('zener-label').style.color=Acol;
-  function f(v){const s=v.toFixed(8);return s.includes('.')?s:s+'.0';}
+function buildStiffFrag(Ex,Ey,Ez,Gxy,nu,Gxz,Gyz,showZener){
+  // Orthotropic directional modulus: 1/E(n) = Σ nᵢ⁴/Eᵢ + Σ nᵢ²nⱼ²·(1/Gᵢⱼ − 2ν/√(EᵢEⱼ))
+  // Zero-stiffness directions are floored at 1e-3 of the stiffest so the glyph stays drawable.
+  if(Gxz===undefined)Gxz=Gxy; if(Gyz===undefined)Gyz=Gxy;
+  const Emx=Math.max(Ex,Ey,Ez,1e-12),fl=v=>Math.max(v,Emx*1e-3);
+  const e1=fl(Ex),e2=fl(Ey),e3=fl(Ez),g12=fl(Gxy),g13=fl(Gxz),g23=fl(Gyz);
+  const S1=1/e1,S2=1/e2,S3=1/e3;
+  const Sxy=1/g12-2*nu/Math.sqrt(e1*e2),Sxz=1/g13-2*nu/Math.sqrt(e1*e3),Syz=1/g23-2*nu/Math.sqrt(e2*e3);
+  const Edir=(x,y,z)=>{const a=x*x,b=y*y,c=z*z;return 1/Math.max(a*a*S1+b*b*S2+c*c*S3+a*b*Sxy+a*c*Sxz+b*c*Syz,1e-12);};
+  let Emax=0,Esum=0;const NS=2000;
+  for(let i=0;i<NS;i++){const zz=1-(i+.5)*2/NS,r=Math.sqrt(1-zz*zz),ph=i*2.399963;const E=Edir(r*Math.cos(ph),r*Math.sin(ph),zz);Emax=Math.max(Emax,E);Esum+=E;}
+  Emax*=1.08;Edir.mean=Esum/NS;buildStiffFrag.lastRatio=Emax/Math.max(Edir.mean,1e-12);
+  // Zener ratio: only meaningful for (near-)cubic results from the upper-bound path
+  if(showZener){
+    const E=(Ex+Ey+Ez)/3,s11=1/E,s12=-nu/E,d=(s11-s12)*(s11+2*s12);
+    const C11=(s11+s12)/d,C12=-s12/d,A=2*Gxy/(C11-C12);
+    document.getElementById('zener-val').textContent=A.toFixed(3);
+    const Aclamp=Math.min(Math.max(A,0.3),2.5);
+    document.getElementById('zener-marker').style.display='';
+    document.getElementById('zener-marker').style.left=((Aclamp-0.3)/(2.5-0.3)*100).toFixed(1)+'%';
+    const Acol=A<0.8?'#e879f9':A<1.2?'#888':A<2.0?'#22d3ee':'#aaff00';
+    document.getElementById('zener-val').style.color=Acol;
+    const Albl=A<0.7?'strongly axial':A<0.9?'axial dominant':A<1.1?'near-isotropic':A<1.5?'diagonal dominant':'strongly diagonal';
+    document.getElementById('zener-label').textContent=Albl;document.getElementById('zener-label').style.color=Acol;
+  } else {
+    document.getElementById('zener-val').textContent='n/a';document.getElementById('zener-val').style.color='#555';
+    document.getElementById('zener-marker').style.display='none';
+    document.getElementById('zener-label').textContent='orthotropic — see Ex, Ey, Ez';document.getElementById('zener-label').style.color='#555';
+  }
+  function f(v){const s=v.toExponential(8);return s;}
   return`#version 300 es
 precision highp float;
 out vec4 fragColor;
 uniform vec2 res;uniform mat3 rot;uniform float zoom;
-float S11=${f(S11)};float Gamma=${f(Gamma)};float Emax=${f(Emax)};
-float Edir(vec3 n){float w=n.x*n.x*n.y*n.y+n.y*n.y*n.z*n.z+n.z*n.z*n.x*n.x;return 1.0/max(abs(S11-(Gamma*0.5)*w),1e-6);}
+float S1=${f(S1)};float S2=${f(S2)};float S3=${f(S3)};float Sxy=${f(Sxy)};float Sxz=${f(Sxz)};float Syz=${f(Syz)};float Emax=${f(Emax)};
+float Edir(vec3 n){vec3 q=n*n;float inv=q.x*q.x*S1+q.y*q.y*S2+q.z*q.z*S3+q.x*q.y*Sxy+q.x*q.z*Sxz+q.y*q.z*Syz;return 1.0/max(inv,1e-12);}
 float implicit(vec3 P){float r=length(P);if(r<0.001)return -1.0;return r-Edir(P/r)/Emax;}
 vec3 nrm(vec3 P){float e=0.004;return normalize(vec3(implicit(P+vec3(e,0.0,0.0))-implicit(P-vec3(e,0.0,0.0)),implicit(P+vec3(0.0,e,0.0))-implicit(P-vec3(0.0,e,0.0)),implicit(P+vec3(0.0,0.0,e))-implicit(P-vec3(0.0,0.0,e))));}
 vec3 palette(float t){vec3 a=vec3(0.5,0.5,0.5),b=vec3(0.5,0.5,0.5),c=vec3(1.0,1.0,1.0),d=vec3(0.0,0.33,0.67);return a+b*cos(6.28318*(c*t+d));}
@@ -1287,8 +1392,8 @@ void main(){
   if(disc<0.0){fragColor=bg;return;}
   float sq=sqrt(disc);float tEn=max(-b2-sq,0.0),tEx=-b2+sq;
   if(tEx<0.0){fragColor=bg;return;}
-  float t=tEn,hit=-1.0,ss=0.018;float prev=implicit(ro+rd*t);
-  for(int i=0;i<280;i++){t+=ss;if(t>tEx)break;float g=implicit(ro+rd*t);if(prev*g<0.0){hit=t-ss*(g/(g-prev));break;}prev=g;}
+  float t=tEn,hit=-1.0,ss=0.012;float prev=implicit(ro+rd*t);
+  for(int i=0;i<420;i++){t+=ss;if(t>tEx)break;float g=implicit(ro+rd*t);if(prev*g<0.0){hit=t-ss*(g/(g-prev));break;}prev=g;}
   if(hit<0.0){fragColor=bg;return;}
   vec3 pos=ro+rd*hit;vec3 n=nrm(pos);if(dot(n,-rd)<0.0)n=-n;
   float Eval=Edir(normalize(pos));float Enorm=clamp(Eval/Emax,0.0,1.0);
@@ -1317,20 +1422,21 @@ let sZoom=2.6;
 function initStiffnessGL(){
   const cv=document.getElementById('ellcv');
   const w=cv.offsetWidth||180;cv.width=w;cv.height=w;
-  sgl=cv.getContext('webgl2')||cv.getContext('webgl');if(!sgl){cv.style.display='none';return false;}
+  sgl=cv.getContext('webgl2');if(!sgl){cv.style.display='none';return false;}
   if(!squadBuf){squadBuf=sgl.createBuffer();sgl.bindBuffer(sgl.ARRAY_BUFFER,squadBuf);sgl.bufferData(sgl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),sgl.STATIC_DRAW);}
   sRotMat=mat3Mul(rotAxisAngle(0,1,0,0.6),rotAxisAngle(1,0,0,-0.3));
   sInitialized=true;return true;
 }
-function rebuildStiffnessShader(Ex,Ey,Ez,Gxy,nu){
+function rebuildStiffnessShader(Ex,Ey,Ez,Gxy,nu,Gxz,Gyz,showZener){
   if(!sInitialized&&!initStiffnessGL())return;
-  const Emean=(Ex+Ey+Ez)/3;const EmaxVal=Math.max(Ex,Ey,Ez)*1.08;
-  sZoom=3.4*(EmaxVal/Emean);
+
   const p=sgl.createProgram();
-  sgl.attachShader(p,mkSShader(sgl.VERTEX_SHADER,SVERT));
-  sgl.attachShader(p,mkSShader(sgl.FRAGMENT_SHADER,buildStiffFrag(Ex,Ey,Ez,Gxy,nu)));
+  const vs=mkSShader(sgl.VERTEX_SHADER,SVERT),fs=mkSShader(sgl.FRAGMENT_SHADER,buildStiffFrag(Ex,Ey,Ez,Gxy,nu,Gxz,Gyz,showZener));
+  sZoom=3.3;   // surface is normalized to its own maximum, so a fixed distance fills the canvas
+  sgl.attachShader(p,vs);sgl.attachShader(p,fs);
   sgl.linkProgram(p);
-  if(!sgl.getProgramParameter(p,sgl.LINK_STATUS)){console.error(sgl.getProgramInfoLog(p));return;}
+  sgl.detachShader(p,vs);sgl.detachShader(p,fs);sgl.deleteShader(vs);sgl.deleteShader(fs);
+  if(!sgl.getProgramParameter(p,sgl.LINK_STATUS)){console.error(sgl.getProgramInfoLog(p));sgl.deleteProgram(p);return;}
   if(sprog)sgl.deleteProgram(sprog);
   sprog=p;sgl.useProgram(sprog);
   sgl.bindBuffer(sgl.ARRAY_BUFFER,squadBuf);
@@ -1352,42 +1458,80 @@ function drawStiffnessSurface(){
   sgl.drawArrays(sgl.TRIANGLE_STRIP,0,4);
 }
 
-function renderBells(axes,vals,N){
+function renderBells(axes,vals,sdLog10,U){
+  // Log-normal spread (median = value, 1σ = ×10^sd). Zero directions shown as "~0".
   const container=document.getElementById('bell-rows');container.innerHTML='';
-  const sigFrac=Math.sqrt(0.18*0.18+(8/N)*(8/N));
-  const W=120,Hmax=64,pad=8;
-  const maxVal=Math.max(...vals.filter(v=>v>0),0.01);
+  // Cell height ∝ value relative to the largest (floor 40%), so the stiffest direction stands tallest.
+  // The curve height (not the label rows) scales with value, so the stiffest direction stands tallest
+  // and even the smallest curve stays readable: 56 px for the largest value, 10 px minimum.
+  const W=120,pad=8,K=10**sdLog10,CURVE_MAX=56,CURVE_MIN=10,LABELS=24;
+  const maxVal=Math.max(...vals.filter(v=>v>0),1e-30);
+  const cellH=v=>LABELS+(v>0?Math.max(Math.round(CURVE_MAX*(v/maxVal)),CURVE_MIN):CURVE_MIN);
   const row=document.createElement('div');
-  row.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:4px;align-items:end';
+  row.className='bell-grid';row.style.cssText='display:grid;grid-template-columns:repeat('+axes.length+',1fr);gap:4px;align-items:end';
+  U=U||stiffUnit(vals);const fmt=v=>fmtStiff(v,U);
+  function hexAlpha(hex,a){const r=parseInt(hex.slice(1,3),16),g2=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g2},${b},${a})`;}
   axes.forEach(({label,color},i)=>{
-    const mu=vals[i],sigma=mu*sigFrac;
-    if(mu<=0)return;
-    const H=Math.max(Math.round(Hmax*(mu/maxVal)),Math.round(Hmax*0.40));
-    const curveTop=13,curveBot=H-11,curveH=curveBot-curveTop;
-    const xMin=Math.max(0,mu-3.2*sigma),xMax=mu+3.2*sigma,range=xMax-xMin;
-    function tx(v){return pad+(v-xMin)/range*(W-2*pad);}
-    function g(x){const z=(x-mu)/sigma;return Math.exp(-0.5*z*z);}
-    const nPts=60,pts=[];
-    for(let k=0;k<=nPts;k++){const x=xMin+k/nPts*range;pts.push([tx(x),curveBot-g(x)*curveH*0.88]);}
+    const mu=vals[i],Hc=cellH(mu);const cell=document.createElement('div');cell.style.cssText='background:#0e0e1a;border-radius:4px;overflow:hidden';
+    if(!(mu>0)){
+      cell.innerHTML=`<svg width="100%" viewBox="0 0 ${W} ${Hc}" style="display:block"><text x="${W/2}" y="9" text-anchor="middle" font-size="9" font-weight="500" fill="${color}">${label}</text><text x="${W/2}" y="${Hc-3}" text-anchor="middle" font-size="8" fill="${color}">~0 <tspan fill="#666" font-size="6.5">· no load path</tspan></text></svg>`;
+      row.appendChild(cell);return;}
+    const lm=Math.log10(mu),lo=lm-3*sdLog10,hi=lm+3*sdLog10,tx=l=>pad+(l-lo)/(hi-lo)*(W-2*pad);
+    const top=13,bot=Hc-11,h=bot-top,g=l=>Math.exp(-0.5*((l-lm)/sdLog10)**2);
+    const pts=[];for(let k=0;k<=60;k++){const l=lo+k/60*(hi-lo);pts.push([tx(l),bot-g(l)*h*0.88]);}
     const curve=pts.map((p,k)=>(k===0?'M':'L')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
-    function fillBand(lo,hi){
-      const fp=[];
-      for(let k=0;k<=nPts;k++){const x=xMin+k/nPts*range;if(x<lo||x>hi)continue;fp.push([tx(x),curveBot-g(x)*curveH*0.88]);}
-      if(fp.length<2)return'';
-      return'M'+fp[0][0].toFixed(1)+' '+curveBot+' L'+fp.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+' L'+fp[fp.length-1][0].toFixed(1)+' '+curveBot+' Z';
-    }
-    function hexAlpha(hex,a){const r=parseInt(hex.slice(1,3),16),g2=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g2},${b},${a})`;}
-    const px=tx(mu).toFixed(1);
-    const cell=document.createElement('div');cell.style.cssText='background:#0e0e1a;border-radius:4px;overflow:hidden';
-    cell.innerHTML=`<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block">
-      <path d="${fillBand(mu-2*sigma,mu+2*sigma)}" fill="${hexAlpha(color,0.12)}"/>
-      <path d="${fillBand(mu-sigma,mu+sigma)}" fill="${hexAlpha(color,0.28)}"/>
+    const band=(a,b)=>{const fp=[];for(let k=0;k<=60;k++){const l=lo+k/60*(hi-lo);if(l<a||l>b)continue;fp.push([tx(l),bot-g(l)*h*0.88]);}
+      return fp.length<2?'':'M'+fp[0][0].toFixed(1)+' '+bot+' L'+fp.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+' L'+fp[fp.length-1][0].toFixed(1)+' '+bot+' Z';};
+    const px=tx(lm).toFixed(1);
+    cell.innerHTML=`<svg width="100%" viewBox="0 0 ${W} ${Hc}" style="display:block">
+      <path d="${band(lm-2*sdLog10,lm+2*sdLog10)}" fill="${hexAlpha(color,0.12)}"/>
+      <path d="${band(lm-sdLog10,lm+sdLog10)}" fill="${hexAlpha(color,0.28)}"/>
       <path d="${curve}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.9"/>
-      <line x1="${px}" y1="${curveBot}" x2="${px}" y2="${curveTop}" stroke="${color}" stroke-width="1" opacity="0.4" stroke-dasharray="2 2"/>
-      <line x1="${pad}" y1="${curveBot}" x2="${W-pad}" y2="${curveBot}" stroke="#333" stroke-width="0.5"/>
+      <line x1="${px}" y1="${bot}" x2="${px}" y2="${top}" stroke="${color}" stroke-width="1" opacity="0.4" stroke-dasharray="2 2"/>
+      <line x1="${pad}" y1="${bot}" x2="${W-pad}" y2="${bot}" stroke="#333" stroke-width="0.5"/>
       <text x="${W/2}" y="9" text-anchor="middle" font-size="9" font-weight="500" fill="${color}">${label}</text>
-      <text x="${px}" y="${H-3}" text-anchor="middle" font-size="8" fill="${color}" opacity="0.85">${mu.toFixed(1)}</text>
-      <text x="${W/2}" y="${H-3}" text-anchor="middle" font-size="7" fill="#444" dx="${parseInt(px)>W/2?'-18':'18'}">±${sigma.toFixed(1)}</text>
+      <text x="${px}" y="${Hc-3}" text-anchor="middle" font-size="8" fill="${color}" opacity="0.9">${fmt(mu)} ${U.name}</text>
+      <text x="${pad}" y="${Hc-3}" text-anchor="start" font-size="6.5" fill="#555">${fmt(mu/K)}</text>
+      <text x="${W-pad}" y="${Hc-3}" text-anchor="end" font-size="6.5" fill="#555">${fmt(mu*K)}</text>
+    </svg>`;
+    row.appendChild(cell);
+  });
+  container.appendChild(row);
+}
+
+// One display unit for all stiffness values of a result (inputs in GPa), chosen from the largest:
+// ≥ 1 GPa → GPa, ≥ 1 MPa → MPa, otherwise kPa. Export stays in GPa.
+function stiffUnit(vals){
+  const m=Math.max(...vals.filter(v=>v>0),0);
+  return (m>=1||m===0)?{name:'GPa',k:1}:m>=1e-3?{name:'MPa',k:1e3}:{name:'kPa',k:1e6};
+}
+function fmtStiff(v,u){
+  if(!(v>0))return '~0';
+  const x=v*u.k;
+  return x>=100?x.toFixed(0):x>=1e-3?x.toPrecision(3):x.toExponential(1);   // 3 significant figures
+}
+function renderCeilings(axes,vals,U){
+  // Solid / thin-wall modes: the value is an upper limit, so draw a ceiling marker per axis with a
+  // band fading downward ("likely below"). Cell height scales with value, like the PI-TPMS curves.
+  const container=document.getElementById('bell-rows');container.innerHTML='';
+  const W=120,pad=8,CURVE_MAX=56,CURVE_MIN=10,LABELS=24;
+  const maxVal=Math.max(...vals.filter(v=>v>0),1e-30);
+  const cellH=v=>LABELS+(v>0?Math.max(Math.round(CURVE_MAX*(v/maxVal)),CURVE_MIN):CURVE_MIN);
+  U=U||stiffUnit(vals);
+  const row=document.createElement('div');
+  row.className='bell-grid';row.style.cssText='display:grid;grid-template-columns:repeat('+axes.length+',1fr);gap:4px;align-items:end';
+  axes.forEach(({label,color},i)=>{
+    const v=vals[i],Hc=cellH(v),top=13,bot=Hc-11,gid='ceil-'+label.replace(/\W/g,'');
+    const cell=document.createElement('div');cell.style.cssText='background:#0e0e1a;border-radius:4px;overflow:hidden';
+    const hint=(bot-top)>=22?`<text x="${W/2}" y="${(top+bot)/2+3}" text-anchor="middle" font-size="7" fill="${color}" opacity="0.7">likely below ↓</text>`:'';
+    cell.innerHTML=`<svg width="100%" viewBox="0 0 ${W} ${Hc}" style="display:block">
+      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity="0.38"/><stop offset="1" stop-color="${color}" stop-opacity="0.02"/></linearGradient></defs>
+      <rect x="${pad}" y="${top}" width="${W-2*pad}" height="${Math.max(bot-top,1)}" fill="url(#${gid})"/>
+      <line x1="${pad}" y1="${top}" x2="${W-pad}" y2="${top}" stroke="${color}" stroke-width="2"/>
+      <line x1="${pad}" y1="${bot}" x2="${W-pad}" y2="${bot}" stroke="#333" stroke-width="0.5"/>
+      ${hint}
+      <text x="${W/2}" y="9" text-anchor="middle" font-size="9" font-weight="500" fill="${color}">${label}</text>
+      <text x="${W/2}" y="${Hc-3}" text-anchor="middle" font-size="8" fill="${color}" opacity="0.9">≤ ${fmtStiff(v,U)} ${U.name}</text>
     </svg>`;
     row.appendChild(cell);
   });
@@ -1405,17 +1549,39 @@ document.getElementById('runBtn').addEventListener('click',async function(){
   const res=runHomogenization(N,Es,nu);
   document.getElementById('homo-status').textContent=N+'³ · '+modeLabel+' · ρ='+(res.rho*100).toFixed(1)+'%';
   document.getElementById('rv').textContent=(res.rho*100).toFixed(1)+'%';
-  document.getElementById('rex').textContent=res.Ex.toFixed(1);
-  document.getElementById('rey').textContent=res.Ey.toFixed(1);
-  document.getElementById('rez').textContent=res.Ez.toFixed(1);
-  document.getElementById('rani').textContent=(()=>{
+  const isPred=res.method==='pi-predict';
+  const U=stiffUnit([res.Ex,res.Ey,res.Ez,res.Gxy]);
+  document.querySelectorAll('.stiff-unit').forEach(s=>s.textContent=' '+U.name);
+  document.getElementById('rex').textContent=fmtStiff(res.Ex,U);
+  document.getElementById('rey').textContent=fmtStiff(res.Ey,U);
+  document.getElementById('rez').textContent=fmtStiff(res.Ez,U);
+  document.getElementById('rani').textContent=isPred?'n/a':(()=>{
     const E=(res.Ex+res.Ey+res.Ez)/3,nu2=res.nuEff||0.3;
     const S11=1/E,S12=-nu2/E,d=(S11-S12)*(S11+2*S12);
     const C11=(S11+S12)/d,C12=-S12/d,C44=res.Gxy;
     return (2*C44/(C11-C12)).toFixed(3);
   })();
-  document.getElementById('rgxy').textContent=res.Gxy.toFixed(1);
-  document.getElementById('rnu').textContent=res.nuEff.toFixed(3);
+  document.getElementById('rgxy').textContent=fmtStiff(res.Gxy,U);
+  document.getElementById('rnu').textContent=isPred?'n/a':res.nuEff.toFixed(3);
+  // Method banner + caveats
+  const mEl=document.getElementById('homo-method');
+  if(isPred){
+    const warn=[];
+    if(!piNormalize)warn.push('normalize is off (trained on normalized pipes)');
+    if(pipeRVal<PIPRED.rTrain[0]||pipeRVal>PIPRED.rTrain[1])warn.push('pipe r outside the trained range '+PIPRED.rTrain[0]+'–'+PIPRED.rTrain[1]);
+    if(Math.abs(nu-PIPRED.nuTrain)>0.05)warn.push('trained at ν = '+PIPRED.nuTrain+'; values scale with E_s, weakly with ν');
+    const zeros=['x','y','z'].filter((a,i)=>!res.links[i]);
+    mEl.className='homo-method pred';
+    mEl.innerHTML=vixivLink()+'<b>trained estimate</b> · typically within ×'+PIPRED.typErrE.toFixed(1)+' (stiffness) and ×'+PIPRED.typErrG.toFixed(1)+' (shear) of finite-element results for PI-TPMS.'+
+      (zeros.length?' No connected load path along '+zeros.join(', ')+' → ~0.':'')+
+      (warn.length?'<br><span class="warn">Rougher here: '+warn.join('; ')+'.</span>':'');
+  } else {
+    mEl.className='homo-method bound';
+    mEl.innerHTML='<b>Upper limit</b> · Hashin–Shtrikman bound split by MIL fabric. Real lattices are usually well below this, often several times lower for thin or bending-dominated structures.';
+  }
+  document.getElementById('method-note').innerHTML=isPred
+    ?'PI-TPMS estimate (model v'+PIPRED.version+'): features from a 32³ voxel cell — volume fraction, per-axis load-path connectivity, effective conductivity and MIL — mapped to Eᵢ and Gᵢⱼ by a fit to '+vixivLink()+'homogenization data ('+PIPRED.families+'). Volume fraction uses the selected grid. Zener ratio and Poisson\'s ratio are not estimated in this mode.'
+    :'Upper limit: Hashin–Shtrikman bound from ρ, split across axes by MIL fabric weights. Useful for comparing designs, not for sizing. Surface complexity = surface area per cell volume, normalized to [0,1].';
   const savColor=res.savNorm<0.42?'#60a5fa':res.savNorm<0.65?'#2dd4bf':res.savNorm<0.88?'#22c55e':'#aaff00';
   const savLabel=res.savNorm<0.42?'low':res.savNorm<0.65?'moderate':res.savNorm<0.88?'high':'very high';
   document.getElementById('rsav').textContent=piMode?'n/a':res.savNorm.toFixed(2);
@@ -1424,13 +1590,23 @@ document.getElementById('runBtn').addEventListener('click',async function(){
   document.getElementById('sav-bar').style.background=savColor;
   document.getElementById('sav-note').textContent=piMode?'pipe network':savLabel;
   document.getElementById('sav-note').style.color=piMode?'#c8ff80':savColor;
+  document.getElementById('sav-block').style.display=piMode?'none':'';
   document.getElementById('homo-results').style.display='block';
   await new Promise(r=>setTimeout(r,10));
-  rebuildStiffnessShader(res.Ex,res.Ey,res.Ez,res.Gxy,res.nuEff||0.3);
-  renderBells(
-    [{label:'Ex',color:'#22d3ee'},{label:'Ey',color:'#e879f9'},{label:'Ez',color:'#facc15'}],
-    [res.Ex,res.Ey,res.Ez],N
-  );
+  rebuildStiffnessShader(res.Ex,res.Ey,res.Ez,res.Gxy,res.nuEff||0.3,res.Gxz,res.Gyz,!isPred);
+  document.getElementById('bell-wrap').style.display='';
+  const AX4=[{label:'Ex',color:'#22d3ee'},{label:'Ey',color:'#e879f9'},{label:'Ez',color:'#facc15'},{label:'Gxy',color:'#a78bfa'}];
+  if(!isPred){
+    document.getElementById('bell-title').textContent='Upper limit per axis';
+    document.getElementById('bell-sub').textContent='Hashin–Shtrikman ceiling split by MIL fabric. The true stiffness sits below each marker, often well below for thin or bending-dominated lattices.';
+    renderCeilings(AX4,[res.Ex,res.Ey,res.Ez,res.Gxy],U);
+  } else {
+    document.getElementById('bell-title').textContent='Likely range of true stiffness';
+    document.getElementById('bell-sub').textContent='Log-normal spread from testing the model on a PI-TPMS family it was not trained on: shaded bands = 1σ (×'+(10**PIPRED.sdLog10).toFixed(1)+') and 2σ. Small numbers at the edges mark the 1σ range.';
+    renderBells(
+      [{label:'Ex',color:'#22d3ee'},{label:'Ey',color:'#e879f9'},{label:'Ez',color:'#facc15'},{label:'Gxy',color:'#a78bfa'}],
+      [res.Ex,res.Ey,res.Ez,res.Gxy],PIPRED.sdLog10,U);
+  }
   lastHomogResult={res,N,Es,nu};
   updateHomogMMHints();
   document.getElementById('exportBtn').textContent='Export JSON (+ homog)';
@@ -1464,7 +1640,7 @@ function buildExportJSON(){
     pipe_radius:piMode?pipeRVal:null,
     pi_normalize:piMode?piNormalize:null,
     phase_shift:piMode?{x:piShift.x,y:piShift.y,z:piShift.z}:null,
-    gradient:gradOn?{enabled:true,x:{lo:gxLo,hi:gxHi},y:{lo:gyLo,hi:gyHi},z:{lo:gzLo,hi:gzHi}}:{enabled:false}
+    gradient:{enabled:false} // feature removed in 0.9.7; key kept for F13LD.mesh compatibility
   };
   let homogBlock=null;
   if(lastHomogResult){
@@ -1472,13 +1648,18 @@ function buildExportJSON(){
     homogBlock={grid:N,E_solid_GPa:Es,poisson:nu,
       volume_fraction:parseFloat((res.rho*100).toFixed(2)),
       Ex_GPa:parseFloat(res.Ex.toFixed(3)),Ey_GPa:parseFloat(res.Ey.toFixed(3)),Ez_GPa:parseFloat(res.Ez.toFixed(3)),
-      Gxy_GPa:parseFloat(res.Gxy.toFixed(3)),nu_eff:parseFloat(res.nuEff.toFixed(4)),
-      anisotropy:parseFloat(res.aniso.toFixed(4)),
+      Gxy_GPa:parseFloat(res.Gxy.toFixed(3)),
+      Gxz_GPa:res.method==='pi-predict'?parseFloat(res.Gxz.toFixed(3)):null,
+      Gyz_GPa:res.method==='pi-predict'?parseFloat(res.Gyz.toFixed(3)):null,
+      nu_eff:res.method==='pi-predict'?null:parseFloat(res.nuEff.toFixed(4)),
+      anisotropy:res.aniso==null?null:parseFloat(res.aniso.toFixed(4)),
+      load_path:res.method==='pi-predict'?{x:res.links[0],y:res.links[1],z:res.links[2]}:null,
       surface_complexity:piMode?null:parseFloat(res.savNorm.toFixed(3)),
-      method:'MIL-HS'};
+      method:res.method==='pi-predict'?'PI-TPMS Vixiv-trained estimate v'+PIPRED.version:'MIL-HS upper bound',
+      uncertainty_log10_sd:res.method==='pi-predict'?PIPRED.sdLog10:null};
   }
   const out={
-    meta:{version:'0.9.6',timestamp:new Date().toISOString(),
+    meta:{version:'1.0.1',timestamp:new Date().toISOString(),
       preset:rawPresetFn?rawPresetFn.label:(terms.length?currentPreset:'custom')},
     surface:surfaceBlock,geometry:geometryBlock
   };
@@ -1666,7 +1847,7 @@ requestAnimationFrame(frame);
   var TUTORIAL_URL = 'https://tutorial.f13ld.app/tpms';
   var TOOL_TITLE   = 'tpms';
   var ROW_SEL      = '.sc-group';   /* the per-control row container for this tool */
-  var INTRO = 'F13LD.tpms turns triply-periodic minimal surfaces into printable lattices, straight from their implicit equations \u2014 pick a surface, give it volume, then grade or phase-shift it. Tap any i beside a control to jump here.';
+  var INTRO = 'F13LD.tpms turns triply-periodic minimal surfaces into printable lattices, straight from their implicit equations \u2014 pick a surface, give it volume, then phase-shift it. Tap any i beside a control to jump here.';
 
   var SECTIONS = [
     { title:'Mode', items:[
@@ -1689,11 +1870,11 @@ requestAnimationFrame(frame);
         see:'Sweeps solid fraction up or down; struts thicken, then pinch off near the extremes.',
         why:'Your volume-fraction / relative-density dial in solid mode.' },
       { id:'wall', label:'wall t', range:'0.02 \u2013 1.5 \u00b7 thin-wall', anchor:{row:'#sWall'},
-        what:'Shell thickness in thin-wall mode. The normalize toggle divides by |\u2207\u03c6| so thickness is a true perpendicular distance.',
+        what:'Shell half-thickness in thin-wall mode (the full wall is 2t; the mm read-out shows the full wall). The normalize toggle divides by |\u2207\u03c6| so thickness is a true perpendicular distance.',
         see:'The shell fattens or thins; normalize on keeps it uniform across the surface, off lets it vary with the gradient.',
         why:'Relative density for shells \u2014 normalize on for constant-thickness walls.' },
       { id:'pipe', label:'pipe r', range:'0.02 \u2013 0.8 \u00b7 PI-TPMS', anchor:{row:'#sPipeR'},
-        what:'Radius of the cylindrical pipes in PI-TPMS mode.',
+        what:'Radius of the cylindrical pipes in PI-TPMS mode (the mm read-out also shows the diameter). The stiffness estimate was trained on r = 0.16\u20131.41.',
         see:'Struts grow or shrink in cross-section.',
         why:'Relative density for the pipe network \u2014 the beam-like analogue of wall thickness.' }
     ]},
@@ -1712,14 +1893,8 @@ requestAnimationFrame(frame);
         why:'Snap for clean symmetric phases; off to chase off-grid ratios.' },
       { id:'pichips', label:'quick set \u00b7 \u03c0/6 \u2026 golden',
         what:'One-tap phase ratios: \u03c0/6, \u03c0/3, 2\u03c0/5, 2\u03c0/3, and golden (1/\u03c6\u00b2).',
-        see:'Jumps every axis to a named symmetry \u2014 hex, pentagonal, triangular, or quasi-periodic.',
+        see:'Sets the last-touched axis (\u0394x, \u0394y or \u0394z) to a named symmetry \u2014 hex, pentagonal, triangular, or quasi-periodic.',
         why:'Shortcuts to biomimetic phase relationships (needs snap off).' }
-    ]},
-    { title:'Gradient', items:[
-      { id:'gradient', label:'gradient \u00b7 per-axis lo \u2192 hi', anchor:{after:'#gradToggle'},
-        what:'Ramps cell frequency across the domain, independently on X, Y, Z, from a low to a high multiplier.',
-        see:'Cells stretch and compress across space \u2014 fine on one side, coarse on the other.',
-        why:'Functionally-graded lattices \u2014 vary stiffness or pore size spatially without changing the base surface.' }
     ]},
     { title:'Surfaces', items:[
       { id:'presets', label:'preset surfaces', anchor:{titleBefore:'#presetSel'},
@@ -1749,7 +1924,7 @@ requestAnimationFrame(frame);
       { id:'run', label:'Run homogenization',
         what:'Estimates the directional-stiffness surface, volume fraction, and surface complexity for the current geometry.',
         see:'Fills the stiffness glyph, the per-axis moduli, the Zener ratio, and the surface-complexity bar.',
-        why:'A fast estimate (MIL fabric + Hashin\u2013Shtrikman ceiling); F13LD.lab does the rigorous FFT version.' }
+        why:'PI-TPMS: a Vixiv-trained estimate (accuracy shown in the results banner). Solid and thin wall: an upper limit (Hashin\u2013Shtrikman \u00d7 MIL fabric). Neither is ground truth \u2014 F13LD.lab does the rigorous FFT version.' }
     ]},
     { title:'Render', items:[
       { id:'quality', label:'quality \u00b7 Low / Med / High',
@@ -1822,6 +1997,8 @@ requestAnimationFrame(frame);
     if(!h) return;
     var r = h.getBoundingClientRect();
     drawer.style.right = Math.max(0, Math.round(window.innerWidth - r.right)) + 'px';
+    drawer.style.top = Math.max(0, Math.round(r.bottom)) + 'px';
+    drawer.style.maxHeight = 'calc(100vh - ' + (Math.max(0, Math.round(r.bottom)) + 16) + 'px)';
   }
 
   function openDrawer(id){

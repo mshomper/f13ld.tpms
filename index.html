@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TPMS Builder — Radial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{min-height:100%;background:#06080f;color:#e0e0ff;font-family:system-ui,sans-serif}
@@ -83,6 +86,13 @@ canvas#c{display:block;width:100%;touch-action:none}
 #pi-controls.snap-off .pi-val{display:none}
 #pi-controls.snap-off .pi-num-inp{display:inline-block}
 #pi-controls.snap-off .pi-chips{display:flex}
+.pi-sel{font-size:11px;padding:2px 4px;background:#0e1e0e;border:0.5px solid #1a4a1a;border-radius:5px;color:#c8ff80;font-family:inherit;cursor:pointer}
+.pi-sel:focus{outline:none;border-color:#c8ff80}
+#pi-warn{display:none;width:100%;font-size:11px;line-height:1.5;color:#f0b35b;background:rgba(240,179,91,0.06);border:0.5px solid #5a4214;border-radius:6px;padding:5px 9px}
+.ab-tabs{display:flex;gap:4px;margin-bottom:6px;align-items:center;flex-wrap:wrap}
+.ab-tab{font-size:11px;padding:3px 12px;border:0.5px solid #3a3a5a;border-radius:14px;background:transparent;color:#888;cursor:pointer;font-family:inherit}
+.ab-tab.on{background:#1a4a1a;color:#c8ff80;border-color:#c8ff80}
+.ab-hint{font-size:10px;color:#555;margin-left:4px}
 .homo-controls{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:10px}
 .homo-controls label{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
 .homo-controls select,.homo-controls input[type=number]{font-size:12px;padding:2px 4px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff}
@@ -125,7 +135,6 @@ canvas.vcv{width:100%;display:block}
 .bell-row{display:grid;grid-template-columns:26px 1fr 52px;gap:4px;align-items:center;margin-bottom:5px}
 .bell-lbl{font-size:11px;font-weight:500;text-align:center}
 .bell-val{font-size:10px;font-variant-numeric:tabular-nums;text-align:right;padding-left:4px;line-height:1.4}
-@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@500;700&display=swap');
 .f13ld-header{display:flex;align-items:center;justify-content:space-between;background:#06080f;border-bottom:0.5px solid #1a2a1a;padding:0 14px;height:48px;flex-shrink:0;font-family:'Exo 2',system-ui,sans-serif;}
 .fh-left{display:flex;align-items:center;gap:10px}
 .fh-brand{display:flex;align-items:center;gap:8px;text-decoration:none}
@@ -180,7 +189,7 @@ canvas.vcv{width:100%;display:block}
   </div>
   <div class="fh-right">
     <button class="fh-mesh-btn" onclick="openInMesh()">⬡ Open in F13LD.mesh</button>
-    <span class="fh-version">v1.0.1</span>
+    <span class="fh-version">v1.1.0</span>
     <div class="fh-icon" style="background:#E1F5EE">
       <svg width="18" height="18" viewBox="0 0 40 40">
         <path d="M0 10 Q5 2 10 10 Q15 18 20 10 Q25 2 30 10 Q35 18 40 10" stroke="#085041" stroke-width="1.9" fill="none" stroke-linecap="round"/>
@@ -252,10 +261,18 @@ canvas.vcv{width:100%;display:block}
 
     <!-- PI-TPMS phase shift controls -->
     <div id="pi-controls">
-      <div class="pi-title">⬡ PI-TPMS — phase shift δ (× period T)</div>
+      <div class="pi-title">⬡ PI-TPMS — field pair + phase shift δ on field B (× its period T)</div>
       <div class="sc-group">
         <button class="pi-norm-toggle on" id="piNormToggle" title="Use angle-corrected perpendicular distance to the intersection curve {φ=0 ∩ φ_δ=0}. Gives true cylindrical pipes with radius r in spatial units, independent of how the two surfaces meet. Off = raw max(|φ|, |φ_δ|) level set with axis-aligned, angle-skewed cross-sections (retains original variation pattern).">normalize: on</button>
         <button class="pi-snap-toggle on" id="piSnapToggle" title="Snap slider stops to eighths of one period (8 reachable phases per axis). Off lets you set any value 0–1 of T continuously, enables typed-in values, and unlocks the quick-set chips for off-grid biomimetic ratios (π/6, π/3, 2π/5, 2π/3, golden).">snap: on</button>
+      </div>
+      <div class="sc-group">
+        <label class="pi-lbl">field B</label>
+        <select id="fieldBSel" class="pi-sel" title="Second surface the pipes are cut from. 'same as A' is classic PI-TPMS (A crossed with a shifted copy of itself)."></select>
+        <label class="pi-lbl">at</label>
+        <select id="fieldBFreq" class="pi-sel" title="Field B frequency as a whole-number multiple of field A. Whole numbers keep one cell periodic, so it still tiles in F13LD.mesh.">
+          <option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option><option value="5">5×</option>
+        </select>
       </div>
       <div class="sc-group">
         <label class="pi-lbl">Δx/T</label>
@@ -292,6 +309,7 @@ canvas.vcv{width:100%;display:block}
         <button class="pi-chip" data-frac="0.33333" title="2π/3 — triangulation">2π/3</button>
         <button class="pi-chip" data-frac="0.38197" title="1/φ² — golden, quasi-periodic biomimetic">golden</button>
       </div>
+      <div id="pi-warn"></div>
     </div>
 
     <hr class="divider">
@@ -467,8 +485,25 @@ const PRESETS={
 
 let rawPresetFn=null;
 
+// ── Field B (PI-TPMS pairing, v1.1.0) ─────────────────────────────────
+// src 'same' → B is a copy of field A (classic PI-TPMS); 'set' → B has its own
+// preset or custom terms. freq is a whole-number multiple of A's frequency so
+// one A cell stays periodic. fieldBAmp = rms(A)/rms(B) matches B's amplitude to
+// A, so pipe r means the same thing for any pair (exactly 1 for self-pairs).
+let fieldB={src:'same',presetKey:'gyroid',terms:[],raw:null,freq:1};
+let editTarget='A';     // which field the term editor is showing
+let fieldBAmp=1;
+let piFnB=null;         // JS evaluator for field B, set at homogenization time
+function fieldA(){return{terms:terms,raw:rawPresetFn};}
+function fieldBResolved(){return fieldB.src==='same'?fieldA():{terms:fieldB.terms,raw:fieldB.raw};}
+function pairActive(){return fieldB.src!=='same'||fieldB.freq!==1;}
+function editingB(){return piMode&&editTarget==='B'&&fieldB.src!=='same';}
+function editTerms(){return editingB()?fieldB.terms:terms;}
+function cloneTerms(list){return list.map(t=>({...t,id:tid++,factors:t.factors.map(f=>({...f}))}));}
+
 function loadPreset(name){
   const p=PRESETS[name];
+  editTarget='A';   // the preset menu always sets field A
   if(p&&p._fn){
     rawPresetFn={fn:p._fn,glsl:p._glsl,label:p._label};
     terms=[];renderList();rebuildShader();
@@ -482,14 +517,28 @@ function dn(v){return parseFloat(parseFloat(v).toFixed(3)).toString();}
 
 function renderList(){
   const el=document.getElementById('termlist');el.innerHTML='';
-  if(rawPresetFn){
+  if(editTarget==='B'&&!(piMode&&fieldB.src!=='same'))editTarget='A';
+  if(piMode&&fieldB.src!=='same'){
+    const tabs=document.createElement('div');tabs.className='ab-tabs';
+    tabs.innerHTML='<span class="coef-lbl">editing</span>'+
+      '<button class="ab-tab'+(editTarget==='A'?' on':'')+'" data-tab="A">field A</button>'+
+      '<button class="ab-tab'+(editTarget==='B'?' on':'')+'" data-tab="B">field B</button>'+
+      '<span class="ab-hint">'+(editTarget==='B'?'field B terms · the preset menu above still sets field A':'field A terms · field B is chosen in the PI-TPMS panel')+'</span>';
+    tabs.addEventListener('click',function(e){const b=e.target.closest('[data-tab]');if(!b)return;editTarget=b.dataset.tab;renderList();});
+    el.appendChild(tabs);
+  }
+  const B=editingB();
+  const raw=B?fieldB.raw:rawPresetFn;
+  const list=B?fieldB.terms:terms;
+  if(raw){
     const note=document.createElement('div');
     note.style.cssText='font-size:11px;color:#555;padding:8px 4px;font-style:italic';
-    note.textContent=rawPresetFn.label+' — uses double-frequency terms (sin 2x, cos 2x). Switch to a standard preset or clear to use the equation editor.';
+    note.textContent=raw.label+' — uses double-frequency terms (sin 2x, cos 2x) and cannot be edited term by term. '+
+      (B?'Pick "custom" for field B to edit its terms.':'Switch to a standard preset to use the equation editor.');
     el.appendChild(note);
     updateEq();return;
   }
-  terms.forEach(t=>{
+  list.forEach(t=>{
     const card=document.createElement('div');card.className='termcard'+(t.on?'':' off');
     let html='<div class="term-hdr">'+
       '<button class="tog'+(t.on?' on':'')+'" data-id="'+t.id+'" data-act="tog">'+(t.on?'on':'off')+'</button>'+
@@ -510,27 +559,30 @@ function renderList(){
   });
   const addBtn=document.createElement('button');
   addBtn.id='addBtn';addBtn.textContent='+ term';addBtn.style.cssText='margin-top:6px;width:100%';
-  addBtn.addEventListener('click',function(){terms.push(mk([mkF('sin(x)'),mkF('cos(y)')],1));renderList();rebuildShader();onSurfaceChange();});
+  addBtn.addEventListener('click',function(){editTerms().push(mk([mkF('sin(x)'),mkF('cos(y)')],1));markBCustom();renderList();rebuildShader();onSurfaceChange();});
   el.appendChild(addBtn);
   updateEq();
 }
+// Editing field B's terms turns its menu entry into "custom".
+function markBCustom(){if(editingB()){fieldB.presetKey='custom';syncFieldBUI();}}
 document.getElementById('termlist').addEventListener('change',function(e){
   const id=parseInt(e.target.dataset.id),fi=e.target.dataset.fi!==undefined?parseInt(e.target.dataset.fi):null,f=e.target.dataset.f;
   if(isNaN(id)||!f)return;
-  const t=terms.find(x=>x.id===id);if(!t)return;
+  const t=editTerms().find(x=>x.id===id);if(!t)return;
   if(f==='coef'){const v=parseFloat(e.target.value);if(!isNaN(v))t.coef=v;}
   else if(fi!==null&&fi>=0){const fac=t.factors[fi];if(!fac)return;if(f==='trig')fac.trig=e.target.value;else{const v=parseFloat(e.target.value);if(!isNaN(v))fac[f]=v;}}
-  updateEq();rebuildShader();onSurfaceChange();
+  markBCustom();updateEq();rebuildShader();onSurfaceChange();
 });
 document.getElementById('termlist').addEventListener('click',function(e){
   const btn=e.target.closest('[data-act]');if(!btn)return;
   const id=parseInt(btn.dataset.id),fi=btn.dataset.fi!==undefined?parseInt(btn.dataset.fi):null,act=btn.dataset.act;
-  const t=terms.find(x=>x.id===id);
-  if(act==='del')terms=terms.filter(x=>x.id!==id);
+  const L=editTerms();
+  const t=L.find(x=>x.id===id);
+  if(act==='del'){const i=L.findIndex(x=>x.id===id);if(i>=0)L.splice(i,1);}
   if(act==='tog'&&t)t.on=!t.on;
   if(act==='delf'&&t&&fi!==null&&t.factors.length>1)t.factors.splice(fi,1);
   if(act==='addf'&&t)t.factors.push(mkF('sin(x)'));
-  renderList();rebuildShader();onSurfaceChange();
+  markBCustom();renderList();rebuildShader();onSurfaceChange();
 });
 document.getElementById('presetSel').addEventListener('change',function(){loadPreset(this.value);onSurfaceChange();});
 
@@ -628,50 +680,71 @@ document.getElementById('shellNormToggle').addEventListener('click',function(){
   updateEq();updateMMHints();rebuildShader();onSurfaceChange();
 });
 
-// ── updateEq — adds PI-TPMS branch ───────────────────────────────────
+// ── Field B controls ──────────────────────────────────────────────────
+(function(){
+  const sel=document.getElementById('fieldBSel');
+  sel.innerHTML='<option value="same">same as A</option>'+document.getElementById('presetSel').innerHTML+
+    '<option value="custom">custom (edit terms)</option>';
+  sel.value='same';
+  sel.addEventListener('change',function(){
+    const v=this.value;
+    if(v==='same'){fieldB.src='same';editTarget='A';}
+    else if(v==='custom'){
+      // Seed custom terms from whatever B currently looks like, so the user edits from there.
+      if(fieldB.src==='same')fieldB.terms=rawPresetFn?cloneTerms(PRESETS.gyroid):cloneTerms(terms);
+      else if(fieldB.raw)fieldB.terms=cloneTerms(PRESETS.gyroid);
+      fieldB.raw=null;fieldB.src='set';fieldB.presetKey='custom';editTarget='B';
+    } else {
+      const p=PRESETS[v];fieldB.src='set';fieldB.presetKey=v;
+      if(p._fn){fieldB.raw={fn:p._fn,glsl:p._glsl,label:p._label};fieldB.terms=[];}
+      else{fieldB.raw=null;fieldB.terms=cloneTerms(p);}
+    }
+    renderList();rebuildShader();onSurfaceChange();
+  });
+  document.getElementById('fieldBFreq').addEventListener('change',function(){
+    fieldB.freq=Math.max(1,parseInt(this.value)||1);
+    updateEq();rebuildShader();onSurfaceChange();
+  });
+})();
+function syncFieldBUI(){
+  document.getElementById('fieldBSel').value=fieldB.src==='same'?'same':(fieldB.presetKey||'custom');
+  document.getElementById('fieldBFreq').value=String(fieldB.freq);
+}
+
+// ── updateEq — PI-TPMS shows field A, field B and the pipe condition ──
+function eqHTML(f){
+  if(f.raw)return '<b>'+f.raw.label+'</b>';
+  const a=f.terms.filter(t=>t.on&&t.factors&&t.factors.length);
+  if(!a.length)return '<i style="color:#555">no active terms</i>';
+  return a.map((t,i)=>{
+    const c=Math.abs(t.coef),cs=c===1?'':dn(c)+'·';
+    const sign=i===0?(t.coef<0?'−':''):(t.coef<0?' − ':' + ');
+    return sign+'<b>'+cs+t.factors.map(f=>f.trig).join('·')+'</b>';
+  }).join('');
+}
 function updateEq(){
-  const a=terms.filter(t=>t.on&&t.factors&&t.factors.length);
   const off=parseFloat(document.getElementById('sOffset').value);
   const modeShell=document.getElementById('mShell').classList.contains('active');
   const modePi=document.getElementById('mPi').classList.contains('pi-active');
   const wall=parseFloat(document.getElementById('sWall').value);
   const pipeR=parseFloat(document.getElementById('sPipeR').value);
-
-  if(rawPresetFn){
-    if(modePi){
-      const left = piNormalize
-        ? 'dist(p, {<b>'+rawPresetFn.label+'</b>=0} ∩ {<b>'+rawPresetFn.label+'</b><sub>+δ</sub>=0})'
-        : 'max(|<b>'+rawPresetFn.label+'</b>(p)|, |<b>'+rawPresetFn.label+'</b>(p+δ)|)';
-      document.getElementById('eqbar').innerHTML = left + ' &lt; '+pipeR.toFixed(2);
-    } else {
-      const offStr=off===0?'':' − '+off.toFixed(2);
-      const lhs = modeShell
-        ? (shellNormalize ? '|<b>'+rawPresetFn.label+'</b>'+offStr+'|/‖∇‖' : '|<b>'+rawPresetFn.label+'</b>'+offStr+'|')
-        : '<b>'+rawPresetFn.label+'</b>'+offStr;
-      document.getElementById('eqbar').innerHTML=
-        modeShell?lhs+' &lt; '+wall.toFixed(2):lhs+' = 0';
-    }
+  const bar=document.getElementById('eqbar');
+  const A=fieldA();
+  if(modePi){
+    const k=fieldB.freq;
+    const bExpr=fieldB.src==='same'?'φ<sub>A</sub>':eqHTML(fieldBResolved());
+    const at='<span style="color:#7aaa7a"> &nbsp;evaluated at '+(k===1?'':k+'·')+'p + δ</span>';
+    const left=piNormalize?'dist(p, {φ<sub>A</sub>=0} ∩ {φ<sub>B</sub>=0})':'max(|φ<sub>A</sub>|, |φ<sub>B</sub>|)';
+    bar.innerHTML='φ<sub>A</sub> = '+eqHTML(A)+'<br>φ<sub>B</sub> = '+bExpr+at+'<br>'+left+' &lt; '+pipeR.toFixed(2);
     return;
   }
-  if(!a.length){document.getElementById('eqbar').innerHTML='<i style="color:#555">no active terms</i>';return;}
-  const eq=a.map((t,i)=>{
-    const c=Math.abs(t.coef),cs=c===1?'':dn(c)+'·';
-    const sign=i===0?(t.coef<0?'−':''):(t.coef<0?' − ':' + ');
-    return sign+'<b>'+cs+t.factors.map(f=>f.trig).join('·')+'</b>';
-  }).join('');
-  if(modePi){
-    const left = piNormalize
-      ? 'dist(p, {φ=0} ∩ {φ<sub>+δ</sub>=0})  φ = '+eq
-      : 'max(|'+eq+'(p)|, |'+eq+'(p+δ)|)';
-    document.getElementById('eqbar').innerHTML = left + ' &lt; '+pipeR.toFixed(2);
-  } else {
-    const offStr=off===0?'':' − '+off.toFixed(2);
-    const lhs = modeShell
-      ? (shellNormalize ? '|'+eq+offStr+'|/‖∇‖' : '|'+eq+offStr+'|')
-      : eq+offStr;
-    document.getElementById('eqbar').innerHTML=
-      modeShell?lhs+' &lt; '+wall.toFixed(2):lhs+' = 0';
-  }
+  if(!A.raw&&!A.terms.some(t=>t.on&&t.factors&&t.factors.length)){bar.innerHTML='<i style="color:#555">no active terms</i>';return;}
+  const eq=eqHTML(A);
+  const offStr=off===0?'':' − '+off.toFixed(2);
+  const lhs=modeShell
+    ?(shellNormalize?'|'+eq+offStr+'|/‖∇‖':'|'+eq+offStr+'|')
+    :eq+offStr;
+  bar.innerHTML=modeShell?lhs+' &lt; '+wall.toFixed(2):lhs+' = 0';
 }
 
 // ── Mode state ────────────────────────────────────────────────────────
@@ -687,6 +760,7 @@ function syncModeUI(){
   document.getElementById('mSolid').classList.toggle('active',!shellMode&&!piMode);
   document.getElementById('mShell').classList.toggle('active',shellMode&&!piMode);
   document.getElementById('mPi').classList.toggle('pi-active',piMode);
+  renderList();
 }
 
 document.getElementById('mSolid').addEventListener('click',function(){
@@ -812,25 +886,24 @@ function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
     const dzS=toFloat(piShiftRad('z'));
     const pipeRS=toFloat(pipeRVal);
 
-    // Each helper gets its own scope — no variable redeclaration possible
-    // evalA evaluates φ at p, evalB evaluates φ at p+δ
-    function makeEvalFn(fnName, ox, oy, oz) {
-      const gxExpr = 'p.x+'+ox;
-      const gyExpr = 'p.y+'+oy;
-      const gzExpr = 'p.z+'+oz;
-      const body = rawPresetFn
-        ? 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; return '+rawPresetFn.glsl+';'
-        : 'float gx='+gxExpr+',gy='+gyExpr+',gz='+gzExpr+'; float v=0.0;'
-          + active.map(t=>{
-              const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');
-              return' v+='+toFloat(t.coef)+'*'+parts.join('*')+';';
-            }).join('')
-          + ' return v;';
-      return `float ${fnName}(vec3 p,float H){ ${body} }`;
+    // evalA(p) = φA(p);  evalB(p) = amp·φB(k·p + δ). k is the whole-number
+    // frequency multiple of field B, amp matches B's amplitude to A.
+    // Each field body lives in its own function so no names can collide.
+    function fieldBody(f){
+      if(f.raw) return 'return '+f.raw.glsl+';';
+      const act=f.terms.filter(t=>t.on&&t.factors&&t.factors.length);
+      return 'float v=0.0;'+act.map(t=>{
+        const parts=t.factors.map(fc=>'('+glslTrig(fc.trig,toFloat(fc.fx),toFloat(fc.fy),toFloat(fc.fz))+')');
+        return ' v+='+toFloat(t.coef)+'*'+parts.join('*')+';';
+      }).join('')+' return v;';
+    }
+    function makeEvalFn(fnName,f,k,ox,oy,oz,amp){
+      return `float ${fnName}_f(float gx,float gy,float gz){ ${fieldBody(f)} }
+float ${fnName}(vec3 p,float H){ return ${amp}*${fnName}_f(${k}*p.x+${ox},${k}*p.y+${oy},${k}*p.z+${oz}); }`;
     }
 
-    const evalA = makeEvalFn('evalA','0.0','0.0','0.0');
-    const evalB = makeEvalFn('evalB', dxS, dyS, dzS);
+    const evalA = makeEvalFn('evalA',fieldA(),'1.0','0.0','0.0','0.0','1.0');
+    const evalB = makeEvalFn('evalB',fieldBResolved(),toFloat(fieldB.freq),dxS,dyS,dzS,toFloat(fieldBAmp));
 
     if(piNormalize){
       // Full angle-corrected distance to intersection curve.
@@ -977,6 +1050,8 @@ baseFunc,
 let prog=null,uRes,uRot,uZoom,quadBuf=null;
 function mkShader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(s));return s;}
 function rebuildShader(){
+  fieldBAmp=computeFieldBAmp();
+  schedulePiCheck();
   const p=gl.createProgram();
   const vs=mkShader(gl.VERTEX_SHADER,VERT),fs=mkShader(gl.FRAGMENT_SHADER,buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult));
   gl.attachShader(p,vs);gl.attachShader(p,fs);
@@ -1091,42 +1166,80 @@ function drawAxisGizmo(rotMat,canvasW,canvasH,camZoom){
 }
 
 // ── Voxelizer / homogenization — isSolid updated for PI-TPMS ─────────
-function compileSurf(terms){
-  if(rawPresetFn)return rawPresetFn.fn;
-  const active=terms.filter(t=>t.on&&t.factors&&t.factors.length);
+function compileField(f){
+  if(f.raw)return f.raw.fn;
+  const active=f.terms.filter(t=>t.on&&t.factors&&t.factors.length);
   if(!active.length)return()=>0;
-  const body=active.map(t=>{const parts=t.factors.map(f=>'('+jsTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');return'v+='+toFloat(t.coef)+'*'+parts.join('*')+';';}).join('');
+  const body=active.map(t=>{const parts=t.factors.map(fc=>'('+jsTrig(fc.trig,toFloat(fc.fx),toFloat(fc.fy),toFloat(fc.fz))+')');return'v+='+toFloat(t.coef)+'*'+parts.join('*')+';';}).join('');
   return new Function('x','y','z','var v=0;'+body+'return v;');
+}
+function compileSurf(terms){return compileField({terms:terms,raw:rawPresetFn});}
+
+// RMS of a field over one cell on a 16³ cell-centred grid. F13LD.mesh uses the
+// identical grid when a recipe arrives without field_b_scale.
+function fieldRMS(fn){
+  const M=16,H=Math.PI,st=2*H/M;let s=0;
+  for(let i=0;i<M;i++){const x=-H+(i+.5)*st;
+    for(let j=0;j<M;j++){const y=-H+(j+.5)*st;
+      for(let k=0;k<M;k++){const z=-H+(k+.5)*st;const v=fn(x,y,z);s+=v*v;}}}
+  return Math.sqrt(s/(M*M*M));
+}
+function computeFieldBAmp(){
+  if(fieldB.src==='same')return 1;
+  const ra=fieldRMS(compileField(fieldA())),rb=fieldRMS(compileField(fieldBResolved()));
+  return (ra>1e-9&&rb>1e-9)?ra/rb:1;
+}
+// Field B as used for PI-TPMS: amp·φB(k·p + δ), in the same cell coordinates as A.
+function makeFnB(){
+  const f=compileField(fieldBResolved()),k=fieldB.freq,s=fieldBAmp;
+  const dx=piShiftRad('x'),dy=piShiftRad('y'),dz=piShiftRad('z');
+  return (x,y,z)=>s*f(k*x+dx,k*y+dy,k*z+dz);
+}
+// Angle-corrected distance to {φA=0 ∩ φB=0} — same math as the shader:
+// d² = (dA² − 2cosα·dA·dB + dB²)/sin²α, dA/dB signed distances to each surface.
+const PI_E=0.012,PI_EPS=0.08,PI_COSCLAMP=0.95;
+function piGeom(fA,fB,x,y,z){
+  const e=PI_E;
+  const vA=fA(x,y,z),vB=fB(x,y,z);
+  const gAx=(fA(x+e,y,z)-fA(x-e,y,z))/(2*e),gAy=(fA(x,y+e,z)-fA(x,y-e,z))/(2*e),gAz=(fA(x,y,z+e)-fA(x,y,z-e))/(2*e);
+  const gBx=(fB(x+e,y,z)-fB(x-e,y,z))/(2*e),gBy=(fB(x,y+e,z)-fB(x,y-e,z))/(2*e),gBz=(fB(x,y,z+e)-fB(x,y,z-e))/(2*e);
+  const magA=Math.max(Math.sqrt(gAx*gAx+gAy*gAy+gAz*gAz),PI_EPS);
+  const magB=Math.max(Math.sqrt(gBx*gBx+gBy*gBy+gBz*gBz),PI_EPS);
+  const dA=vA/magA,dB=vB/magB;
+  const cosRaw=(gAx*gBx+gAy*gBy+gAz*gBz)/(magA*magB);
+  const c=Math.max(-PI_COSCLAMP,Math.min(PI_COSCLAMP,cosRaw));
+  const sin2=1-c*c,num=dA*dA-2*c*dA*dB+dB*dB;
+  return{vA,vB,dA,dB,cosRaw,dist:Math.sqrt(Math.max(num,0)/sin2)};
+}
+// Coincidence check: where both surfaces pass close to a sample point, how often
+// are their normals nearly parallel? A high share means the two surfaces lie on
+// top of each other there, so the "pipes" swell into sheets or blobs.
+let _piCheckTimer=null;
+function schedulePiCheck(){clearTimeout(_piCheckTimer);_piCheckTimer=setTimeout(piCheck,150);}
+function piCheck(){
+  const el=document.getElementById('pi-warn');if(!el)return;
+  if(!piMode){el.style.display='none';return;}
+  const fA=compileField(fieldA()),fB=makeFnB();
+  const M=20,H=Math.PI,st=2*H/M,BAND=0.3;let near=0,par=0;
+  for(let i=0;i<M;i++){const x=-H+(i+.5)*st;
+    for(let j=0;j<M;j++){const y=-H+(j+.5)*st;
+      for(let k=0;k<M;k++){const z=-H+(k+.5)*st;
+        const g=piGeom(fA,fB,x,y,z);
+        if(Math.abs(g.dA)<BAND&&Math.abs(g.dB)<BAND){near++;if(Math.abs(g.cosRaw)>PI_COSCLAMP)par++;}}}}
+  let msg='';
+  if(near===0)msg='The two surfaces barely cross inside one cell, so expect few or no pipes. Try another phase shift or field pairing.';
+  else if(par/near>0.3)msg='The surfaces nearly coincide along about '+Math.round(100*par/near)+'% of where they meet. Pipes swell into sheets or blobs there. Try another phase shift or field pairing.';
+  el.textContent=msg?'⚠ '+msg:'';
+  el.style.display=msg?'block':'none';
 }
 
 function isSolid(fn,x,y,z){
   if(piMode){
-    // PI-TPMS: solid where max(|φ(p)|, |φ(p+δ)|) < pipeR
-    // δ must be in radians — same as shader (fraction × 2π), NOT fraction of domain size
-    const dx=piShiftRad('x'), dy=piShiftRad('y'), dz=piShiftRad('z');
-    const vA=fn(x,y,z);
-    const vB=fn(x+dx,y+dy,z+dz);
-    if(piNormalize){
-      // Match shader: full angle-corrected distance to intersection curve.
-      // d_curve² = (d_A² − 2cosα·d_A·d_B + d_B²) / sin²α
-      // d_A, d_B are signed; cos α from full gradient vectors.
-      const e=0.012, EPS=0.08, COSCLAMP=0.95;
-      const gAx=(fn(x+e,y,z)-fn(x-e,y,z))/(2*e);
-      const gAy=(fn(x,y+e,z)-fn(x,y-e,z))/(2*e);
-      const gAz=(fn(x,y,z+e)-fn(x,y,z-e))/(2*e);
-      const magA=Math.max(Math.sqrt(gAx*gAx+gAy*gAy+gAz*gAz),EPS);
-      const gBx=(fn(x+dx+e,y+dy,z+dz)-fn(x+dx-e,y+dy,z+dz))/(2*e);
-      const gBy=(fn(x+dx,y+dy+e,z+dz)-fn(x+dx,y+dy-e,z+dz))/(2*e);
-      const gBz=(fn(x+dx,y+dy,z+dz+e)-fn(x+dx,y+dy,z+dz-e))/(2*e);
-      const magB=Math.max(Math.sqrt(gBx*gBx+gBy*gBy+gBz*gBz),EPS);
-      const dA=vA/magA;
-      const dB=vB/magB;
-      const cosA=Math.max(-COSCLAMP, Math.min(COSCLAMP, (gAx*gBx+gAy*gBy+gAz*gBz)/(magA*magB)));
-      const sin2=1-cosA*cosA;
-      const num=dA*dA - 2*cosA*dA*dB + dB*dB;
-      return Math.sqrt(Math.max(num,0)/sin2) < pipeRVal;
-    }
-    return Math.max(Math.abs(vA),Math.abs(vB))<pipeRVal;
+    // PI-TPMS: pipes around {φA=0 ∩ φB=0}. fn is field A; field B comes from
+    // piFnB (set once per homogenization run — never rebuilt per voxel).
+    const fnB=piFnB||makeFnB();
+    if(piNormalize) return piGeom(fn,fnB,x,y,z).dist<pipeRVal;
+    return Math.max(Math.abs(fn(x,y,z)),Math.abs(fnB(x,y,z)))<pipeRVal;
   }
   const v=fn(x,y,z);
   if(shellMode){
@@ -1307,6 +1420,7 @@ function piPredict(fn,Es,rho){
 
 function runHomogenization(N,Es,nu){
   const fn=compileSurf(terms);
+  piFnB=piMode?makeFnB():null;
   // Always one period (one unit cell), independent of the viewport 'cells' slider,
   // so the voxel window is periodic and matches the mm read-outs.
   const H=Math.PI,step=2*H/N,N2=N*N,N3=N*N*N;
@@ -1569,6 +1683,7 @@ document.getElementById('runBtn').addEventListener('click',async function(){
     const warn=[];
     if(!piNormalize)warn.push('normalize is off (trained on normalized pipes)');
     if(pipeRVal<PIPRED.rTrain[0]||pipeRVal>PIPRED.rTrain[1])warn.push('pipe r outside the trained range '+PIPRED.rTrain[0]+'–'+PIPRED.rTrain[1]);
+    if(pairActive())warn.push('field pair is outside the trained self-pairs ('+PIPRED.families+')');
     if(Math.abs(nu-PIPRED.nuTrain)>0.05)warn.push('trained at ν = '+PIPRED.nuTrain+'; values scale with E_s, weakly with ν');
     const zeros=['x','y','z'].filter((a,i)=>!res.links[i]);
     mEl.className='homo-method pred';
@@ -1631,6 +1746,15 @@ function buildExportJSON(){
     ?{type:'raw_preset',preset:currentPreset,label:rawPresetFn.label}
     :{type:'terms',preset:terms.length>0?currentPreset:'custom',
       terms:terms.map(t=>({on:t.on,coef:t.coef,factors:t.factors.map(f=>({trig:f.trig,fx:f.fx,fy:f.fy,fz:f.fz}))}))};
+  // Field B (v1.1.0): null when B is a copy of A. F13LD.mesh reads surface_b,
+  // geometry.field_b_freq and geometry.field_b_scale.
+  let surfaceBBlock=null;
+  if(piMode&&fieldB.src!=='same'){
+    surfaceBBlock=fieldB.raw
+      ?{type:'raw_preset',preset:fieldB.presetKey,label:fieldB.raw.label}
+      :{type:'terms',preset:fieldB.presetKey||'custom',
+        terms:fieldB.terms.map(t=>({on:t.on,coef:t.coef,factors:t.factors.map(f=>({trig:f.trig,fx:f.fx,fy:f.fy,fz:f.fz}))}))};
+  }
   const geometryBlock={
     offset:piMode?null:offsetVal,
     cell_scale:cellMult,
@@ -1640,6 +1764,8 @@ function buildExportJSON(){
     pipe_radius:piMode?pipeRVal:null,
     pi_normalize:piMode?piNormalize:null,
     phase_shift:piMode?{x:piShift.x,y:piShift.y,z:piShift.z}:null,
+    field_b_freq:piMode?fieldB.freq:null,
+    field_b_scale:piMode?parseFloat(fieldBAmp.toFixed(6)):null,
     gradient:{enabled:false} // feature removed in 0.9.7; key kept for F13LD.mesh compatibility
   };
   let homogBlock=null;
@@ -1659,9 +1785,9 @@ function buildExportJSON(){
       uncertainty_log10_sd:res.method==='pi-predict'?PIPRED.sdLog10:null};
   }
   const out={
-    meta:{version:'1.0.1',timestamp:new Date().toISOString(),
+    meta:{version:'1.1.0',timestamp:new Date().toISOString(),
       preset:rawPresetFn?rawPresetFn.label:(terms.length?currentPreset:'custom')},
-    surface:surfaceBlock,geometry:geometryBlock
+    surface:surfaceBlock,surface_b:surfaceBBlock,geometry:geometryBlock
   };
   if(homogBlock)out.homogenization=homogBlock;
   return out;
@@ -1873,14 +1999,18 @@ requestAnimationFrame(frame);
         what:'Shell half-thickness in thin-wall mode (the full wall is 2t; the mm read-out shows the full wall). The normalize toggle divides by |\u2207\u03c6| so thickness is a true perpendicular distance.',
         see:'The shell fattens or thins; normalize on keeps it uniform across the surface, off lets it vary with the gradient.',
         why:'Relative density for shells \u2014 normalize on for constant-thickness walls.' },
-      { id:'pipe', label:'pipe r', range:'0.02 \u2013 0.8 \u00b7 PI-TPMS', anchor:{row:'#sPipeR'},
+      { id:'pipe', label:'pipe r', range:'0.02 \u2013 1.45 \u00b7 PI-TPMS', anchor:{row:'#sPipeR'},
         what:'Radius of the cylindrical pipes in PI-TPMS mode (the mm read-out also shows the diameter). The stiffness estimate was trained on r = 0.16\u20131.41.',
         see:'Struts grow or shrink in cross-section.',
         why:'Relative density for the pipe network \u2014 the beam-like analogue of wall thickness.' }
     ]},
-    { title:'PI-TPMS \u00b7 phase shift', items:[
+    { title:'PI-TPMS \u00b7 field pair + phase shift', items:[
+      { id:'fieldb', label:'field B \u00b7 pairing + frequency', anchor:{row:'#fieldBSel'},
+        what:'Chooses the second surface the pipes are cut from: a copy of field A (classic PI-TPMS), any preset, or custom terms. \u201cat\u201d runs field B at a whole-number multiple of field A\u2019s frequency.',
+        see:'Pipes trace wherever field A and field B cross. New pairs and multiples give new pipe networks; whole-number multiples keep one cell tileable in F13LD.mesh. A warning appears if the two surfaces mostly coincide or barely cross.',
+        why:'Opens PI-TPMS from self-pairs to any pair of fields. Field B is rescaled to field A\u2019s amplitude so pipe r means the same thing for any pair. Pairs other than self-pairs are outside the trained stiffness estimate.' },
       { id:'pishift', label:'phase shift \u03b4 \u00b7 \u0394x \u0394y \u0394z', anchor:{into:'.pi-title'},
-        what:'Offsets a second copy of the surface by a fraction of one period on each axis; the pipes trace where the two surfaces intersect.',
+        what:'Offsets field B by a fraction of its own period on each axis; the pipes trace where field A and the shifted field B intersect.',
         see:'\u0394x / \u0394y / \u0394z reroute the strut network \u2014 from straight channels toward chiral, woven, or hex paths.',
         why:'PI-TPMS \u2014 the phase triple tunes connectivity and anisotropy independently of cell size.' },
       { id:'pinorm', label:'normalize (PI)',
@@ -1905,7 +2035,7 @@ requestAnimationFrame(frame);
     { title:'Implicit equation', items:[
       { id:'terms', label:'implicit equation \u00b7 terms', anchor:{into:'#eqbar-label'},
         what:'The live expression defining the surface \u2014 each term is a product of sin/cos factors with a coefficient.',
-        see:'Editing or adding terms rebuilds the surface in real time; the bar mirrors the current math.',
+        see:'Editing or adding terms rebuilds the surface in real time; the bar mirrors the current math. In PI-TPMS with its own field B, tabs above the terms switch between editing field A and field B.',
         why:'The raw surface synthesizer \u2014 every preset is just a short list of these. Compose novel TPMS here.' }
     ]},
     { title:'Homogenization \u00b7 MIL-HS', items:[

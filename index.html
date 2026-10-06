@@ -189,7 +189,7 @@ canvas.vcv{width:100%;display:block}
   </div>
   <div class="fh-right">
     <button class="fh-mesh-btn" onclick="openInMesh()">⬡ Open in F13LD.mesh</button>
-    <span class="fh-version">v1.1.0</span>
+    <span class="fh-version">v1.2.0</span>
     <div class="fh-icon" style="background:#E1F5EE">
       <svg width="18" height="18" viewBox="0 0 40 40">
         <path d="M0 10 Q5 2 10 10 Q15 18 20 10 Q25 2 30 10 Q35 18 40 10" stroke="#085041" stroke-width="1.9" fill="none" stroke-linecap="round"/>
@@ -411,6 +411,126 @@ canvas.vcv{width:100%;display:block}
 
 <script>
 const canvas=document.getElementById('c');
+let f13View=null;
+// ==== F13LD-SHADE v1 · shared viewer shading (GLSL). Keep this block byte-identical in every F13LD tool. ====
+// The shader using it must define  float f13Map(vec3 p)  (distance to the visible
+// surface, clipped to the visible domain) BEFORE inserting F13_SHADE_GLSL.
+// Works in GLSL ES 1.00 and 3.00. f13Shade() returns a tone-mapped sRGB color.
+const F13_SHADE_GLSL = `
+uniform float uF13Shadow;uniform float uF13AO;uniform float uF13WarmCool;uniform float uF13Cut;uniform float uF13Lime;uniform float uF13Interact;
+vec3 f13Lin(vec3 c){return pow(max(c,vec3(0.0)),vec3(2.2));}
+vec3 f13Tone(vec3 c){c=(c*(2.51*c+0.03))/(c*(2.43*c+0.59)+0.14);return pow(clamp(c,0.0,1.0),vec3(1.0/2.2));}
+vec3 f13KeyDir(mat3 R){return normalize(-0.55*R[0]+0.75*R[1]+0.55*R[2]);}
+vec3 f13FillDir(mat3 R){return normalize(0.7*R[0]-0.35*R[1]+0.25*R[2]);}
+float f13AO(vec3 p,vec3 n,float cell,float eps){
+  float occ=0.0;float w=1.0;
+  for(int i=0;i<5;i++){float h=cell*(0.04+0.04*float(i))+2.0*eps;float d=f13Map(p+n*h);occ+=max(h-d,0.0)*w;w*=0.8;}
+  return clamp(1.0-occ*(3.2/cell),0.0,1.0);
+}
+float f13Shadow(vec3 ro,vec3 ld,float eps,float tMax){
+  float res=1.0;float t=4.0*eps;
+  for(int i=0;i<48;i++){float h=f13Map(ro+ld*t);res=min(res,8.0*h/t);t+=clamp(h,0.75*eps,tMax*0.05);if(res<0.02||t>tMax)break;}
+  return clamp(res,0.0,1.0);
+}
+vec3 f13Shade(vec3 base,vec3 p,vec3 n,vec3 rd,mat3 R,bool isCut,float cell,float eps,float tMax){
+  vec3 alb=f13Lin(base);
+  if(uF13Cut>0.5&&isCut){float lum=dot(alb,vec3(0.2126,0.7152,0.0722));alb=mix(alb,vec3(lum),0.3)*0.9;}
+  bool wc=uF13WarmCool>0.5;
+  vec3 kD=f13KeyDir(R);vec3 fD=f13FillDir(R);
+  vec3 kC=wc?vec3(1.0,0.93,0.82)*1.35:vec3(1.3);
+  vec3 fC=wc?vec3(0.30,0.42,0.62)*0.75:vec3(0.5);
+  float kd=max(dot(n,kD),0.0);
+  float sh=1.0;if(uF13Shadow>0.5&&uF13Interact<0.5&&kd>0.0)sh=f13Shadow(p+n*3.0*eps,kD,eps,tMax);
+  float ao=1.0;if(uF13AO>0.5)ao=f13AO(p,n,cell,eps);
+  float hemi=0.5+0.5*dot(n,R[1]);
+  vec3 amb=mix(vec3(0.10,0.09,0.08),wc?vec3(0.20,0.23,0.30):vec3(0.24),hemi);
+  float vf=max(dot(n,-rd),0.0);
+  vec3 col=alb*(kC*kd*sh+fC*max(dot(n,fD),0.0)*mix(0.4,1.0,ao)+vec3(0.30)*vf*ao+amb*ao);
+  col+=vec3(0.35)*pow(max(dot(n,normalize(kD-rd)),0.0),48.0)*sh;
+  float fr=pow(1.0-vf,3.0);
+  if(uF13Lime>0.5)col+=f13Lin(vec3(0.784,0.961,0.259))*0.9*fr*ao;else col+=(alb*0.6+vec3(0.06))*fr*ao*0.5;
+  return f13Tone(col);
+}
+vec3 f13ShadeData(vec3 dataCol,vec3 p,vec3 n,vec3 rd,mat3 R,float cell,float eps,float tMax){
+  vec3 kD=f13KeyDir(R);float kd=max(dot(n,kD),0.0);
+  float sh=1.0;if(uF13Shadow>0.5&&uF13Interact<0.5&&kd>0.0)sh=f13Shadow(p+n*3.0*eps,kD,eps,tMax);
+  float ao=1.0;if(uF13AO>0.5)ao=f13AO(p,n,cell,eps);
+  float lit=(0.42+0.58*kd*sh)*mix(0.65,1.0,ao)+0.12*max(dot(n,-rd),0.0);
+  return clamp(dataCol*lit+vec3(0.18)*pow(max(dot(n,normalize(kD-rd)),0.0),48.0)*sh,0.0,1.0);
+}
+`;
+// ==== /F13LD-SHADE ====
+// ==== F13LD-VIEW v1 · shared viewer "view" menu (JS). Keep this block byte-identical in every F13LD tool. ====
+// f13ViewInit({tool, host, canvas, redraw, moving, css}) adds a "◐ view" menu to
+// host (a position:relative viewport box) and returns {opts, apply(gl,prog)}.
+// apply() sets the F13_SHADE_GLSL uniforms. Soft shadows pause while the user
+// orbits/zooms the canvas, drags a slider, or while moving() returns true.
+function f13ViewInit(cfg){
+  var DEF={shadows:true,occlusion:true,warmCool:true,cutFaces:true,limeEdges:false};
+  var LBL={shadows:'Shadows',occlusion:'Occlusion',warmCool:'Warm / cool light',cutFaces:'Shade cut faces',limeEdges:'Lime edges'};
+  var key='f13ld.'+cfg.tool+'.view',o={},k;
+  for(k in DEF)o[k]=DEF[k];
+  try{var j=JSON.parse(localStorage.getItem(key)||'null');if(j&&typeof j==='object'){for(k in DEF){if(typeof j[k]==='boolean')o[k]=j[k];}}}catch(e){}
+  var st={opts:o,interacting:false};
+  function save(){try{localStorage.setItem(key,JSON.stringify(o));}catch(e){}}
+  function redraw(){if(cfg.redraw)cfg.redraw();}
+  if(!document.getElementById('f13vStyle')){
+    var s=document.createElement('style');s.id='f13vStyle';
+    s.textContent='.f13v{position:absolute;top:10px;left:10px;z-index:20;font:10px "IBM Plex Mono",ui-monospace,monospace}'+
+      '.f13v>button{font:inherit;color:#8a8aa0;background:rgba(6,8,15,.85);border:.5px solid #2a2a3a;border-radius:5px;padding:3px 8px;cursor:pointer}'+
+      '.f13v>button:hover,.f13v>button[aria-expanded=true]{color:#e0e0ff;border-color:#888}'+
+      '.f13v-p{margin-top:4px;display:flex;flex-direction:column;gap:2px;background:rgba(6,8,15,.92);border:.5px solid #2a2a3a;border-radius:6px;padding:6px 10px 6px 8px;min-width:150px}'+
+      '.f13v-p[hidden]{display:none}'+
+      '.f13v-p label{display:flex;align-items:center;gap:7px;color:#e0e0ff;font-size:11px;cursor:pointer;user-select:none;min-height:24px;white-space:nowrap}'+
+      '.f13v-p input{width:13px;height:13px;margin:0;accent-color:#22d3ee;cursor:pointer}'+
+      '.f13v-p .f13v-r{align-self:flex-start;margin-top:3px;font:inherit;color:#8a8aa0;background:none;border:.5px solid #2a2a3a;border-radius:4px;padding:1px 7px;cursor:pointer}';
+    document.head.appendChild(s);
+  }
+  if(cfg.host){
+    var w=document.createElement('div');w.className='f13v';if(cfg.css)w.style.cssText=cfg.css;
+    var b=document.createElement('button');b.type='button';b.textContent='◐ view';b.title='Viewer shading options';b.setAttribute('aria-expanded','false');
+    var p=document.createElement('div');p.className='f13v-p';p.hidden=true;
+    var boxes={};
+    for(k in DEF){(function(k){var l=document.createElement('label'),c=document.createElement('input');c.type='checkbox';c.checked=o[k];
+      c.addEventListener('change',function(){o[k]=c.checked;save();redraw();});boxes[k]=c;l.appendChild(c);l.appendChild(document.createTextNode(LBL[k]));p.appendChild(l);})(k);}
+    var r=document.createElement('button');r.type='button';r.className='f13v-r';r.textContent='reset';
+    r.addEventListener('click',function(){for(var q in DEF){o[q]=DEF[q];boxes[q].checked=DEF[q];}save();redraw();});p.appendChild(r);
+    function setOpen(v){p.hidden=!v;b.setAttribute('aria-expanded',v?'true':'false');}
+    b.addEventListener('click',function(e){e.stopPropagation();setOpen(p.hidden);});
+    p.addEventListener('click',function(e){e.stopPropagation();});
+    ['mousedown','touchstart','pointerdown','wheel'].forEach(function(ev){w.addEventListener(ev,function(e){e.stopPropagation();},{passive:true});});
+    document.addEventListener('click',function(){if(!p.hidden)setOpen(false);});
+    w.appendChild(b);w.appendChild(p);cfg.host.appendChild(w);
+  }
+  var tmr=null;
+  function begin(){st.interacting=true;}
+  function end(){if(st.interacting){st.interacting=false;redraw();}}
+  function endSoon(){begin();clearTimeout(tmr);tmr=setTimeout(end,200);}
+  if(cfg.canvas){
+    cfg.canvas.addEventListener('mousedown',begin);
+    cfg.canvas.addEventListener('touchstart',begin,{passive:true});
+    cfg.canvas.addEventListener('wheel',endSoon,{passive:true});
+  }
+  window.addEventListener('mouseup',end);
+  window.addEventListener('touchend',function(e){if(!e.touches||!e.touches.length)end();});
+  document.addEventListener('input',function(e){var t=e.target;if(t&&t.type==='range')endSoon();},true);
+  var locs=typeof WeakMap!=='undefined'?new WeakMap():null;
+  st.apply=function(gl,prog){
+    if(!gl||!prog)return;
+    var L=locs&&locs.get(prog);
+    if(!L){L={};['uF13Shadow','uF13AO','uF13WarmCool','uF13Cut','uF13Lime','uF13Interact'].forEach(function(n){L[n]=gl.getUniformLocation(prog,n);});if(locs)locs.set(prog,L);}
+    var mv=st.interacting||(cfg.moving?!!cfg.moving():false);
+    if(L.uF13Shadow)gl.uniform1f(L.uF13Shadow,o.shadows?1:0);
+    if(L.uF13AO)gl.uniform1f(L.uF13AO,o.occlusion?1:0);
+    if(L.uF13WarmCool)gl.uniform1f(L.uF13WarmCool,o.warmCool?1:0);
+    if(L.uF13Cut)gl.uniform1f(L.uF13Cut,o.cutFaces?1:0);
+    if(L.uF13Lime)gl.uniform1f(L.uF13Lime,o.limeEdges?1:0);
+    if(L.uF13Interact)gl.uniform1f(L.uF13Interact,mv?1:0);
+  };
+  return st;
+}
+// ==== /F13LD-VIEW ====
+
 // All shaders are GLSL ES 3.00 → WebGL2 is required (a WebGL1 fallback can never compile them).
 const gl=canvas.getContext('webgl2',{preserveDrawingBuffer:true});
 if(!gl){canvas.parentElement.innerHTML='<p style="color:#888;padding:40px;text-align:center">This tool needs WebGL2, which this browser or GPU does not provide.</p>';throw new Error('WebGL2 unavailable');}
@@ -986,7 +1106,10 @@ baseFunc,
 'float sceneSDF(vec3 p,float H){float s=max(implicit(p,H),boxSDF(p,H));if(uClipAxis>0.5){float coord=(uClipAxis<1.5)?p.x:((uClipAxis<2.5)?p.y:p.z);float cp=uClipPos*H;float clip=(uClipSide>0.0)?(coord-cp):(cp-coord);s=max(s,clip);}return s;}',
 // Normal FD step scales with featureSize so it stays sharp across all modes and zoom levels
 'vec3 nrm(vec3 p,float H,float e){return normalize(vec3(sceneSDF(p+vec3(e,0,0),H)-sceneSDF(p-vec3(e,0,0),H),sceneSDF(p+vec3(0,e,0),H)-sceneSDF(p-vec3(0,e,0),H),sceneSDF(p+vec3(0,0,e),H)-sceneSDF(p-vec3(0,0,e),H)));}',
-'vec3 palette(float t){vec3 a=vec3(0.55,0.57,0.42),b=vec3(0.43,0.42,0.30),c=vec3(1.0,1.0,1.0),d=vec3(0.02,0.0,0.05);return clamp(a+b*cos(6.28318*(c*t+d)),0.0,1.0);}',
+// F13LD shared viewer shading (lighting, occlusion, shadows) — see F13_SHADE_GLSL
+// Raw TPMS values overstate distance (|∇φ| up to ~1.7), so lighting rays step at 0.6×.
+'float f13Map(vec3 p){return 0.6*sceneSDF(p,'+H+');}',
+F13_SHADE_GLSL,
 'void main(){',
 '  vec2 uv=(gl_FragCoord.xy-res*0.5)/min(res.x,res.y);',
 '  vec3 ro=rot*vec3(0.0,0.0,zoom);',
@@ -1028,18 +1151,10 @@ baseFunc,
 '  }',
 '  vec3 pos=ro+rd*t,n=nrm(pos,H,nrmE);',
 '  if(dot(n,-rd)<0.0)n=-n;',
-'  float dx=dot(n,vec3(1.0,0.0,0.0)),dy=dot(n,vec3(0.0,1.0,0.0)),dz=dot(n,vec3(0.0,0.0,1.0));',
-'  float hue=dy*dy*0.33+dz*dz*0.67;',
-'  vec3 iridBase=palette(hue);',
-'  vec3 iridShift=palette(hue+0.5);',
-'  vec3 l1=normalize(vec3(1.0,1.8,2.0)),l2=normalize(vec3(-0.8,-0.3,0.6));',
-'  float l3fill=max(dot(n,normalize(vec3(-0.5,-1.0,-1.5))),0.0)*0.3;',
-'  float diff=0.35+max(dot(n,l1),0.0)*0.7+max(dot(n,l2),0.0)*0.25+l3fill;',
-'  float spec1=pow(max(dot(reflect(-l1,n),-rd),0.0),120.0)*0.7;',
-'  float spec2=pow(max(dot(reflect(-l1,n),-rd),0.0),20.0)*0.2;',
-'  float rim=pow(1.0-max(dot(n,-rd),0.0),2.5)*0.8;',
-'  vec3 green=vec3(0.784,0.961,0.259);',
-'  vec3 col=iridBase*diff+vec3(1.0,1.0,1.0)*spec1+green*spec2*0.6+green*rim*0.45;',
+// Cut face = the cube or clip plane is the visible surface (lattice is inside there).
+'  bool isCut=implicit(pos,H)<sceneSDF(pos,H)-1e-5;',
+// TPMS family color #5ecaa5; one period (2π) sets the occlusion reach.
+'  vec3 col=f13Shade(vec3(0.369,0.792,0.647),pos,n,rd,rot,isCut,6.2832,nrmE,1.6*H);',
 '  if(uClipAxis>0.5){vec3 axM2=vec3((uClipAxis<1.5)?1.0:0.0,(uClipAxis>1.5&&uClipAxis<2.5)?1.0:0.0,(uClipAxis>2.5)?1.0:0.0);float ccp=uClipPos*H;if(abs(dot(pos,axM2)-ccp)<0.02*H&&abs(dot(n,axM2))>0.7){vec3 axisCol=uClipAxis<1.5?vec3(0.1333,0.8275,0.9333):uClipAxis<2.5?vec3(0.9098,0.4745,0.9765):vec3(0.9804,0.8000,0.0824);col=mix(col,axisCol,0.30);}}',
 '  col=mix(bgCol,col,exp(-max(t-tEn,0.0)*0.010));',
 '  fragColor=vec4(clamp(col,0.0,1.0),1.0);',
@@ -1832,6 +1947,7 @@ function frame(ts){
     if(uClipAxis)gl.uniform1f(uClipAxis,clipState.axis);
     if(uClipPos)gl.uniform1f(uClipPos,clipState.pos);
     if(uClipSide)gl.uniform1f(uClipSide,clipState.side);
+    if(f13View)f13View.apply(gl,prog);
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
   }
   drawAxisGizmo(rotMat,canvas.clientWidth,canvas.clientHeight,camZoom);
@@ -1841,6 +1957,7 @@ function frame(ts){
 }
 
 // Init
+f13View=f13ViewInit({tool:'tpms',host:document.getElementById('cw'),canvas:canvas});
 syncModeUI();
 loadPreset('gyroid');
 updateMMHints();

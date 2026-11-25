@@ -58,14 +58,18 @@ canvas#c{display:block;width:100%;height:100%;touch-action:none}
 #axisCanvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:12}
 #ctrlPane{position:relative;min-height:0;min-width:0;display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);background:var(--panel);border-left:1px solid var(--hair)}
 #sectionsRail{grid-column:1;grid-row:1;min-height:0;position:relative}
-#ctrlScroll{grid-column:2;grid-row:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
-  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 14px,#000 calc(100% - 18px),transparent 100%);
-          mask-image:linear-gradient(to bottom,transparent 0,#000 14px,#000 calc(100% - 18px),transparent 100%)}
+/* one section at a time; the column scrolls only if that section is taller than it.
+   Edges fade only where content is hidden (.ft / .fb set by the layout script). */
+#ctrlScroll{grid-column:2;grid-row:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;--ft:0px;--fb:0px;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 var(--ft),#000 calc(100% - var(--fb)),transparent 100%);
+          mask-image:linear-gradient(to bottom,transparent 0,#000 var(--ft),#000 calc(100% - var(--fb)),transparent 100%)}
+#ctrlScroll.ft{--ft:20px}
+#ctrlScroll.fb{--fb:28px}
 #sheetHandle,#sectionsBar{display:none}
 
 /* ── Sections ── */
-.sec{padding:20px 16px 22px 4px;border-bottom:1px solid var(--hair);min-width:0}
-.sec:last-child{border-bottom:none;padding-bottom:40px}
+.sec{display:none;padding:20px 16px 32px 4px;min-width:0}
+.sec.on{display:block}
 .sec-h{display:flex;align-items:baseline;gap:8px;font-size:15px;font-weight:600;color:var(--ink);letter-spacing:0.01em;margin-bottom:14px}
 .sec-h .sec-n{font:500 11px/1 var(--lq-mono);color:var(--ink-faint)}
 .sub-h{font-size:11px;font-weight:600;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.08em;margin:14px 0 6px;display:flex;align-items:center}
@@ -325,8 +329,7 @@ body .f13h-close{width:44px;height:44px}
   #sheetHandle::before{content:'';width:36px;height:4px;border-radius:2px;background:var(--hair-strong)}
   #sheetHandle::after{content:'';position:absolute;left:0;right:0;top:-12px;bottom:-10px}
   #ctrlScroll{flex:1 1 auto;padding:0 16px}
-  .sec{display:none;padding:6px 0 20px;border-bottom:none}
-  .sec.on{display:block}
+  .sec{padding:6px 0 20px}
   #sectionsBar{display:block;flex:0 0 auto;border-top:1px solid var(--hair);padding-bottom:env(safe-area-inset-bottom);background:var(--panel)}
 }
 @media (prefers-reduced-motion:reduce){
@@ -558,7 +561,7 @@ body .f13h-close{width:44px;height:44px}
           <div id="viz-row">
             <div class="viz-card">
               <div class="viz-title">directional stiffness surface</div>
-              <canvas id="ellcv" style="width:100%;max-width:244px;aspect-ratio:1;display:block;margin:0 auto;border-radius:8px;cursor:default"></canvas>
+              <canvas id="ellcv" style="width:100%;max-width:244px;aspect-ratio:1;display:block;margin:0 auto;cursor:default"></canvas>
               <div class="zener-row">
                 <div class="zener-k">A =</div>
                 <div id="zener-val">—</div>
@@ -3455,31 +3458,71 @@ function f13ViewInit(cfg){
 // ==== /F13LD-VIEW ====
 
 // All shaders are GLSL ES 3.00 → WebGL2 is required (a WebGL1 fallback can never compile them).
-const gl=canvas.getContext('webgl2',{preserveDrawingBuffer:true});
+// antialias off: the view is one full-screen ray-marched quad (MSAA does nothing for it), and a
+// multisampled default framebuffer cannot be the target of blitFramebuffer.
+// preserveDrawingBuffer keeps the last frame for the queue snapshot (drawImage of the canvas).
+const gl=canvas.getContext('webgl2',{preserveDrawingBuffer:true,antialias:false,depth:false,stencil:false});
 if(!gl){canvas.parentElement.innerHTML='<p style="color:#888;padding:40px;text-align:center">This tool needs WebGL2, which this browser or GPU does not provide.</p>';throw new Error('WebGL2 unavailable');}
 // ── Adaptive render quality (replaces the Low/Med/High switch) ─────────
 // The ray-march step limit and hit threshold are uniforms, so quality never
-// recompiles. While the user orbits, zooms, drags a slider or types (and while
-// auto-rotate runs) frames use Q_INT; ~150 ms after the last interaction one
-// refined frame is drawn with Q_HI. Rendering is on demand: nothing is drawn
-// unless something changed (requestRender / kick).
-const Q_INT={steps:384,thresh:1.0,dpr:1.5},Q_HI={steps:768,thresh:0.5,dpr:2};
-const IDLE_MS=150;
-let renderDirty=true,refinePending=false,lastInteract=0;
-function requestRender(){renderDirty=true;}
-function kick(){lastInteract=performance.now();renderDirty=true;}
-// Size the drawing buffer from the viewer pane (not a fixed 420 px strip).
-function resize(q){
-  q=q||Q_INT;
+// recompiles. The canvas buffer stays at CSS size × min(devicePixelRatio, 2) and
+// is only resized when the pane really changes size.
+// While the user orbits, zooms, drags the clip handle, edits a control (and while
+// auto-rotate runs) frames use Q_INT, rendered into an offscreen framebuffer at a
+// reduced scale (AQ.scale, adapted to hold ~60 fps) and upscaled to the canvas with
+// blitFramebuffer. ~150 ms after the last interaction one rest frame is drawn with
+// Q_REST at full canvas resolution. Rendering is on demand: the loop sleeps until
+// something changes (requestRender / kick).
+const Q_INT={steps:160,thresh:1.0},Q_REST={steps:384,thresh:1.0};
+const IDLE_MS=150,DPR_MAX=2;
+const AQ={scale:0.7,min:0.4,max:0.85,cap:0.85,ema:0,prev:0,vsync:16.7,lastTick:0,pxCost:0};   // interactive render scale
+let renderDirty=true,refinePending=false,lastInteract=0,lastTs=0,loopOn=false,drawingInt=false;
+const drawStats={int:0,rest:0,glyph:0,compile:0};   // frame counters (tests / profiling)
+function wakeLoop(){if(!loopOn){loopOn=true;lastTs=0;requestAnimationFrame(frame);}}
+function requestRender(){renderDirty=true;wakeLoop();}
+function kick(){lastInteract=performance.now();renderDirty=true;wakeLoop();}
+// Size the drawing buffer from the viewer pane; fixed DPR, so tier changes never resize it.
+function resize(){
   const host=canvas.parentElement;
   const cssW=Math.max(1,host.clientWidth),cssH=Math.max(1,host.clientHeight);
-  const dpr=Math.min(window.devicePixelRatio||1,q.dpr);
+  const dpr=Math.min(window.devicePixelRatio||1,DPR_MAX);
   const w=Math.round(cssW*dpr),h=Math.round(cssH*dpr);
-  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
+  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;return true;}
+  return false;
 }
 resize();
 window.addEventListener('resize',requestRender);
 if(window.ResizeObserver)new ResizeObserver(requestRender).observe(canvas.parentElement);
+// Offscreen colour target for interactive frames, allocated at AQ.max of the canvas size so
+// scale changes only move the viewport (no reallocation); reallocated on canvas resize only.
+const lowFB={fb:null,rb:null,w:0,h:0};
+function ensureLowFB(){
+  const w=Math.max(1,Math.ceil(canvas.width*AQ.max)),h=Math.max(1,Math.ceil(canvas.height*AQ.max));
+  if(lowFB.fb&&lowFB.w===w&&lowFB.h===h)return true;
+  if(!lowFB.fb){lowFB.fb=gl.createFramebuffer();lowFB.rb=gl.createRenderbuffer();}
+  gl.bindRenderbuffer(gl.RENDERBUFFER,lowFB.rb);
+  gl.renderbufferStorage(gl.RENDERBUFFER,gl.RGBA8,w,h);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,lowFB.fb);
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.RENDERBUFFER,lowFB.rb);
+  const ok=gl.checkFramebufferStatus(gl.FRAMEBUFFER)===gl.FRAMEBUFFER_COMPLETE;
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  lowFB.w=w;lowFB.h=h;
+  if(!ok){gl.deleteFramebuffer(lowFB.fb);gl.deleteRenderbuffer(lowFB.rb);lowFB.fb=null;}
+  return ok;
+}
+// Adaptive scale: frame-to-frame time of consecutive interactive frames (EMA). Slower than
+// ~20 ms (or 1.6 display frames) lowers the scale; at the display rate (≤ ~12 ms, or 1.2
+// display frames) it creeps back up, never above the last scale that was too slow.
+function aqSample(ts){
+  if(AQ.prev&&ts-AQ.prev<250){
+    const d=ts-AQ.prev;AQ.ema=AQ.ema?AQ.ema*0.7+d*0.3:d;
+    AQ.pxCost=AQ.ema/Math.max(1,canvas.width*canvas.height*AQ.scale*AQ.scale);   // ms per interactive pixel (upper bound: includes vsync wait)
+    const fast=Math.max(12,AQ.vsync*1.2),slow=Math.max(20,AQ.vsync*1.6);
+    if(AQ.ema>slow){AQ.cap=Math.max(AQ.min,AQ.scale-0.03);AQ.scale=Math.max(AQ.min,AQ.scale*0.88);AQ.ema=0;}
+    else if(AQ.ema<fast&&AQ.scale<AQ.cap)AQ.scale=Math.min(AQ.cap,AQ.scale+0.01);
+  }
+  AQ.prev=ts;
+}
 // Any edit to a control counts as interaction (sliders, selects, number fields).
 document.addEventListener('input',kick,true);
 document.addEventListener('change',kick,true);
@@ -3968,45 +4011,38 @@ function updateHomogMMHints(){
 
 // ── buildFrag — core shader generator with PI-TPMS branch ─────────────
 const VERT='#version 300 es\nin vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
-function buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult){
-  const active=terms.filter(t=>t.on&&t.factors&&t.factors.length);
-  const H=toFloat(Math.PI*cellMult);
-  let baseFunc, implicitExpr;
+// The fragment source carries the shader's STRUCTURE plus the term coefficients and frequencies
+// (literals: they change only on a term edit, a single change event, and as literals the GPU
+// compiler can fold them — uniform terms measured 25–50% slower per frame). Every value a slider
+// or switch changes — offset, wall t, pipe r, cells, phase shift, field B frequency/amplitude,
+// the normalize switches — is a uniform (sceneUniforms), so dragging never recompiles.
+// Uniform values are rounded to 6 decimals exactly as the former literals were (toFloat).
+const r6=v=>parseFloat(toFloat(v));
+function fieldGLSL(f){
+  if(f.raw)return{body:'return '+f.raw.glsl+';',lines:'  v='+f.raw.glsl+';'};
+  const act=f.terms.filter(t=>t.on&&t.factors&&t.factors.length);
+  const exprs=act.map(t=>{const parts=t.factors.map(fc=>'('+glslTrig(fc.trig,toFloat(fc.fx),toFloat(fc.fy),toFloat(fc.fz))+')');return'v+='+toFloat(t.coef)+'*'+parts.join('*')+';';});
+  return{body:'float v=0.0;'+exprs.map(e=>' '+e).join('')+' return v;',lines:exprs.map(e=>'  '+e).join('\n')};
+}
+function buildFrag(terms,shellMode,piMode){
+  let baseFunc, implicitExpr, decl;
 
   if(piMode){
-    // Phase shift in radians — period-invariant
-    const dxS=toFloat(piShiftRad('x'));
-    const dyS=toFloat(piShiftRad('y'));
-    const dzS=toFloat(piShiftRad('z'));
-    const pipeRS=toFloat(pipeRVal);
-
-    // evalA(p) = φA(p);  evalB(p) = amp·φB(k·p + δ). k is the whole-number
-    // frequency multiple of field B, amp matches B's amplitude to A.
+    // evalA(p) = φA(p);  evalB(p) = amp·φB(k·p + δ). k (whole-number frequency multiple of
+    // field B), δ (phase shift, radians) and amp (matches B's amplitude to A) are uniforms.
     // Each field body lives in its own function so no names can collide.
-    function fieldBody(f){
-      if(f.raw) return 'return '+f.raw.glsl+';';
-      const act=f.terms.filter(t=>t.on&&t.factors&&t.factors.length);
-      return 'float v=0.0;'+act.map(t=>{
-        const parts=t.factors.map(fc=>'('+glslTrig(fc.trig,toFloat(fc.fx),toFloat(fc.fy),toFloat(fc.fz))+')');
-        return ' v+='+toFloat(t.coef)+'*'+parts.join('*')+';';
-      }).join('')+' return v;';
-    }
-    function makeEvalFn(fnName,f,k,ox,oy,oz,amp){
-      return `float ${fnName}_f(float gx,float gy,float gz){ ${fieldBody(f)} }
-float ${fnName}(vec3 p,float H){ return ${amp}*${fnName}_f(${k}*p.x+${ox},${k}*p.y+${oy},${k}*p.z+${oz}); }`;
-    }
-
-    const evalA = makeEvalFn('evalA',fieldA(),'1.0','0.0','0.0','0.0','1.0');
-    const evalB = makeEvalFn('evalB',fieldBResolved(),toFloat(fieldB.freq),dxS,dyS,dzS,toFloat(fieldBAmp));
-
-    if(piNormalize){
-      // Full angle-corrected distance to intersection curve.
-      // d_curve² = (d_A² − 2·cosα·d_A·d_B + d_B²) / sin²α
-      // where d_A, d_B are SIGNED perpendicular distances to each surface,
-      // and α is the angle between the surface normals at p (∇φ(p) and ∇φ(p+δ)).
-      // FD step 0.012; ε-floor 0.08 on |∇φ|; cos α clamped to ±0.95 to bound
-      // 1/sin²α (≤ ~10) when surfaces become near-parallel.
-      const gradFn = `
+    const gA=fieldGLSL(fieldA()),gB=fieldGLSL(fieldBResolved());
+    decl='uniform float uPipeR;uniform float uPiK;uniform vec3 uPiShift;uniform float uPiAmp;uniform float uPiNorm;';
+    const evalA=`float evalA_f(float gx,float gy,float gz){ ${gA.body} }
+float evalA(vec3 p,float H){ return 1.0*evalA_f(1.0*p.x+0.0,1.0*p.y+0.0,1.0*p.z+0.0); }`;
+    const evalB=`float evalB_f(float gx,float gy,float gz){ ${gB.body} }
+float evalB(vec3 p,float H){ return uPiAmp*evalB_f(uPiK*p.x+uPiShift.x,uPiK*p.y+uPiShift.y,uPiK*p.z+uPiShift.z); }`;
+    // normalize on (uPiNorm): full angle-corrected distance to the intersection curve,
+    // d_curve² = (d_A² − 2·cosα·d_A·d_B + d_B²) / sin²α, d_A, d_B SIGNED perpendicular distances
+    // to each surface, α the angle between ∇φ(p) and ∇φ(p+δ). FD step 0.012; ε-floor 0.08 on
+    // |∇φ|; cos α clamped to ±0.95 to bound 1/sin²α (≤ ~10) when surfaces become near-parallel.
+    // normalize off: raw max(|φA|, |φB|) level set.
+    baseFunc=evalA+'\n'+evalB+`
 vec3 gradVecA(vec3 p, float H){
   float e = 0.012;
   float dx = evalA(p+vec3(e,0.0,0.0),H) - evalA(p-vec3(e,0.0,0.0),H);
@@ -4020,38 +4056,32 @@ vec3 gradVecB(vec3 p, float H){
   float dy = evalB(p+vec3(0.0,e,0.0),H) - evalB(p-vec3(0.0,e,0.0),H);
   float dz = evalB(p+vec3(0.0,0.0,e),H) - evalB(p-vec3(0.0,0.0,e),H);
   return vec3(dx, dy, dz) / (2.0*e);
-}`;
-      baseFunc = evalA+'\n'+evalB+gradFn+`
+}
 float base(vec3 p,float H){ return evalA(p,H); }
 float piField(vec3 p,float H){
-  vec3 gA = gradVecA(p, H);
-  vec3 gB = gradVecB(p, H);
-  float magA = max(length(gA), 0.08);
-  float magB = max(length(gB), 0.08);
-  float dA = evalA(p, H) / magA;
-  float dB = evalB(p, H) / magB;
-  float cosA = clamp(dot(gA, gB) / (magA * magB), -0.95, 0.95);
-  float sin2 = 1.0 - cosA * cosA;
-  float num = dA*dA - 2.0*cosA*dA*dB + dB*dB;
-  return sqrt(max(num, 0.0) / sin2);
+  if(uPiNorm>0.5){
+    vec3 gA = gradVecA(p, H);
+    vec3 gB = gradVecB(p, H);
+    float magA = max(length(gA), 0.08);
+    float magB = max(length(gB), 0.08);
+    float dA = evalA(p, H) / magA;
+    float dB = evalB(p, H) / magB;
+    float cosA = clamp(dot(gA, gB) / (magA * magB), -0.95, 0.95);
+    float sin2 = 1.0 - cosA * cosA;
+    float num = dA*dA - 2.0*cosA*dA*dB + dB*dB;
+    return sqrt(max(num, 0.0) / sin2);
+  }
+  return max(abs(evalA(p,H)),abs(evalB(p,H)));
 }`;
-    } else {
-      baseFunc = evalA+'\n'+evalB+`
-float base(vec3 p,float H){ return evalA(p,H); }
-float piField(vec3 p,float H){ return max(abs(evalA(p,H)),abs(evalB(p,H))); }`;
-    }
-    implicitExpr='piField(p,H)-'+pipeRS;
+    implicitExpr='piField(p,H)-uPipeR';
   } else {
-    const lines=rawPresetFn
-      ?'  v='+rawPresetFn.glsl+';'
-      :active.map(t=>{const parts=t.factors.map(f=>'('+glslTrig(f.trig,toFloat(f.fx),toFloat(f.fy),toFloat(f.fz))+')');return'  v+='+toFloat(t.coef)+'*'+parts.join('*')+';';}).join('\n');
-    const offS=toFloat(offsetVal);
-    const wallS=toFloat(wallVal);
-    baseFunc=`float base(vec3 p,float H){float v=0.0;\nfloat gx=p.x,gy=p.y,gz=p.z;${lines}\nreturn v;}`;
-    if(shellMode && shellNormalize){
-      // Normalize the shell distance by |∇base| so wall thickness is a real
-      // perpendicular distance independent of where on the surface we are.
-      // FD step 0.012; ε-floor 0.08 on |∇φ| guards against critical points.
+    const gA=fieldGLSL({terms:terms,raw:rawPresetFn});
+    decl='uniform float uOffset;'+(shellMode?'uniform float uWall;uniform float uShellNorm;':'');
+    baseFunc=`float base(vec3 p,float H){float v=0.0;\nfloat gx=p.x,gy=p.y,gz=p.z;${gA.lines}\nreturn v;}`;
+    if(shellMode){
+      // normalize on (uShellNorm): |φ−offset| / |∇φ| so wall thickness is a real perpendicular
+      // distance independent of where on the surface we are. FD step 0.012; ε-floor 0.08 on |∇φ|
+      // guards against critical points. Off: raw |φ−offset|.
       baseFunc += `
 float gradMagBase(vec3 p, float H){
   float e = 0.012;
@@ -4060,10 +4090,11 @@ float gradMagBase(vec3 p, float H){
   float dz = base(p+vec3(0.0,0.0,e),H) - base(p-vec3(0.0,0.0,e),H);
   float g = sqrt(dx*dx + dy*dy + dz*dz) / (2.0*e);
   return max(g, 0.08);
-}`;
-      implicitExpr='abs(base(p,H)-('+offS+'))/gradMagBase(p,H)-'+wallS;
+}
+float shellField(vec3 p,float H){float d=abs(base(p,H)-(uOffset));if(uShellNorm>0.5)d=d/gradMagBase(p,H);return d;}`;
+      implicitExpr='shellField(p,H)-uWall';
     } else {
-      implicitExpr=shellMode?'abs(base(p,H)-('+offS+'))-'+wallS:'base(p,H)-('+offS+')';
+      implicitExpr='base(p,H)-(uOffset)';
     }
   }
 
@@ -4074,6 +4105,7 @@ float gradMagBase(vec3 p, float H){
 'uniform vec2 res;uniform mat3 rot;uniform float zoom;',
 'uniform float uClipAxis;uniform float uClipPos;uniform float uClipSide;',
 'uniform int uMaxSteps;uniform float uThreshScale;',
+'uniform float uH;uniform float uFeature;'+decl,
 baseFunc,
 'float implicit(vec3 p,float H){return '+implicitExpr+';}',
 // Box SDF for clipping — intersection with implicit gives solid clipped to cube
@@ -4083,20 +4115,20 @@ baseFunc,
 'vec3 nrm(vec3 p,float H,float e){return normalize(vec3(sceneSDF(p+vec3(e,0,0),H)-sceneSDF(p-vec3(e,0,0),H),sceneSDF(p+vec3(0,e,0),H)-sceneSDF(p-vec3(0,e,0),H),sceneSDF(p+vec3(0,0,e),H)-sceneSDF(p-vec3(0,0,e),H)));}',
 // F13LD shared viewer shading (lighting, occlusion, shadows) — see F13_SHADE_GLSL
 // Raw TPMS values overstate distance (|∇φ| up to ~1.7), so lighting rays step at 0.6×.
-'float f13Map(vec3 p){return 0.6*sceneSDF(p,'+H+');}',
+'float f13Map(vec3 p){return 0.6*sceneSDF(p,uH);}',
 F13_SHADE_GLSL,
 'void main(){',
 '  vec2 uv=(gl_FragCoord.xy-res*0.5)/min(res.x,res.y);',
 '  vec3 ro=rot*vec3(0.0,0.0,zoom);',
 '  vec3 rd=normalize(rot*vec3(uv.x,uv.y,-1.6));',
-'  float H='+H+';',
+'  float H=uH;',
 '  float r=clamp(length(uv)*1.1,0.0,1.0);',
 '  vec3 bgCentre=vec3(0.07,0.07,0.07);',
 '  vec3 bgEdge=vec3(0.03,0.03,0.03);',
 '  vec3 bgCol=mix(bgCentre,bgEdge,r*r);',
 '  vec4 bg=vec4(bgCol,1.0);',
 // Feature size drives thresh, maxStep, and normal e — different per mode
-'  float featureSize='+toFloat(piMode ? pipeRVal : shellMode ? wallVal : Math.PI*cellMult*0.25)+';',
+'  float featureSize=uFeature;',
 '  float camScale=clamp(zoom/16.0,0.15,1.0);',
 '  float thresh=featureSize*0.008*camScale*uThreshScale;',
 '  float maxStep=featureSize*0.25*camScale;',
@@ -4140,22 +4172,38 @@ F13_SHADE_GLSL,
 
 let prog=null,uRes,uRot,uZoom,quadBuf=null;
 function mkShader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(s));return s;}
+let progSrc='',sceneLoc={};
+// Values for the scene uniforms, rounded like the former literals (see buildFrag).
+function sceneUniforms(){
+  return{uH:r6(Math.PI*cellMult),uFeature:r6(piMode?pipeRVal:shellMode?wallVal:Math.PI*cellMult*0.25),
+    uOffset:r6(offsetVal),uWall:r6(wallVal),uShellNorm:shellNormalize?1:0,
+    uPipeR:r6(pipeRVal),uPiK:r6(fieldB.freq),uPiShift:[r6(piShiftRad('x')),r6(piShiftRad('y')),r6(piShiftRad('z'))],uPiAmp:r6(fieldBAmp),uPiNorm:piNormalize?1:0};
+}
+function setSceneUniforms(){
+  const v=sceneUniforms();
+  for(const k in sceneLoc){const l=sceneLoc[k];if(!l)continue;const x=v[k];
+    if(k==='uPiShift')gl.uniform3f(l,x[0],x[1],x[2]);else gl.uniform1f(l,x);}
+}
+// Recompiles only when the generated source changes (structure); value edits just redraw.
 function rebuildShader(){
   fieldBAmp=computeFieldBAmp();
   schedulePiCheck();
+  const src=buildFrag(terms,shellMode,piMode);
+  if(prog&&src===progSrc){kick();return;}
   const p=gl.createProgram();
-  const vs=mkShader(gl.VERTEX_SHADER,VERT),fs=mkShader(gl.FRAGMENT_SHADER,buildFrag(terms,shellMode,piMode,offsetVal,wallVal,pipeRVal,cellMult));
+  const vs=mkShader(gl.VERTEX_SHADER,VERT),fs=mkShader(gl.FRAGMENT_SHADER,src);
   gl.attachShader(p,vs);gl.attachShader(p,fs);
-  gl.linkProgram(p);
+  gl.linkProgram(p);drawStats.compile++;
   gl.detachShader(p,vs);gl.detachShader(p,fs);gl.deleteShader(vs);gl.deleteShader(fs);
   if(!gl.getProgramParameter(p,gl.LINK_STATUS)){console.error(gl.getProgramInfoLog(p));gl.deleteProgram(p);return;}
   if(prog)gl.deleteProgram(prog);
-  prog=p;gl.useProgram(prog);
+  prog=p;progSrc=src;gl.useProgram(prog);
   if(!quadBuf){quadBuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,quadBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);}
   else gl.bindBuffer(gl.ARRAY_BUFFER,quadBuf);
   const loc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
   uRes=gl.getUniformLocation(prog,'res');uRot=gl.getUniformLocation(prog,'rot');uZoom=gl.getUniformLocation(prog,'zoom');uClipAxis=gl.getUniformLocation(prog,'uClipAxis');uClipPos=gl.getUniformLocation(prog,'uClipPos');uClipSide=gl.getUniformLocation(prog,'uClipSide');
   uMaxSteps=gl.getUniformLocation(prog,'uMaxSteps');uThreshScale=gl.getUniformLocation(prog,'uThreshScale');
+  sceneLoc={};['uH','uFeature','uOffset','uWall','uShellNorm','uPipeR','uPiK','uPiShift','uPiAmp','uPiNorm'].forEach(n=>{sceneLoc[n]=gl.getUniformLocation(prog,n);});
   kick();
 }
 let uMaxSteps,uThreshScale;
@@ -4224,9 +4272,10 @@ function drawAxisGizmo(rotMat,canvasW,canvasH,camZoom){
   var cv=document.getElementById('axisCanvas');
   if(!cv)return;
   var dpr=Math.min(window.devicePixelRatio||1,2);
-  cv.width=Math.round(canvasW*dpr);cv.height=Math.round(canvasH*dpr);
+  var bw=Math.round(canvasW*dpr),bh=Math.round(canvasH*dpr);
+  if(cv.width!==bw||cv.height!==bh){cv.width=bw;cv.height=bh;}   // reallocate only on a real size change
   var ctx=cv.getContext('2d');
-  ctx.scale(dpr,dpr);ctx.clearRect(0,0,canvasW,canvasH);
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,bw,bh);ctx.setTransform(dpr,0,0,dpr,0,0);
   var H=Math.PI*cellMult;
   var cx=rotMat[6],cy=rotMat[7],cz=rotMat[8];
   function proj(p){
@@ -4592,19 +4641,8 @@ float Edir(vec3 n){vec3 q=n*n;float inv=q.x*q.x*S1+q.y*q.y*S2+q.z*q.z*S3+q.x*q.y
 float implicit(vec3 P){float r=length(P);if(r<0.001)return -1.0;return r-Edir(P/r)/Emax;}
 vec3 nrm(vec3 P){float e=0.004;return normalize(vec3(implicit(P+vec3(e,0.0,0.0))-implicit(P-vec3(e,0.0,0.0)),implicit(P+vec3(0.0,e,0.0))-implicit(P-vec3(0.0,e,0.0)),implicit(P+vec3(0.0,0.0,e))-implicit(P-vec3(0.0,0.0,e))));}
 vec3 palette(float t){vec3 a=vec3(0.5,0.5,0.5),b=vec3(0.5,0.5,0.5),c=vec3(1.0,1.0,1.0),d=vec3(0.0,0.33,0.67);return a+b*cos(6.28318*(c*t+d));}
-void main(){
-  vec2 uv=(gl_FragCoord.xy-res*0.5)/min(res.x,res.y);
-  vec3 ro=rot*vec3(0.0,0.0,zoom);vec3 rd=normalize(rot*vec3(uv.x,uv.y,-1.6));
-  float r=clamp(length(uv)*1.1,0.0,1.0);
-  vec3 bgCol=mix(vec3(0.07,0.09,0.22),vec3(0.01,0.01,0.04),r*r);vec4 bg=vec4(bgCol,1.0);
-  float bR=1.15;float b2=dot(ro,rd),c2=dot(ro,ro)-bR*bR;float disc=b2*b2-c2;
-  if(disc<0.0){fragColor=bg;return;}
-  float sq=sqrt(disc);float tEn=max(-b2-sq,0.0),tEx=-b2+sq;
-  if(tEx<0.0){fragColor=bg;return;}
-  float t=tEn,hit=-1.0,ss=0.012;float prev=implicit(ro+rd*t);
-  for(int i=0;i<420;i++){t+=ss;if(t>tEx)break;float g=implicit(ro+rd*t);if(prev*g<0.0){hit=t-ss*(g/(g-prev));break;}prev=g;}
-  if(hit<0.0){fragColor=bg;return;}
-  vec3 pos=ro+rd*hit;vec3 n=nrm(pos);if(dot(n,-rd)<0.0)n=-n;
+vec3 shade(vec3 pos,vec3 rd){
+  vec3 n=nrm(pos);if(dot(n,-rd)<0.0)n=-n;
   float Eval=Edir(normalize(pos));float Enorm=clamp(Eval/Emax,0.0,1.0);
   float dx=dot(n,vec3(1.0,0.0,0.0)),dy=dot(n,vec3(0.0,1.0,0.0)),dz=dot(n,vec3(0.0,0.0,1.0));
   float hue=dy*dy*0.33+dz*dz*0.67+Enorm*0.15;
@@ -4618,7 +4656,26 @@ void main(){
   vec3 col=mix(iridBase,iridShift,Enorm*0.35)*diff;
   col+=iridShift*fresnel*0.6;col+=vec3(spec1+spec2);col+=iridShift*rim*0.45;
   col*=(0.7+Enorm*0.4);
-  fragColor=vec4(clamp(col,0.0,1.0),1.0);
+  return clamp(col,0.0,1.0);
+}
+// Transparent backdrop (premultiplied alpha). Rays that miss but pass within about a pixel of
+// the surface get partial coverage, shaded at their closest approach: an antialiased silhouette.
+void main(){
+  vec2 uv=(gl_FragCoord.xy-res*0.5)/min(res.x,res.y);
+  vec3 ro=rot*vec3(0.0,0.0,zoom);vec3 rd=normalize(rot*vec3(uv.x,uv.y,-1.6));
+  fragColor=vec4(0.0);
+  float bR=1.15;float b2=dot(ro,rd),c2=dot(ro,ro)-bR*bR;float disc=b2*b2-c2;
+  if(disc<0.0)return;
+  float sq=sqrt(disc);float tEn=max(-b2-sq,0.0),tEx=-b2+sq;
+  if(tEx<0.0)return;
+  float t=tEn,hit=-1.0,ss=0.012;float prev=implicit(ro+rd*t);
+  float gMin=prev>0.0?prev:1e5,tMin=t;
+  for(int i=0;i<420;i++){t+=ss;if(t>tEx)break;float g=implicit(ro+rd*t);if(prev*g<0.0){hit=t-ss*(g/(g-prev));break;}if(g>0.0&&g<gMin){gMin=g;tMin=t;}prev=g;}
+  if(hit>=0.0){fragColor=vec4(shade(ro+rd*hit,rd),1.0);return;}
+  float pixW=tMin/(1.6*min(res.x,res.y));
+  float cov=clamp(1.0-gMin/pixW,0.0,1.0);
+  if(cov<=0.0)return;
+  fragColor=vec4(shade(ro+rd*tMin,rd)*cov,cov);
 }
 `;}
 
@@ -4628,10 +4685,19 @@ function mkSShader(type,src){
   return s;
 }
 let sZoom=2.6;
+// Backing size = CSS size × min(DPR, 2); checked before each draw (the card may have been hidden at init).
+function sizeStiffCanvas(cv){
+  const css=cv.clientWidth;if(!css)return;
+  const w=Math.round(css*Math.min(window.devicePixelRatio||1,2));
+  if(cv.width!==w||cv.height!==w){cv.width=w;cv.height=w;}
+}
 function initStiffnessGL(){
   const cv=document.getElementById('ellcv');
-  const w=cv.offsetWidth||180;cv.width=w;cv.height=w;
-  sgl=cv.getContext('webgl2');if(!sgl){cv.style.display='none';return false;}
+  if(cv.clientWidth)sizeStiffCanvas(cv);else{cv.width=cv.height=180;}
+  // transparent backdrop: the surface sits straight on its card (premultiplied output)
+  sgl=cv.getContext('webgl2',{alpha:true,premultipliedAlpha:true,antialias:false,depth:false,stencil:false});if(!sgl){cv.style.display='none';return false;}
+  if(window.IntersectionObserver)new IntersectionObserver(es=>{glyphOnScreen=es[es.length-1].isIntersecting;if(glyphOnScreen)glyphRedraw();}).observe(cv);
+  else glyphOnScreen=true;
   if(!squadBuf){squadBuf=sgl.createBuffer();sgl.bindBuffer(sgl.ARRAY_BUFFER,squadBuf);sgl.bufferData(sgl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),sgl.STATIC_DRAW);}
   sRotMat=mat3Mul(rotAxisAngle(0,1,0,0.6),rotAxisAngle(1,0,0,-0.3));
   sInitialized=true;return true;
@@ -4654,12 +4720,14 @@ function rebuildStiffnessShader(Ex,Ey,Ez,Gxy,nu,Gxz,Gyz,showZener){
   suRes=sgl.getUniformLocation(sprog,'res');
   suRot=sgl.getUniformLocation(sprog,'rot');
   suZoom=sgl.getUniformLocation(sprog,'zoom');
+  glyphRedraw();
 }
-function drawStiffnessSurface(){
+function drawStiffnessSurface(angle){
   if(!sprog||!suRes)return;
   const cv=document.getElementById('ellcv');
-  sRotMat=mat3Mul(rotAxisAngle(0,1,0,0.003),sRotMat);
-  sRotMat=orthonormalize(sRotMat);
+  sizeStiffCanvas(cv);
+  if(angle){sRotMat=mat3Mul(rotAxisAngle(0,1,0,angle),sRotMat);sRotMat=orthonormalize(sRotMat);}
+  drawStats.glyph++;
   sgl.viewport(0,0,cv.width,cv.height);
   sgl.uniform2f(suRes,cv.width,cv.height);
   sgl.uniformMatrix3fv(suRot,false,new Float32Array(sRotMat));
@@ -4923,45 +4991,135 @@ document.getElementById('exportBtn').addEventListener('click',function(){
   },1800);
 });
 
-let lastTs=0;
-function drawMain(q){
-  resize(q);
-  rotMat=orthonormalize(rotMat);
-  if(prog&&uRes){
-    gl.viewport(0,0,canvas.width,canvas.height);
-    gl.uniform2f(uRes,canvas.width,canvas.height);
-    gl.uniformMatrix3fv(uRot,false,new Float32Array(rotMat));
-    gl.uniform1f(uZoom,camZoom);
-    if(uClipAxis)gl.uniform1f(uClipAxis,clipState.axis);
-    if(uClipPos)gl.uniform1f(uClipPos,clipState.pos);
-    if(uClipSide)gl.uniform1f(uClipSide,clipState.side);
-    if(uMaxSteps)gl.uniform1i(uMaxSteps,q.steps);
-    if(uThreshScale)gl.uniform1f(uThreshScale,q.thresh);
-    if(f13View)f13View.apply(gl,prog);
-    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
-  }
+// interactive=true: Q_INT into the offscreen target at AQ.scale, blitted (LINEAR) to the canvas.
+// interactive=false: Q_REST straight into the canvas at full resolution.
+// Bind a target, set every uniform and draw the quad (optionally scissored to rows y0..y1).
+function sceneDraw(fb,w,h,q,rows){
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
+  gl.viewport(0,0,w,h);
+  gl.uniform2f(uRes,w,h);
+  gl.uniformMatrix3fv(uRot,false,new Float32Array(rotMat));
+  gl.uniform1f(uZoom,camZoom);
+  if(uClipAxis)gl.uniform1f(uClipAxis,clipState.axis);
+  if(uClipPos)gl.uniform1f(uClipPos,clipState.pos);
+  if(uClipSide)gl.uniform1f(uClipSide,clipState.side);
+  if(uMaxSteps)gl.uniform1i(uMaxSteps,q.steps);
+  if(uThreshScale)gl.uniform1f(uThreshScale,q.thresh);
+  setSceneUniforms();
+  if(f13View)f13View.apply(gl,prog);
+  if(rows){gl.enable(gl.SCISSOR_TEST);gl.scissor(0,rows[0],w,rows[1]-rows[0]);}
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  if(rows)gl.disable(gl.SCISSOR_TEST);
+}
+function drawOverlay(){
   drawAxisGizmo(rotMat,canvas.clientWidth,canvas.clientHeight,camZoom);
   drawClipHandle(rotMat,canvas.clientWidth,canvas.clientHeight,camZoom);
 }
+// interactive=true: Q_INT into the offscreen target at AQ.scale, blitted (LINEAR) to the canvas.
+// interactive=false: a whole Q_REST frame straight into the canvas (used when the progressive
+// path is unavailable, and by the timing harness).
+function drawMain(interactive){
+  if(resize())AQ.prev=0;
+  rotMat=orthonormalize(rotMat);
+  if(prog&&uRes){
+    const W=canvas.width,H=canvas.height,low=interactive&&ensureLowFB();
+    const w=low?Math.max(1,Math.min(lowFB.w,Math.round(W*AQ.scale))):W,h=low?Math.max(1,Math.min(lowFB.h,Math.round(H*AQ.scale))):H;
+    sceneDraw(low?lowFB.fb:null,w,h,interactive?Q_INT:Q_REST);
+    if(low){
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER,lowFB.fb);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,null);
+      gl.blitFramebuffer(0,0,w,h,0,0,W,H,gl.COLOR_BUFFER_BIT,gl.LINEAR);
+      gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    }
+    drawStats[interactive?'int':'rest']++;
+  }
+  drawOverlay();
+}
+// ── Progressive rest frame ──────────────────────────────────────────────
+// The rest frame is rendered in horizontal strips into a full-resolution offscreen target over
+// several display frames (each strip sized to ~8 ms from the measured per-pixel cost), while the
+// canvas keeps showing the upscaled interactive frame; one blit swaps it in when complete, so it
+// never tears. Any new interaction drops the strips (the next idle starts over).
+const hiFB={fb:null,rb:null,w:0,h:0};
+function ensureHiFB(){
+  const w=canvas.width,h=canvas.height;
+  if(hiFB.fb&&hiFB.w===w&&hiFB.h===h)return true;
+  if(!hiFB.fb){hiFB.fb=gl.createFramebuffer();hiFB.rb=gl.createRenderbuffer();}
+  gl.bindRenderbuffer(gl.RENDERBUFFER,hiFB.rb);
+  gl.renderbufferStorage(gl.RENDERBUFFER,gl.RGBA8,w,h);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,hiFB.fb);
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.RENDERBUFFER,hiFB.rb);
+  const ok=gl.checkFramebufferStatus(gl.FRAMEBUFFER)===gl.FRAMEBUFFER_COMPLETE;
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  hiFB.w=w;hiFB.h=h;
+  if(!ok){gl.deleteFramebuffer(hiFB.fb);gl.deleteRenderbuffer(hiFB.rb);hiFB.fb=null;}
+  return ok;
+}
+const REST={active:false,y:0,rows:0,last:0,strips:0,STRIP_MS:8,REST_COST:2};   // REST_COST: rest px vs interactive px (shadows, more steps)
+function restBegin(){
+  if(resize())AQ.prev=0;
+  if(!prog||!uRes||!ensureHiFB())return false;
+  const W=canvas.width,H=canvas.height,lo=Math.ceil(H/16),hi=Math.ceil(H/4);
+  REST.rows=AQ.pxCost>0?Math.round(REST.STRIP_MS/(AQ.pxCost*REST.REST_COST*W)):Math.ceil(H/6);
+  REST.rows=Math.max(lo,Math.min(hi,REST.rows));
+  REST.active=true;REST.y=0;REST.last=0;REST.strips=0;
+  return true;
+}
+// one strip; true when the frame is complete and on the canvas
+function restStep(ts){
+  const W=canvas.width,H=canvas.height;
+  if(W!==hiFB.w||H!==hiFB.h){REST.active=false;renderDirty=true;return false;}   // pane resized mid-way
+  if(REST.last){const d=ts-REST.last,lo=Math.ceil(H/16),hi=Math.ceil(H/4);   // adapt to the measured strip interval
+    if(d>Math.max(24,AQ.vsync*1.5))REST.rows=Math.max(lo,Math.floor(REST.rows*0.6));
+    else if(d<Math.max(14,AQ.vsync*1.05))REST.rows=Math.min(hi,Math.ceil(REST.rows*1.3));}
+  REST.last=ts;
+  rotMat=orthonormalize(rotMat);
+  const y1=Math.min(H,REST.y+REST.rows);
+  sceneDraw(hiFB.fb,W,H,Q_REST,[REST.y,y1]);REST.y=y1;REST.strips++;
+  if(REST.y<H)return false;
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER,hiFB.fb);
+  gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,null);
+  gl.blitFramebuffer(0,0,W,H,0,0,W,H,gl.COLOR_BUFFER_BIT,gl.NEAREST);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  REST.active=false;drawStats.rest++;drawStats.restStrips=REST.strips;
+  return true;
+}
+function drawRestProgressiveAll(){if(!restBegin())return;let t=0;while(REST.active)restStep(t+=16);}   // timing harness only
+// Stiffness glyph: drawn on change, spun at ≤ 30 fps while on screen, paused while the main view moves.
+let glyphOnScreen=false,glyphDirty=false,glyphLast=0;
+const GLYPH_SPIN=0.18;   // rad/s (was 0.003 rad per 60 Hz frame)
+const REDUCE_MOTION=window.matchMedia('(prefers-reduced-motion:reduce)');
 // On-demand loop: the main view is drawn only when something changed
 // (renderDirty) or auto-rotate is on, at interactive quality while moving,
-// then once more at full quality when the user goes idle.
+// then once at rest quality when the user goes idle. The loop stops when idle.
 function frame(ts){
-  const dt=Math.min((ts-lastTs)/1000,0.05);lastTs=ts;
+  loopOn=false;
+  if(AQ.lastTick){const d=ts-AQ.lastTick;if(d>4&&d<AQ.vsync)AQ.vsync=d;}AQ.lastTick=ts;   // display frame interval
+  const dt=lastTs?Math.min((ts-lastTs)/1000,0.05):1/60;lastTs=ts;
   if(autoRot){applyDelta(dt*50,0);renderDirty=true;}
   const now=performance.now();
   const moving=autoRot||drag||scrub||!!pinch||(now-lastInteract<IDLE_MS)||!!(f13View&&f13View.interacting);
-  if(renderDirty){
-    renderDirty=false;
-    if(moving){drawMain(Q_INT);refinePending=true;}
-    else{drawMain(Q_HI);refinePending=false;}
-  } else if(refinePending&&!moving){
-    drawMain(Q_HI);refinePending=false;
+  let drewInt=false;
+  if(renderDirty){                       // any change: show a quick frame now, refine when idle
+    renderDirty=false;REST.active=false;
+    drawingInt=true;drawMain(true);drawingInt=false;refinePending=true;drewInt=true;
+  } else if(refinePending&&moving){
+    REST.active=false;                   // interaction resumed: drop the strips
+  } else if(refinePending){
+    if(!REST.active&&!restBegin()){drawMain(false);refinePending=false;}
+    else if(restStep(ts)){refinePending=false;AQ.cap=Math.min(AQ.max,AQ.cap+0.05);}   // let the next interaction probe a little higher
   }
-  // stiffness glyph spins while its results card is on screen
-  if(sprog){const ec=document.getElementById('ellcv');if(ec&&ec.getClientRects().length)drawStiffnessSurface();}
-  requestAnimationFrame(frame);
+  if(drewInt)aqSample(ts);else AQ.prev=0;
+  // stiffness glyph
+  const spin=glyphOnScreen&&!!sprog&&!moving&&!REDUCE_MOTION.matches;
+  if(sprog&&glyphOnScreen&&glyphDirty){drawStiffnessSurface(0);glyphDirty=false;glyphLast=spin?ts:0;}
+  else if(spin){
+    if(!glyphLast)glyphLast=ts;
+    else if(ts-glyphLast>=33){drawStiffnessSurface(Math.min((ts-glyphLast)/1000,0.1)*GLYPH_SPIN);glyphLast=ts;}
+  } else glyphLast=0;
+  if(autoRot||renderDirty||refinePending||moving||spin){loopOn=true;requestAnimationFrame(frame);}
 }
+function glyphRedraw(){glyphDirty=true;wakeLoop();}
 
 // Init
 f13View=f13ViewInit({tool:'tpms',host:document.getElementById('cw'),canvas:canvas,redraw:requestRender});
@@ -4970,15 +5128,16 @@ f13View=f13ViewInit({tool:'tpms',host:document.getElementById('cw'),canvas:canva
 syncModeUI();
 loadPreset('gyroid');
 updateMMHints();
-requestAnimationFrame(frame);
+wakeLoop();
 
-// ════ Layout shell: sections, desktop scroll-spy, phone bottom sheet ════
+// ════ Layout shell: sections (one at a time), phone bottom sheet ════
 // window.F13UI is the hook surface for the liquid widgets:
 //   F13UI.sections            ['surface','volume','cell','analyze']
 //   F13UI.active              current section id
 //   F13UI.isPhone()           true below 900 px (bottom-sheet layout)
-//   F13UI.scrollToSection(id) desktop: scroll the control column; phone: showSection
-//   F13UI.showSection(id)     phone: show only that section; desktop: scrollToSection
+//   F13UI.showSection(id)     show only that section (desktop column and phone sheet alike)
+//   F13UI.scrollToSection(id) alias of showSection (kept for older callers)
+//   F13UI.sectionOf(el)       id of the section containing el (or null)
 //   F13UI.setSheet('peek'|'full')  phone sheet snap
 //   F13UI.onSectionChange(id) set by the lead; called whenever the active section changes
 //   F13UI.onModeChange(m) / onClipChange(axis) / onAnalyze('running'|'new'|'stale') — optional hooks
@@ -4989,7 +5148,6 @@ requestAnimationFrame(frame);
   const scroller=document.getElementById('ctrlScroll');
   const pane=document.getElementById('ctrlPane');
   const secEl=id=>document.getElementById('sec-'+id);
-  const reduce=window.matchMedia('(prefers-reduced-motion:reduce)');
   UI.sections=SECS.slice();
   UI.active='surface';
   UI.isPhone=()=>mq.matches;
@@ -4999,32 +5157,26 @@ requestAnimationFrame(frame);
     document.querySelectorAll('.sb-fallback [data-section]').forEach(b=>b.classList.toggle('on',b.dataset.section===id));
     if(UI.onSectionChange)try{UI.onSectionChange(id);}catch(e){console.error(e);}
   }
-  function applyPhoneSections(){
+  function applySections(){
     SECS.forEach(s=>secEl(s).classList.toggle('on',s===UI.active));
+    updateFades();
   }
   UI.showSection=function(id){
     if(!SECS.includes(id))return;
-    if(!mq.matches){UI.scrollToSection(id);return;}
-    setActive(id);applyPhoneSections();scroller.scrollTop=0;
+    const changed=id!==UI.active;
+    setActive(id);applySections();
+    if(changed)scroller.scrollTop=0;
   };
-  UI.scrollToSection=function(id){
-    if(!SECS.includes(id))return;
-    if(mq.matches){UI.showSection(id);return;}
-    const top=secEl(id).offsetTop-scroller.offsetTop;
-    spyLock=performance.now()+600;setActive(id);
-    scroller.scrollTo({top:Math.max(0,top),behavior:reduce.matches?'auto':'smooth'});
-  };
-  // desktop scroll-spy: the active section is the last one whose top has passed a third of the column
-  let spyLock=0;
-  function spy(){
-    if(mq.matches||performance.now()<spyLock)return;
-    const y=scroller.scrollTop,h=scroller.clientHeight;
-    let cur=SECS[0];
-    if(y+h>=scroller.scrollHeight-2)cur=SECS[SECS.length-1];
-    else SECS.forEach(s=>{if(secEl(s).offsetTop-scroller.offsetTop<=y+h*0.33)cur=s;});
-    setActive(cur);
+  UI.scrollToSection=UI.showSection;
+  UI.sectionOf=function(el){const s=el&&el.closest&&el.closest('.sec[data-section]');return s?s.dataset.section:null;};
+  // the column scrolls only when the active section is taller than it; fade only the edges that hide content
+  function updateFades(){
+    const y=scroller.scrollTop,max=scroller.scrollHeight-scroller.clientHeight;
+    scroller.classList.toggle('ft',y>1);
+    scroller.classList.toggle('fb',max-y>1);
   }
-  scroller.addEventListener('scroll',spy,{passive:true});
+  scroller.addEventListener('scroll',updateFades,{passive:true});
+  if(window.ResizeObserver){const ro=new ResizeObserver(updateFades);ro.observe(scroller);SECS.forEach(s=>ro.observe(secEl(s)));}
   document.querySelectorAll('.sb-fallback [data-section]').forEach(b=>b.addEventListener('click',()=>UI.showSection(b.dataset.section)));
 
   // header height drives the phone viewer height (the header wraps on phones)
@@ -5070,8 +5222,9 @@ requestAnimationFrame(frame);
   handle.addEventListener('click',e=>{if(e.detail===0&&mq.matches)setSheet(sheetState==='peek'?'full':'peek',true);});   // keyboard
 
   function applyLayout(){
-    if(mq.matches){applyPhoneSections();setSheet(sheetState,false);}
-    else{SECS.forEach(s=>secEl(s).classList.remove('on'));pane.style.removeProperty('--sheet-h');}
+    applySections();
+    if(mq.matches)setSheet(sheetState,false);
+    else pane.style.removeProperty('--sheet-h');
     requestRender();
   }
   mq.addEventListener?mq.addEventListener('change',applyLayout):mq.addListener(applyLayout);
@@ -5139,6 +5292,17 @@ html.f13w #sectionsRail>.f13w-rail{margin:14px 0 0 4px}
 html.f13w .sb-fallback{display:none}
 html.f13w #sectionsBar{border-top:none;padding:0 8px env(safe-area-inset-bottom)}
 #w-send:not(.lq-wsd),#w-mode:not(.lq-seg),#w-preset:not(.lq-wd),#w-run:not(.lq-pb),#w-clip:empty{display:none}
+/* liquid dropdowns for field B, its frequency and the Analyze grid */
+html.f13w #w-fieldB{flex:1 1 120px;min-width:0}
+html.f13w .f13w-at{display:flex;align-items:center;gap:8px;flex:none;margin-left:auto}
+html.f13w .f13w-dd-c{flex:none}
+html.f13w .homo-controls .f13w-dd-c{align-self:flex-start}
+/* help: "show" jumps from a drawer card to its control */
+.f13w-show{position:relative;margin-left:auto;display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border:1px solid var(--hair-strong);border-radius:999px;background:none;color:var(--ink-dim);font:500 11px var(--lq-font);cursor:pointer}
+.f13w-show::after{content:'';position:absolute;left:50%;top:50%;width:max(100%,44px);height:44px;transform:translate(-50%,-50%)}
+.f13w-show:hover{color:var(--accent);border-color:var(--accent-line)}
+.f13w-flash{border-radius:12px;animation:f13wFlash 1.4s var(--ease)}
+@keyframes f13wFlash{0%,60%{box-shadow:0 0 0 2px var(--accent-line),0 0 0 6px var(--accent-soft)}100%{box-shadow:0 0 0 0 transparent}}
 </style>
 <script id="f13ui-wire">
 (function(){
@@ -5291,17 +5455,12 @@ html.f13w #sectionsBar{border-top:none;padding:0 8px env(safe-area-inset-bottom)
   // ---- sections: rail (desktop) + tab bar (phone), Analyze badge ----
   function mk(parent,cls){const d=document.createElement('div');d.className=cls;parent.appendChild(d);return d;}
   W.rail=Liquid.ui.sections(mk($('sectionsRail'),'f13w-rail'),{items:SECTIONS,value:UI.active,orientation:'vertical',
-    accent:ACC,ariaLabel:'Sections',onChange:id=>UI.scrollToSection(id)});
+    accent:ACC,ariaLabel:'Sections',onChange:id=>UI.showSection(id)});
   W.bar=Liquid.ui.sections(mk($('sectionsBar'),'f13w-bar'),{items:SECTIONS,value:UI.active,orientation:'horizontal',
     accent:ACC,ariaLabel:'Sections',onChange:id=>UI.showSection(id)});
   let badge=null;                                                    // 'running' | 'new' | 'stale' | null
   function setBadge(b){badge=b;const v=b?'dot':null;W.rail.setBadge('analyze',v);W.bar.setBadge('analyze',v);}
-  const scroller=$('ctrlScroll'),secA=$('sec-analyze');
-  function analyzeSeen(){
-    if(UI.active==='analyze')return true;
-    if(UI.isPhone())return false;
-    return secA.getBoundingClientRect().top<scroller.getBoundingClientRect().bottom-120;
-  }
+  const analyzeSeen=()=>UI.active==='analyze';                       // one section at a time: seen = shown
   const clearIfSeen=()=>{if(badge&&badge!=='running'&&analyzeSeen())setBadge(null);};
   hook('onSectionChange',id=>{W.rail.set(id);W.bar.set(id);clearIfSeen();});
   hook('onAnalyze',s=>{
@@ -5309,7 +5468,102 @@ html.f13w #sectionsBar{border-top:none;padding:0 8px env(safe-area-inset-bottom)
     else if(s==='new'){running=false;W.run.setProgress(1);setBadge(analyzeSeen()?null:'new');}
     else if(s==='stale')setBadge(analyzeSeen()?null:'stale');
   });
-  scroller.addEventListener('scroll',clearIfSeen,{passive:true});
+
+  // ---- native selects → liquid dropdowns (native stays hidden as the state source) ----
+  // groups from a <select>: <optgroup>s keep their label, loose options gather in unlabelled groups
+  function selectGroups(sel,relabel){
+    const out=[];let loose=null;
+    [...sel.children].forEach(c=>{
+      const opt=o=>({value:o.value,label:(relabel&&relabel[o.value]&&relabel[o.value].label)||o.textContent});
+      if(c.tagName==='OPTGROUP'){loose=null;out.push({label:c.label,options:[...c.querySelectorAll('option')].map(opt)});}
+      else if(c.tagName==='OPTION'){
+        const g=relabel&&relabel[c.value]&&relabel[c.value].group;
+        if(g!=null){loose=null;out.push({label:g,options:[opt(c)]});}
+        else{if(!loose){loose={label:'',options:[]};out.push(loose);}loose.options.push(opt(c));}
+      }});
+    return out;
+  }
+  // width that fits the longest label on the button face (15 px / 650, 18 + 14 padding, 8 gap, 18 chevron)
+  function faceWidth(labels){
+    const c=faceWidth.c||(faceWidth.c=document.createElement('canvas').getContext('2d'));
+    c.font='650 15px '+(css.getPropertyValue('--lq-font').trim()||'system-ui');
+    return Math.ceil(Math.max(...labels.map(l=>c.measureText(l).width)))+18+14+8+18+4;
+  }
+  function liquidSelect(sel,o){
+    const host=document.createElement('div');host.id=o.id;host.className='f13w-dd'+(o.compact?' f13w-dd-c':'');
+    sel.setAttribute('data-native','select');sel.after(host);
+    const groups=selectGroups(sel,o.relabel);
+    if(o.compact)host.style.width=faceWidth(groups.flatMap(g=>g.options.map(x=>x.label)))+'px';
+    let quiet=fn=>fn();
+    const w=Liquid.ui.dropdown(host,{groups,value:sel.value,accent:ACC,ariaLabel:o.ariaLabel,minPanelWidth:o.compact?112:undefined,
+      onChange:v=>{quiet(()=>{sel.value=v;});fire(sel,'change');if(o.after)o.after(v);}});
+    quiet=mirrorValue(sel,HTMLSelectElement.prototype,v=>{w.set(v);if(o.after)o.after(v);});
+    return w;
+  }
+  // field B: the face reads "custom" once the app (or the user) switches B to its own terms
+  const fbSel=$('fieldBSel');
+  W.fieldB=liquidSelect(fbSel,{id:'w-fieldB',ariaLabel:'Field B',relabel:{custom:{label:'custom (edit terms)',group:'own terms'}},after:v=>shortCustom()});
+  function shortCustom(){
+    if(fbSel.value!=='custom')return;
+    const btn=$('w-fieldB').querySelector('.lq-wd-btn'),list=btn&&$(btn.getAttribute('aria-controls'));
+    [btn,list&&list.parentNode].forEach(f=>{const b=f&&f.querySelector('.lq-wd-face b');if(b&&b.textContent!=='custom')b.textContent='custom';});
+  }
+  shortCustom();
+  W.fieldBFreq=liquidSelect($('fieldBFreq'),{id:'w-fieldBFreq',ariaLabel:'Field B frequency',compact:true});
+  {const at=document.querySelector('label[for="fieldBFreq"]'),u=document.createElement('span');u.className='f13w-at';   // "at" + frequency wrap as one unit
+   at.before(u);u.append(at,$('w-fieldBFreq'));}
+  W.grid=liquidSelect($('gridsize'),{id:'w-grid',ariaLabel:'Analysis grid',compact:true});
+
+  // ---- help: the engine has no "show control" action, so each drawer card whose control lives in a
+  // section gets one here; it switches to that section, brings the control into view and flashes it ----
+  const HELP_TARGET={presets:'#grp-preset',terms:'#eqbar-wrap',mode:'#grp-mode',offset:'#grp-offset',wall:'#grp-wall',
+    pipe:'#grp-piper',fieldb:'#w-fieldB',pishift:'.pi-title',pinorm:'#piNormToggle',pichips:'.pi-chips',cells:'#grp-cells',
+    cellsize:'#grp-cellsize',grid:'#w-grid',es:'#Es',nu:'#nu',run:'#w-run',export:'#exportBtn'};
+  UI.revealControl=function(sel){
+    const el=typeof sel==='string'?document.querySelector(sel):sel;if(!el)return false;
+    const sec=UI.sectionOf(el);if(sec)UI.showSection(sec);
+    if(UI.isPhone()&&UI.setSheet)UI.setSheet('full');
+    if(!el.getClientRects().length)return false;                    // hidden in this mode (e.g. wall t outside thin wall)
+    const row=el.closest('.sc-group,#eqbar-wrap,#pi-controls')||el;
+    row.scrollIntoView({block:'center',behavior:Liquid.state.reduce?'auto':'smooth'});
+    row.classList.remove('f13w-flash');void row.offsetWidth;row.classList.add('f13w-flash');
+    setTimeout(()=>row.classList.remove('f13w-flash'),1400);
+    return true;
+  };
+  const SHOW_ICON='<svg class="ic sm" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v2.4M8 11.8v2.4M1.8 8h2.4M11.8 8h2.4"/></svg>';
+  function addShowButtons(){
+    Object.keys(HELP_TARGET).forEach(id=>{
+      const h=document.querySelector('#f13h-card-'+id+' .f13h-card-h');if(!h||h.querySelector('.f13w-show'))return;
+      const b=document.createElement('button');b.type='button';b.className='f13w-show';b.innerHTML=SHOW_ICON+'<span>show</span>';
+      b.setAttribute('aria-label','Show this control');
+      b.addEventListener('click',e=>{e.stopPropagation();
+        const s=document.querySelector('.f13h-scrim.open');if(s)s.click();  // close the drawer the engine's own way
+        UI.revealControl(HELP_TARGET[id]);});
+      h.appendChild(b);
+    });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(addShowButtons,0));else setTimeout(addShowButtons,0);
+
+  /* ---- TODO(toggles): wire Liquid.ui.toggle when the kit ships it. Native switches to replace -------
+     All are <button class="sw" role="switch"> except the view menu, which is checkboxes.
+     1. View menu (shared F13LD-VIEW block, do not edit it): '#cw .f13v-p input[type=checkbox]', five in
+        order shadows · occlusion · warmCool · cutFaces · limeEdges (labels: the parent <label> text).
+        Read: input.checked (also f13View.opts[key]). Write: input.checked=v + dispatch 'change' (its
+        listener stores f13View.opts, saves localStorage 'f13ld.tpms.view', redraws). The menu's
+        'reset' button (.f13v-r) sets .checked directly with no event: mirror via mirrorValue-style
+        override of 'checked' (HTMLInputElement.prototype) or re-read on its click.
+     2. '#shellNormToggle' (Volume, under wall t, thin wall only) → app var shellNormalize.
+        Read: aria-checked==='true' (or .on). Write: .click() toggles (the handler flips the var,
+        sets .on + aria-checked, rebuilds). No other code writes it.
+     3. '#piNormToggle' (Volume, PI-TPMS panel) → app var piNormalize. Same read/write as 2.
+        Both carry the native look via .sw; mark them data-native="toggle" once replaced and mount the
+        widget beside them (help rows: the 'pinorm' card has no inline i).
+     4. Per-term on/off: '#termlist .sw.tog[data-act="tog"]' with data-id=term id; rebuilt by
+        renderList() (innerHTML) on every term edit, preset, mode or field-tab change, so remount
+        after each render (MutationObserver childList on #termlist, or wrap renderList).
+        Read: aria-checked (state is term.on in editTerms()). Write: .click() on the native button
+        (delegated #termlist click handler toggles term.on, marks field B custom, re-renders).
+  ------------------------------------------------------------------------------------------------- */
 })();
 </script>
 <!-- ==================  END F13LD UI · liquid widgets wiring  =========== -->

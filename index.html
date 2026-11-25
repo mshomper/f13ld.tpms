@@ -308,7 +308,7 @@ body .f13h-close{width:44px;height:44px}
   .f13ld-header::after{content:'';order:1;flex:0 0 100%;height:0}
   .fh-right{display:contents}
   .fh-left{order:0;margin-right:auto}
-  .f13ld-header .f13h-trigger,.fh-version,.fh-icon,#w-send{order:1}
+  .f13ld-header .f13h-trigger,.fh-version,.fh-icon,#w-recipe{order:1}
   .fh-right .fh-mesh-btn,.fh-right .f13ldq-split{order:2;margin-top:8px}
   .fh-mesh-btn{flex:1 1 0;min-width:0;height:36px;padding:0 6px}
   .fh-right .f13ldq-split{flex:1.4 1 0;min-width:0;display:flex}
@@ -366,10 +366,10 @@ body .f13h-close{width:44px;height:44px}
     <div class="fh-tool-name">TPMS</div>
   </div>
   <div class="fh-right">
-    <div id="w-send"></div>
+    <div id="w-recipe"></div>
     <button class="fh-mesh-btn" data-native="send" onclick="openInMesh()" title="Open in F13LD.mesh — build a watertight, printable 3MF" aria-label="Open in F13LD.mesh"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l5.5 3.2v6.4L8 14.4 2.5 11.2V4.8z"/><path d="M8 8v6.4M8 8L2.5 4.8M8 8l5.5-3.2"/></svg><span>Mesh</span></button>
     <button class="fh-mesh-btn" data-native="send" onclick="openInLab()" title="Open in F13LD.lab — homogenize in the validated FFT solver" aria-label="Open in F13LD.lab"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.2 1.8h3.6M6.7 1.8v4.4L2.9 12.6a1.2 1.2 0 0 0 1 1.8h8.2a1.2 1.2 0 0 0 1-1.8L9.3 6.2V1.8"/><path d="M4.6 10h6.8"/></svg><span>Lab</span></button>
-    <span class="fh-version">v1.3.0</span>
+    <span class="fh-version">v1.4.0</span>
     <div class="fh-icon" style="background:#E1F5EE">
       <svg width="18" height="18" viewBox="0 0 40 40">
         <path d="M0 10 Q5 2 10 10 Q15 18 20 10 Q25 2 30 10 Q35 18 40 10" stroke="#085041" stroke-width="1.9" fill="none" stroke-linecap="round"/>
@@ -528,7 +528,7 @@ body .f13h-close{width:44px;height:44px}
         </div>
         <div class="sc-group" id="grp-cellsize">
           <label for="cellSizeMM">cell size</label>
-          <input type="number" id="cellSizeMM" class="cellsize-inp" min="0" step="0.1" value="2" inputmode="decimal" title="Real-world unit cell edge length in mm. Display-only — does not affect JSON export. Stored per-browser via localStorage.">
+          <input type="number" id="cellSizeMM" class="cellsize-inp" min="0" step="0.1" value="2" inputmode="decimal" title="Real-world unit cell edge length in mm. Display only — saved in the recipe's display block, never changes the geometry. Stored per-browser via localStorage.">
           <span class="unit">mm</span>
         </div>
         <div class="phys" id="physReadout">
@@ -630,12 +630,12 @@ body .f13h-close{width:44px;height:44px}
 </div>
 
 <!-- ===================================================================== -->
-<!-- ===== F13LD UI · liquid-ui bundle (mshomper/liquid-ui @ 51157e2) ===== -->
+<!-- ===== F13LD UI · liquid-ui bundle (mshomper/liquid-ui @ 93af83e) ===== -->
 <!-- Shared drop-in: core + widgets. Do not edit here; rebuild the kit and   -->
 <!-- paste dist/liquid-ui.js. Wiring for this tool is in #f13ui-wire.       -->
 <!-- ===================================================================== -->
 <script id="liquid-ui">
-/* liquid-ui (mshomper/liquid-ui @ 51157e2) — core + widgets bundle. Do not edit here; edit the kit and rebuild. */
+/* liquid-ui (mshomper/liquid-ui @ 93af83e) — core + widgets bundle. Do not edit here; edit the kit and rebuild. */
 /* ============================================================================
    Liquid UI core — SDF-shaded "liquid" controls for the web.
    One shared WebGL context renders every component into its own 2D canvas.
@@ -644,6 +644,9 @@ body .f13h-close{width:44px;height:44px}
      float accentSDF(vec2 p)  lit liquid accent (bead, knob, droplet). Return 1e5 if none.
    Optional:  #define HAS_FLOOD + float floodSDF(vec2 p)  accent-tinted liquid INSIDE the body.
               #define BULGE 14.0   apparent thickness of the accent blob (px) for lighting.
+              #define SHADOW_DY 12.0 / SHADOW_A 0.5 / SHADOW_R 18.0   body drop shadow offset, opacity, falloff (px).
+              #define HAS_ACCENT_AT + void accentAt(vec2 p, inout vec3 A, inout vec3 AD)  per-pixel accent
+                (several accent colours on one surface; A/AD arrive as uAccent/uAccentDeep).
    p is in CSS px, origin top-left of the component canvas, y down.
    Rules: exact SDFs only (no "mix the radius" shortcuts); snap springs at rest;
    text/icons are DOM on top; shapes live in the shader.
@@ -703,6 +706,7 @@ precision highp float;
 uniform vec2 uRes; uniform float uDpr, uField, uK, uTime;
 uniform vec3 uAccent, uAccentDeep, uFillTop, uFillBot;
 uniform float uAccentA, uBleed;   // accent layer opacity (0..1), set via surf.setAccentOpacity()
+uniform float uGlowA;             // accent glow + spill strength (0..1), set via surf.setGlow()
 `;
 
   // exact distance primitives + smooth booleans
@@ -740,14 +744,20 @@ float ssub(float a, float b, float k){ return smax(a, -b, k); }   // a minus b, 
 #ifndef SHADOW_DY
 #define SHADOW_DY 12.0
 #endif
+#ifndef SHADOW_A
+#define SHADOW_A 0.5
+#endif
+#ifndef SHADOW_R
+#define SHADOW_R 18.0
+#endif
 void over(inout vec4 acc, vec3 c, float a){ acc.rgb = c*a + acc.rgb*(1.-a); acc.a = a + acc.a*(1.-a); }
-vec3 litLiquid(float a, vec2 g, float flatness){
+vec3 litLiquid(float a, vec2 g, float flatness, vec3 A, vec3 AD){
   float depth = clamp(-a / BULGE, 0., 1.);
   float z = sqrt(1. - (1.-depth)*(1.-depth));
   vec3 N = normalize(vec3(g*(1.-depth)*(1.-flatness), max(z, 0.05)));
   vec3 L = normalize(vec3(-0.45, -0.6, 0.66));
   float dif = clamp(dot(N,L), 0., 1.);
-  vec3 col = mix(uAccentDeep, uAccent, 0.3 + 0.7*dif);
+  vec3 col = mix(AD, A, 0.3 + 0.7*dif);
   float spec = pow(clamp(dot(reflect(-L,N), vec3(0.,0.,1.)), 0., 1.), 28.) * 0.32 * (1.-flatness);
   return col + spec;
 }
@@ -762,6 +772,10 @@ void main(){
   float fl = 1e5;
 #endif
   vec4 acc = vec4(0.);
+  vec3 A = uAccent, AD = uAccentDeep;
+#ifdef HAS_ACCENT_AT
+  accentAt(p, A, AD);
+#endif
 
   if (uField > 0.5) {
     float f = min(d, a);
@@ -770,9 +784,9 @@ void main(){
     over(acc, (d < 0. ? inC : outC) * band * exp(-abs(d)/90.), d > 9e4 ? 0. : 0.85*exp(-max(d,0.)/120.)*(1. - smoothstep(30., 60., d)));
     over(acc, vec3(1.), clamp(1.2 - abs(d)/aa*0.6, 0., 1.));
     float abnd = 0.5 + 0.5*cos(a*0.785);
-    over(acc, uAccent * abnd, a < 0. ? 0.55 : 0.);
-    over(acc, uAccent, clamp(1. - abs(a)/aa, 0., 1.));
-    over(acc, mix(uAccent, vec3(1.), .5), clamp(1. - abs(fl)/aa, 0., 1.) * 0.8);
+    over(acc, A * abnd, a < 0. ? 0.55 : 0.);
+    over(acc, A, clamp(1. - abs(a)/aa, 0., 1.));
+    over(acc, mix(A, vec3(1.), .5), clamp(1. - abs(fl)/aa, 0., 1.) * 0.8);
     gl_FragColor = acc; return;
   }
 
@@ -783,13 +797,13 @@ void main(){
 
   // drop shadow under body
   float dS = bodySDF(p - vec2(0., SHADOW_DY));
-  over(acc, vec3(0.), 0.5 * exp(-max(dS,0.)/18.) * (1. - smoothstep(10., 30., dS)) * (1. - fillA));
+  over(acc, vec3(0.), SHADOW_A * exp(-max(dS,0.)/SHADOW_R) * (1. - smoothstep(SHADOW_R*0.55, SHADOW_R*1.67, dS)) * (1. - fillA));
 
   // glass fill, faint top rim light, accent light spilling in
-  float spill = exp(-max(a, 0.)/22.) * uAccentA;
+  float spill = exp(-max(a, 0.)/19.) * uAccentA * uGlowA;
   vec3 fill = mix(uFillTop, uFillBot, t);
   fill += vec3(0.04) * (1. - smoothstep(0., 9., -d)) * clamp(-gd.y, 0., 1.);
-  fill = mix(fill, uAccent*0.35 + fill*0.65, spill * 0.25 * (1. - smoothstep(0., 30., -d)));
+  fill = mix(fill, A*0.35 + fill*0.65, spill * 0.2 * (1. - smoothstep(0., 30., -d)));
   over(acc, fill, fillA);
 
   // flood: accent liquid held inside the body
@@ -798,7 +812,7 @@ void main(){
   if (flA > 0.) {
     vec2 gf = vec2(floodSDF(p + vec2(0.5,0.)) - fl, floodSDF(p + vec2(0.,0.5)) - fl);
     gf = gf / max(length(gf), 1e-5);
-    over(acc, litLiquid(fl, gf, 0.55) * 0.92, flA * 0.94);
+    over(acc, litLiquid(fl, gf, 0.55, A, AD) * 0.92, flA * 0.94);
   }
 #endif
 
@@ -808,50 +822,70 @@ void main(){
 
   // hairline outline of the body: translucent ink, warmer near accent
   float lineA = clamp((0.55 - abs(d)) / aa + 0.5, 0., 1.);
-  float inkA  = mix(0.12, 0.30, clamp(-gd.y*0.5 + 0.5, 0., 1.)) + 0.35*spill;
-  over(acc, mix(vec3(1.), uAccent, clamp(spill*0.9, 0., 1.)), lineA * clamp(inkA, 0., 0.85));
+  float inkA  = mix(0.12, 0.30, clamp(-gd.y*0.5 + 0.5, 0., 1.)) + 0.28*spill;
+  over(acc, mix(vec3(1.), A, clamp(spill*0.72, 0., 1.)), lineA * clamp(inkA, 0., 0.85));
 
   // accent glow + lit body
-  over(acc, uAccent, 0.42 * exp(-max(a,0.)/13.) * (1. - smoothstep(16., 34., a)) * clamp(a, 0., 1.) * uAccentA);
+  over(acc, A, 0.33 * exp(-max(a,0.)/11.) * (1. - smoothstep(13.5, 29., a)) * clamp(a, 0., 1.) * uAccentA * uGlowA);
   float aA = clamp(0.5 - a/aa, 0., 1.);
   if (aA > 0.) {
     vec2 ga = vec2(accentSDF(p + vec2(0.5,0.)) - a, accentSDF(p + vec2(0.,0.5)) - a);
     ga = ga / max(length(ga), 1e-5);
-    over(acc, litLiquid(a, ga, 0.), aA * uAccentA);
+    over(acc, litLiquid(a, ga, 0., A, AD), aA * uAccentA);
   }
   gl_FragColor = acc;
 }
 `;
 
   let quad = null;
-  const programCache = new Map();
+  const programCache = new Map();   // GLSL -> { glsl, pr, loc }; Surfaces hold the entry, so a rebuilt program reaches them
+  const lost = () => gl.isContextLost();
   function compile(type, src) {
     const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      if (lost()) return null;
       const log = gl.getShaderInfoLog(s);
       console.error('[Liquid] shader error:\n' + log + '\n' + src.split('\n').map((l, i) => (i + 1) + ': ' + l).join('\n'));
       throw new Error(log);
     }
     return s;
   }
-  function program(glsl) {
-    if (programCache.has(glsl)) return programCache.get(glsl);
+  function build(entry) {   // (re)link entry.pr from entry.glsl; stays null while the context is lost
+    entry.pr = null; entry.loc.clear();
+    if (lost()) return entry;
+    const vs = compile(gl.VERTEX_SHADER, VS), fs = compile(gl.FRAGMENT_SHADER, HEADER + LIB + entry.glsl + SHADE);
+    if (!vs || !fs) return entry;
     const pr = gl.createProgram();
-    gl.attachShader(pr, compile(gl.VERTEX_SHADER, VS));
-    gl.attachShader(pr, compile(gl.FRAGMENT_SHADER, HEADER + LIB + glsl + SHADE));
+    gl.attachShader(pr, vs); gl.attachShader(pr, fs);
     gl.bindAttribLocation(pr, 0, 'a');
     gl.linkProgram(pr);
-    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
-    const entry = { pr, loc: new Map() };
-    programCache.set(glsl, entry);
+    gl.deleteShader(vs); gl.deleteShader(fs);
+    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) { if (lost()) return entry; throw new Error(gl.getProgramInfoLog(pr)); }
+    entry.pr = pr;
     return entry;
   }
+  function program(glsl) {
+    if (programCache.has(glsl)) return programCache.get(glsl);
+    const entry = { glsl, pr: null, loc: new Map() };
+    programCache.set(glsl, entry);
+    return build(entry);
+  }
   function ensureQuad() {
-    if (quad) return;
+    if (quad || lost()) return;
     quad = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, quad);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.enable(gl.SCISSOR_TEST);
+  }
+
+  // GPU reset / driver hiccup: keep the canvases' last frames, rebuild everything on restore, redraw.
+  if (ok) {
+    glc.addEventListener('webglcontextlost', e => { e.preventDefault(); quad = null; }, false);
+    glc.addEventListener('webglcontextrestored', () => {
+      quad = null; ensureQuad();
+      for (const entry of programCache.values()) { try { build(entry); } catch (err) { console.error('[Liquid] rebuild failed', err); } }
+      redrawAll();
+    }, false);
   }
 
   // ---------- Surface: one component's canvas ----------
@@ -867,9 +901,9 @@ void main(){
       this.ctx = this.canvas.getContext('2d');
       this.uniforms = new Map();
       this.w = 0; this.h = 0; this.dpr = 1;
-      this.accentA = 1;
+      this.accentA = 1; this.glowA = 1;
       this.setAccent(ACCENTS.lime);
-      if (ok) { ensureQuad(); this.prog = program(glsl); }
+      if (ok) { ensureQuad(); this.prog = program(glsl); }   // prog.pr is null while the context is lost; rebuilt on restore
       else host.insertAdjacentHTML('beforeend', '<div style="position:absolute;inset:0;display:grid;place-items:center;font-size:12px;opacity:.6">WebGL unavailable</div>');
       this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(host);
       surfaces.add(this);
@@ -887,16 +921,25 @@ void main(){
     set(name, ...v) { this.uniforms.set(name, v); return this; }
     setAccent(A) {
       this.accent = A;
-      this.accentRGB = oklch(A.L, A.C, A.h);
-      this.accentDeepRGB = oklch(A.L - 0.11, A.C + 0.01, A.h);
+      const c = accentColors(A); this.accentRGB = c.rgb; this.accentDeepRGB = c.deep;
       const s = this.host.style;
       s.setProperty('--al', A.L.toFixed(4)); s.setProperty('--ac', A.C.toFixed(4)); s.setProperty('--ah', A.h.toFixed(2));
       return this;
     }
     setAccentOpacity(a) { this.accentA = a; return this; }
+    setGlow(a) { this.glowA = a; return this; }
     destroy() { this.ro.disconnect(); surfaces.delete(this); this.canvas.remove(); this.w = 0; }
     draw() {
-      if (!ok || !this.w) return;
+      if (!ok || !this.w || !this.prog || !this.prog.pr || lost()) return;
+      // a non-finite uniform would flood the whole canvas (NaN reads as inside): keep the last frame instead
+      for (const [n, v] of this.uniforms) {
+        for (let i = 0; i < v.length; i++) if (!Number.isFinite(v[i])) {
+          if (!this.warned) { this.warned = true; console.warn(`[Liquid] skipped draw: ${n} = ${v.join(', ')}`, this.host); }
+          return;
+        }
+      }
+      if (!Number.isFinite(this.accentA) || !Number.isFinite(this.glowA)) return;
+      ensureQuad();
       const W = this.canvas.width, H = this.canvas.height;
       if (glc.width < W || glc.height < H) { glc.width = Math.max(glc.width, W); glc.height = Math.max(glc.height, H); }
       const { pr, loc } = this.prog;
@@ -908,7 +951,7 @@ void main(){
       gl.uniform1f(L('uField'), state.field ? 1 : 0); gl.uniform1f(L('uK'), state.melt);
       gl.uniform1f(L('uTime'), performance.now() / 1000);
       gl.uniform3fv(L('uAccent'), this.accentRGB); gl.uniform3fv(L('uAccentDeep'), this.accentDeepRGB);
-      gl.uniform1f(L('uAccentA'), this.accentA); gl.uniform1f(L('uBleed'), this.bleed); gl.uniform3fv(L('uFillTop'), FILL_TOP); gl.uniform3fv(L('uFillBot'), FILL_BOT);
+      gl.uniform1f(L('uAccentA'), this.accentA); gl.uniform1f(L('uGlowA'), this.glowA); gl.uniform1f(L('uBleed'), this.bleed); gl.uniform3fv(L('uFillTop'), FILL_TOP); gl.uniform3fv(L('uFillBot'), FILL_BOT);
       for (const [n, v] of this.uniforms) {
         const l = L(n); if (!l) continue;
         if (v.length === 1) gl.uniform1f(l, v[0]); else if (v.length === 2) gl.uniform2f(l, v[0], v[1]);
@@ -928,6 +971,7 @@ void main(){
       if (state.reduce) { k = Math.max(k, 900); z = 1; }
       const c = 2 * z * Math.sqrt(k);
       this.v += (k * (this.target - this.x) - c * this.v) * h; this.x += this.v * h;
+      if (!Number.isFinite(this.x) || !Number.isFinite(this.v)) { if (Number.isFinite(this.target)) this.x = this.target; this.v = 0; }
     }
     settled(eps = 0.25) { return Math.abs(this.v) < eps * 6 && Math.abs(this.target - this.x) < eps; }
     snap() { this.x = this.target; this.v = 0; }
@@ -935,16 +979,26 @@ void main(){
   }
 
   // ---------- animation loop: animators step until they report settled ----------
-  const active = new Set(); let raf = 0, last = 0;
+  // dt guard: a rAF timestamp is the frame's start time, so it can come out EARLIER than a performance.now()
+  // read in an input handler of the same frame, or after a long stall (handler blocked 1 s -> dt = -1 s).
+  // Integrating a negative or huge dt blows springs up (a bead scale of -1e6 floods the whole canvas).
+  // So the first tick after a wake, any non-positive gap, and any gap over 100 ms step one 1/60 s frame.
+  const active = new Set(); let raf = 0, last = -1;
   function tick(now) {
     raf = 0;
-    const dt = Math.min((now - last) / 1000, 1 / 30) * state.timeScale; last = now;
-    for (const a of [...active]) { if (!a.fn(dt)) active.delete(a); }
+    const ms = now - last;
+    const dt = (last < 0 || !(ms > 0) || ms > 100 ? 1 / 60 : Math.min(ms / 1000, 1 / 30)) * state.timeScale;
+    last = now;
+    for (const a of [...active]) {
+      let more = false;
+      try { more = a.fn(dt); } catch (err) { console.error('[Liquid] animator error', err); }
+      if (!more) active.delete(a);
+    }
     if (active.size) raf = requestAnimationFrame(tick);
   }
   // fn(dt) -> true while still moving. Do substeps + draw inside fn.
   function animator(fn) {
-    const a = { fn, wake() { active.add(a); if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); } } };
+    const a = { fn, wake() { active.add(a); if (!raf) { last = -1; raf = requestAnimationFrame(tick); } } };
     return a;
   }
   // step a list of springs with substeps
@@ -1005,8 +1059,10 @@ void main(){
   const registry = [];
   function register(def) { registry.push(def); }
   function redrawAll() { for (const s of surfaces) s.draw(); }
+  // accent -> { rgb, deep } shader colours (what Surface.setAccent uses), for HAS_ACCENT_AT uniforms
+  const accentColors = A => ({ rgb: oklch(A.L, A.C, A.h), deep: oklch(A.L - 0.11, A.C + 0.01, A.h) });
 
-  return { state, oklch, ACCENTS, mixAccent, setTheme, Surface, Spring, animator, stepSprings, pointer, haptic, ICONS, icon, register, registry, redrawAll, ok };
+  return { gl: ok ? gl : null, state, oklch, ACCENTS, mixAccent, accentColors, setTheme, Surface, Spring, animator, stepSprings, pointer, haptic, ICONS, icon, register, registry, redrawAll, ok };
 })();
 
 /* ---- widgets/dropdown.js ---- */
@@ -1026,7 +1082,7 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
 .lq-wd-btn{ position:absolute; inset:0; border:0; padding:0 14px 0 18px; background:none; border-radius:22px; cursor:pointer; font:inherit;
   color:${DIM}; -webkit-tap-highlight-color:transparent; }
 .lq-wd-btn:disabled{ cursor:default; opacity:.45; }
-.lq-wd-btn:focus-visible{ outline:none; box-shadow:0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .55); }
+.lq-wd-btn:focus-visible{ outline:none; box-shadow:0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .45); }
 .lq-wd-face{ position:absolute; inset:0; display:flex; align-items:center; gap:8px; padding:0 14px 0 18px; pointer-events:none;
   font-size:15px; font-weight:550; color:${DIM}; white-space:nowrap; }
 .lq-wd-face .t{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; text-align:left; }
@@ -1051,7 +1107,7 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
   transition: opacity 90ms ease-out, transform 90ms ease-out, filter 90ms ease-out, color 150ms ease-out, background 150ms ease-out; }
 .lq-wd-opt:hover{ color:${INK}; background:oklch(1 0 0 / .04); }
 .lq-wd-opt[aria-selected=true]{ color:${INK}; font-weight:650; }
-.lq-wd-opt:focus-visible{ outline:none; box-shadow: inset 0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .5); }
+.lq-wd-opt:focus-visible{ outline:none; box-shadow: inset 0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .4); }
 .lq-wd-opt:focus{ outline:none; }
 .lq-wd-open .lq-wd-opt, .lq-wd-open .lq-wd-hdr{ opacity:1; transform:none; filter:none;
   transition: opacity 170ms ease-out var(--d), transform 200ms cubic-bezier(.3,1.3,.5,1) var(--d), filter 170ms ease-out var(--d), color 150ms ease-out, background 150ms ease-out; }
@@ -1209,7 +1265,7 @@ float accentSDF(vec2 p){
 
     function write() {
       if (!ready || destroyed) return;
-      const sq = press.x;
+      const sq = press.x > -1.5 ? Math.min(press.x, 1.5) : -1.5;   // bounded press squash (NaN -> -1.5)
       const ovOn = active && os && os.w;
       hs.canvas.style.visibility = ovOn ? 'hidden' : '';
       if (!ovOn) {
@@ -1416,7 +1472,7 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
 .lq-pb{ position:relative; height:44px; overflow-x:clip; user-select:none; -webkit-user-select:none; font-family:var(--lq-font, inherit); }
 .lq-pb-btn{ position:absolute; inset:0; margin:0; padding:0 18px; border:0; background:none; border-radius:999px; font:inherit; color:${INK};
   cursor:pointer; outline:none; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
-.lq-pb-btn:focus-visible{ box-shadow:0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .6); }
+.lq-pb-btn:focus-visible{ box-shadow:0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .5); }
 .lq-pb-lab, .lq-pb-ink{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:8px; padding:0 18px;
   font-size:15px; font-weight:620; letter-spacing:-.01em; white-space:nowrap; pointer-events:none; transition:opacity 160ms ease-out, filter 160ms ease-out; }
 .lq-pb-lab > span, .lq-pb-ink > span{ overflow:hidden; text-overflow:ellipsis; }
@@ -1506,7 +1562,7 @@ float floodSDF(vec2 p){
 
     function write() {
       if (!ready || dead) return;
-      const s = scale.x, sy = Liquid.state.reduce ? 1 : 1 + (s - 1) * 0.6;
+      const s = scale.x > 0.7 ? Math.min(scale.x, 1.3) : 0.7, sy = Liquid.state.reduce ? 1 : 1 + (s - 1) * 0.6;
       const hw = G.hw * s, hh = G.hh * sy;
       let xb = Math.max(back.x, G.xl), xf = Math.min(front.x, G.xr);
       const vis = xf - xb > 0.6 ? 1 : 0;
@@ -1653,7 +1709,7 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
 .lq-wr[aria-disabled=true]{ opacity:.45; pointer-events:none; }
 .lq-wr-opt{ position:absolute; display:block; background:none; border:0; padding:0; margin:0; font:inherit; cursor:pointer;
   color:var(--lq-ink-dim, var(--ink-dim, oklch(0.78 0.02 290))); border-radius:12px; -webkit-tap-highlight-color:transparent; }
-.lq-wr-opt:focus-visible{ outline:none; box-shadow: inset 0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .6); }
+.lq-wr-opt:focus-visible{ outline:none; box-shadow: inset 0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .5); }
 .lq-wr-lab{ position:absolute; top:50%; white-space:nowrap; font-family:var(--lq-font, inherit); font-weight:650; letter-spacing:-.01em;
   pointer-events:none; transition: color 140ms ease-out; }
 .lq-wr-lab.in{ transform:translate(-50%,-50%); }
@@ -1770,6 +1826,7 @@ float bodySDF(vec2 p){
     surf.setAccent(accOf(Math.max(sel, 0)));
     let lit = -2;
 
+    const clampN = (x, a, b) => (x > a ? (x < b ? x : b) : a);   // NaN -> a
     function write() {
       if (!ready) return;
       const sc = G.R0 / 7.6;                              // tuned at R0 7.6: scale distances with size
@@ -1777,7 +1834,7 @@ float bodySDF(vec2 p){
       const reduce = Liquid.state.reduce;
       const rh = G.R0 * (1 - 0.14 * s), rt = G.R0 * (0.82 - 0.22 * s);
       const pinch = Math.max(0, sep - 30) * 0.26 * sc;
-      const stt = reduce ? 0 : Math.min(Math.abs(head.v) / (2400 * sc), 0.28) + sq.x;
+      const stt = reduce ? 0 : clampN(Math.min(Math.abs(head.v) / (2400 * sc), 0.28) + sq.x, -0.3, 0.6);   // 1 + stt stays > 0
       const k = 1 + stt, sqv = horiz ? [k, 1 / k] : [1 / k, k];
       const cross = L.cs[0][1 - ax];
       const P = v => (horiz ? [v, cross] : [cross, v]);
@@ -1922,7 +1979,7 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
 .lq-ws{ position:relative; font-family:var(--lq-font, inherit); }
 .lq-ws[aria-disabled=true]{ opacity:.45; pointer-events:none; }
 .lq-ws-tab{ position:absolute; background:none; border:0; padding:0; margin:0; color:${DIM}; pointer-events:none; border-radius:16px; font:inherit; }
-.lq-ws-tab:focus-visible{ outline:none; box-shadow: inset 0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .6); }
+.lq-ws-tab:focus-visible{ outline:none; box-shadow: inset 0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .5); }
 .lq-ws-ic{ position:absolute; width:22px; height:22px; margin:-11px 0 0 -11px;
   transition: opacity 160ms ease-out, filter 160ms ease-out, transform 160ms ease-out, color 160ms ease-out; }
 .lq-ws-lab{ position:absolute; left:50%; transform:translate(-50%,-50%); font-size:11px; font-weight:650; letter-spacing:.01em; white-space:nowrap;
@@ -2040,6 +2097,7 @@ float accentSDF(vec2 p){
 #define SHADOW_DY 3.0
 uniform vec4 uB[${N}];   // x, y, r, half length
 uniform vec3 uS[${N}];   // source x, y, r
+uniform vec3 uBA[${N}], uBD[${N}];   // per-badge accent (lit, deep)
 float beadSD(vec2 p, vec4 B){ if (B.z < 0.05) return 1e5; vec2 q = p - B.xy; return sdSegment(q, vec2(-B.w, 0.), vec2(B.w, 0.)) - B.z; }
 float budSD(vec2 p, vec4 B, vec3 S){
   float s = S.z < 0.05 ? 1e5 : sdCircle(p - S.xy, S.z);
@@ -2050,6 +2108,11 @@ float accentSDF(vec2 p){
   float d = 1e5;
   for (int i = 0; i < ${N}; i++) d = min(d, budSD(p, uB[i], uS[i]));
   return d;
+}
+#define HAS_ACCENT_AT
+void accentAt(vec2 p, inout vec3 A, inout vec3 AD){   // each pixel takes the colour of the nearest badge
+  float best = 1e9;
+  for (int i = 0; i < ${N}; i++) { float d = budSD(p, uB[i], uS[i]); if (d < best) { best = d; A = uBA[i]; AD = uBD[i]; } }
 }`;
     const BR = 8, DOT = 4.5;
     const B = T.map(() => ({
@@ -2058,9 +2121,13 @@ float accentSDF(vec2 p){
       r: new Liquid.Spring(0, { k: 380, zeta: 0.62 }),
       s: new Liquid.Spring(0, { k: 260, zeta: 0.9, fixed: true }),
       L: new Liquid.Spring(0, { k: 420, zeta: 0.8 }),
-      cnt: null, well: false
+      cnt: null, well: false, acc: null, col: null
     }));
-    B.forEach(b => { b.cnt = document.createElement('div'); b.cnt.className = 'lq-ws-cnt'; b.cnt.setAttribute('aria-hidden', 'true'); host.appendChild(b.cnt); });
+    function badgeColour(b, a) {
+      b.acc = a; b.col = Liquid.accentColors(a);
+      if (b.cnt) b.cnt.style.setProperty('--bh', a.h.toFixed(1));
+    }
+    B.forEach(b => { b.cnt = document.createElement('div'); b.cnt.className = 'lq-ws-cnt'; b.cnt.setAttribute('aria-hidden', 'true'); host.appendChild(b.cnt); badgeColour(b, badgeAcc); });
     const bsurf = new Liquid.Surface(stage, { glsl: bglsl, onResize() { write(); } });
     bsurf.setAccent(badgeAcc);
     host.style.setProperty('--bh', badgeAcc.h.toFixed(1));
@@ -2080,21 +2147,22 @@ float accentSDF(vec2 p){
         bx = G.bw - dip; by = head.x;
         surf.set('uBar', 0, 0, G.bw, G.bh).set('uHead', bx, by).set('uTail', G.bw - dip * 0.5, tail.x).set('uSquash', 1 / (1 + stv), 1 + stv);
       }
-      surf.set('uCorner', G.corner).set('uRn', G.R + G.gap).set('uR', G.R).set('uScale', scale.x);
+      const sc = scale.x > 0.5 ? Math.min(scale.x, 1.6) : 0.5;   // bounded bead scale (<= 0 would flip the field)
+      surf.set('uCorner', G.corner).set('uRn', G.R + G.gap).set('uR', G.R).set('uScale', sc);
       const f = Math.min(Math.max((head.x - G.cs[0]) / G.slotW, 0), N - 1), i0 = Math.floor(f), i1 = Math.min(i0 + 1, N - 1);
       surf.setAccent(Liquid.mixAccent(accOf(i0), accOf(i1), f - i0));
       surf.draw();
-      bead.style.transform = `translate(${bx}px, ${by}px) scale(${scale.x})`;
+      bead.style.transform = `translate(${bx}px, ${by}px) scale(${sc})`;
       const n = nearest(head.x);
       if (n !== near) { near = n; els.forEach((el, j) => el.classList.toggle('near', j === n)); }
       const Lf = !dragging && Math.abs(head.x - G.cs[target]) < 4 && sp < 120 ? target : -1;
       if (Lf !== lifted) { lifted = Lf; els.forEach((el, j) => el.classList.toggle('lifted', j === Lf)); beadLayers.forEach((l, j) => l.classList.toggle('on', j === Lf)); }
-      writeBadges(bx, by);
+      writeBadges(bx, by, sc);
     }
 
-    function writeBadges(bx, by) {
+    function writeBadges(bx, by, sc) {
       const d = Math.SQRT1_2, red = Liquid.state.reduce;
-      const bc = [bx + (G.R * scale.x) * 0.72, by - (G.R * scale.x) * 0.72];
+      const bc = [bx + (G.R * sc) * 0.72, by - (G.R * sc) * 0.72];
       B.forEach((b, i) => {
         const ic = horiz ? [G.cs[i] + 11, G.barT + G.iconOff - 10] : [G.iconX + 10, G.cs[i] - 10];
         // a badge rides onto the bead as the bead arrives over its item
@@ -2104,7 +2172,8 @@ float accentSDF(vec2 p){
         const src = [rest[0] - 7 * d, rest[1] + 7 * d];
         const m = b.m.x, x = src[0] + (rest[0] - src[0]) * m, y = src[1] + (rest[1] - src[1]) * m;
         const r = Math.max(b.r.x, 0), L = Math.max(b.L.x, 0);
-        bsurf.set(`uB[${i}]`, x, y, r, L).set(`uS[${i}]`, src[0], src[1], Math.max(b.s.x, 0));
+        bsurf.set(`uB[${i}]`, x, y, r, L).set(`uS[${i}]`, src[0], src[1], Math.max(b.s.x, 0))
+          .set(`uBA[${i}]`, ...b.col.rgb).set(`uBD[${i}]`, ...b.col.deep);
         b.cnt.style.transform = `translate(${x}px, ${y}px) scale(${Math.min(Math.max(r / BR, 0), 1.3)})`;
         const want = typeof b.val === 'number' && b.val > 0 ? (b.val > 99 ? '99+' : String(b.val)) : '';
         if (want !== b.shown) swapCount(b, want);
@@ -2192,10 +2261,12 @@ float accentSDF(vec2 p){
     }
     T.forEach((_, i) => label(i));
 
-    function setBadge(id, v) {
+    // setBadge(id, value, { accent }): value = number | 'dot' | null; accent (per call) defaults to the badge accent
+    function setBadge(id, v, { accent } = {}) {
       const i = idx(id); if (i < 0) return;
       const b = B[i];
       if (typeof v === 'number' && v <= 0) v = null;
+      if (v != null) { const a = accent ? acc(accent) : badgeAcc; if (a !== b.acc) badgeColour(b, a); }
       const was = b.val != null;
       b.val = v == null ? null : v;
       label(i);
@@ -2251,6 +2322,7 @@ float accentSDF(vec2 p){
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
       <button class="toggle bb" data-a="add">Badge +1</button>
       <button class="toggle bb" data-a="dot">Dot</button>
+      <button class="toggle bb" data-a="stale">Stale (amber)</button>
       <button class="toggle bb" data-a="clear">Clear</button>
       <button class="toggle bb" data-a="spy">Scroll-spy step</button>
     </div>
@@ -2267,7 +2339,8 @@ float accentSDF(vec2 p){
         const act = btn.dataset.a;
         if (act === 'add') { n++; a.setBadge('analyze', n); b.setBadge('analyze', n); }
         if (act === 'dot') { a.setBadge('cell', 'dot'); b.setBadge('cell', 'dot'); }
-        if (act === 'clear') { n = 0; for (const w of [a, b]) { w.setBadge('analyze', null); w.setBadge('cell', null); } }
+        if (act === 'stale') { for (const w of [a, b]) w.setBadge('volume', 'dot', { accent: 'amber' }); }
+        if (act === 'clear') { n = 0; for (const w of [a, b]) { w.setBadge('analyze', null); w.setBadge('cell', null); w.setBadge('volume', null); } }
         if (act === 'spy') { const i = (ITEMS.findIndex(t => t.id === a.get()) + 1) % ITEMS.length; a.set(ITEMS[i].id); b.set(ITEMS[i].id); out.textContent = 'section: ' + ITEMS[i].id; }
       }));
       return { redraw() { a.redraw(); b.redraw(); }, a, b };
@@ -2292,7 +2365,7 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
 .lq-seg-opt{ position:absolute; top:0; height:100%; background:none; border:0; padding:0; margin:0; font:inherit; color:${DIM};
   border-radius:999px; cursor:pointer; outline:none; -webkit-tap-highlight-color:transparent; }
 .lq-seg-opt::after{ content:''; position:absolute; left:3px; right:3px; top:50%; height:var(--lq-seg-ph); transform:translateY(-50%);
-  border-radius:999px; opacity:0; box-shadow:inset 0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .7); transition:opacity 140ms ease-out; }
+  border-radius:999px; opacity:0; box-shadow:inset 0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .56); transition:opacity 140ms ease-out; }
 .lq-seg-opt:focus-visible::after{ opacity:1; }
 .lq-seg-lab, .lq-seg-ink span{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:0 8px;
   font-size:13px; font-weight:620; letter-spacing:-.005em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -2566,7 +2639,7 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
 .lq-wsd-main{ position:absolute; inset:0; border:0; padding:0; background:none; cursor:pointer; border-radius:18px; font:inherit;
   -webkit-tap-highlight-color:transparent; }
 .lq-wsd-main:disabled{ cursor:default; opacity:.45; }
-.lq-wsd-main:focus-visible{ outline:none; box-shadow:0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .55); }
+.lq-wsd-main:focus-visible{ outline:none; box-shadow:0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .45); }
 .lq-wsd-face{ position:absolute; display:flex; align-items:center; justify-content:center; gap:6px; pointer-events:none;
   color:oklch(0.24 0.06 var(--ah)); font-size:13px; font-weight:700; letter-spacing:-.005em; white-space:nowrap; }
 .lq-wsd-main .lq-wsd-face{ inset:0; }
@@ -2581,7 +2654,7 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
   pointer-events:none; opacity:0; -webkit-tap-highlight-color:transparent; }
 .lq-wsd-open .lq-wsd-kid:not(:disabled){ pointer-events:auto; }
 .lq-wsd-kid:disabled{ cursor:default; }
-.lq-wsd-kid:focus-visible{ outline:none; box-shadow: inset 0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .6); }
+.lq-wsd-kid:focus-visible{ outline:none; box-shadow: inset 0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .5); }
 .lq-wsd-kid:focus{ outline:none; }
 .lq-wsd-kic{ position:absolute; top:50%; width:18px; height:18px; margin:-9px 0 0 -9px; color:oklch(0.24 0.06 var(--ah)); }
 .lq-wsd-kic .lq-i{ stroke-width:2.1; }
@@ -2599,8 +2672,7 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
   let uid = 0;
 
   Liquid.ui.send = function (host, opts = {}) {
-    const items = (opts.items || []).map(it => ({ ...it, disabled: !!it.disabled }));
-    const N = Math.max(items.length, 1);
+    let items = [], N = 1, kids = [], s = [];   // rebuilt by setItems()
     const A = acc(opts.accent);
     const label = opts.label != null ? opts.label : 'Send';
     const icon = opts.icon || 'send';
@@ -2630,18 +2702,22 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
     const menu = document.createElement('div'); menu.id = id + '-m'; menu.setAttribute('role', 'menu');
     menu.setAttribute('aria-label', opts.ariaLabel || label || 'Send');
     ov.append(face2, menu);
-    const kids = items.map((it, i) => {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'lq-wsd-kid'; b.setAttribute('role', 'menuitem'); b.tabIndex = -1;
-      b.innerHTML = `<span class="lq-wsd-kic">${Liquid.icon(it.icon)}</span><span class="lq-wsd-lab"></span>`;
-      b.querySelector('.lq-wsd-lab').textContent = it.label;
-      b.disabled = it.disabled;
-      b.addEventListener('click', () => pick(i));
-      menu.appendChild(b); return b;
-    });
-
-    // springs
-    const s = items.map(() => new Liquid.Spring(0, { k: 300, zeta: 0.6 }));
+    function buildItems(list) {
+      items = (list || []).map(it => ({ ...it, disabled: !!it.disabled }));
+      N = Math.max(items.length, 1);
+      menu.textContent = '';
+      kids = items.map((it, i) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'lq-wsd-kid'; b.setAttribute('role', 'menuitem'); b.tabIndex = -1;
+        b.innerHTML = `<span class="lq-wsd-kic">${Liquid.icon(it.icon)}</span><span class="lq-wsd-lab"></span>`;
+        b.querySelector('.lq-wsd-lab').textContent = it.label;
+        b.disabled = it.disabled;
+        b.addEventListener('click', () => pick(i));
+        menu.appendChild(b); return b;
+      });
+      s = items.map(() => new Liquid.Spring(0, { k: 300, zeta: 0.6 }));   // one per droplet
+    }
+    buildItems(opts.items);
     const sc = new Liquid.Spring(1, { k: 650, zeta: 0.4, fixed: true });
 
     // host surface: pill only
@@ -2653,7 +2729,7 @@ float accentSDF(vec2 p){ return sdRoundBox(p - uMain.xy, uMain.zw, min(uMain.z, 
     const hs = new Liquid.Surface(host, { glsl: hostGlsl, onResize() { ready = true; write(); } });
     hs.setAccent(A);
 
-    const ovGlsl = `
+    const ovGlsl = N => `
 #define BULGE 10.0
 #define SHADOW_DY 6.0
 uniform vec4 uMain;
@@ -2734,7 +2810,7 @@ float bodySDF(vec2 p){
       if (!ready || destroyed) return;
       const ovOn = active && os && os.w;
       hs.canvas.style.visibility = ovOn ? 'hidden' : '';
-      const k = sc.x;
+      const k = sc.x > 0.5 ? Math.min(sc.x, 1.6) : 0.5;   // bounded squeeze (NaN -> 0.5)
       if (!ovOn) {
         hs.set('uMain', W / 2, 22, (W / 2) * (0.92 + 0.08 * k), (PH / 2) * k);
         hs.draw(); return;
@@ -2786,7 +2862,7 @@ float bodySDF(vec2 p){
       if (v) {
         if (!ov.parentNode) document.body.appendChild(ov);
         themeOverlay(); ov.style.display = 'block'; layoutOverlay();
-        if (!os) os = new Liquid.Surface(ov, { glsl: ovGlsl, bleed: 32, onResize() { write(); } });
+        if (!os) os = new Liquid.Surface(ov, { glsl: ovGlsl(N), bleed: 32, onResize() { write(); } });
         os.setAccent(A);
         if (!active) { attachWin(); s.forEach(sp => sp.set(0)); }
         active = true;
@@ -2842,11 +2918,25 @@ float bodySDF(vec2 p){
         if ('label' in st) { items[i].label = st.label; kids[i].querySelector('.lq-wsd-lab').textContent = st.label; if (active) layoutOverlay(); }
         write();
       },
+      // replace the targets in place (no destroy/recreate); an open menu closes at once
+      setItems(list) {
+        if (open || active) {
+          const refocus = ov.contains(document.activeElement);
+          open = false; active = false; pending = [];
+          main.setAttribute('aria-expanded', 'false');
+          host.classList.remove('lq-wsd-open'); ov.classList.remove('lq-wsd-open');
+          ov.style.display = 'none'; detachWin();
+          if (refocus) main.focus({ preventScroll: true });
+        }
+        if (os) { os.destroy(); os = null; }   // the overlay shader is sized by item count
+        buildItems(list);
+        write();
+      },
       setDisabled(b) { disabled = !!b; main.disabled = disabled; if (disabled && open) setOpen(false); },
       redraw: write,
       destroy() {
         destroyed = true; detachWin(); document.removeEventListener('pointerdown', outside, true);
-        for (const x of [hs, os]) if (x) { x.ro.disconnect(); x.draw = () => {}; }
+        for (const x of [hs, os]) if (x) x.destroy();
         ov.remove(); host.innerHTML = ''; host.classList.remove('lq-wsd', 'lq-wsd-open'); host.style.width = '';
       }
     };
@@ -2864,6 +2954,7 @@ float bodySDF(vec2 p){
 </div>
 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
   <button class="toggle" data-a="lab" aria-pressed="false">Lab busy</button>
+  <button class="toggle" data-a="more" aria-pressed="false">Choose queue</button>
 </div>
 <p class="out" style="margin-top:10px;font-size:13px;color:var(--ink-faint)">sent: none</p>`;
       const out = host.querySelector('.out');
@@ -2877,6 +2968,14 @@ float bodySDF(vec2 p){
       tb.addEventListener('click', () => {
         const on = tb.getAttribute('aria-pressed') !== 'true'; tb.setAttribute('aria-pressed', on);
         s1.setItemState('lab', { disabled: on, label: on ? 'Lab (busy)' : 'Lab' });
+      });
+      const BASE = [{ id: 'queue', label: 'Queue', icon: 'queue' }, { id: 'mesh', label: 'Mesh', icon: 'layers' },
+        { id: 'lab', label: 'Lab', icon: 'flask' }, { id: 'json', label: 'Export JSON', icon: 'download' }];
+      const mb = host.querySelector('[data-a=more]');
+      mb.addEventListener('click', () => {
+        const on = mb.getAttribute('aria-pressed') !== 'true'; mb.setAttribute('aria-pressed', on);
+        const list = BASE.slice(); if (on) list.splice(1, 0, { id: 'choose', label: 'Choose queue…', icon: 'folder' });
+        s1.setItems(list); tb.setAttribute('aria-pressed', 'false');
       });
       return { redraw() { s1.redraw(); }, s1 };
     }
@@ -2902,7 +3001,7 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
   font-family:var(--lq-font, inherit); }
 .lq-sl-track{ position:absolute; left:0; right:0; top:12px; bottom:-4px; touch-action:pan-y; cursor:pointer; outline:none; }
 .lq-sl-ring{ position:absolute; pointer-events:none; border-radius:999px; opacity:0; transition:opacity 140ms ease-out;
-  box-shadow:0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .55); }
+  box-shadow:0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .45); }
 .lq-sl-track:focus-visible .lq-sl-ring{ opacity:1; }
 .lq-sl-head{ position:absolute; left:0; right:0; top:0; height:18px; display:flex; align-items:center; gap:6px; pointer-events:none; }
 .lq-sl-label{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
@@ -2910,8 +3009,8 @@ Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
 .lq-sl-val{ position:relative; flex:none; pointer-events:auto; background:none; border:0; margin:0; padding:0 2px; border-radius:5px;
   font:inherit; font-family:${MONO}; font-size:13px; line-height:18px; font-variant-numeric:tabular-nums; color:${INK};
   cursor:text; white-space:nowrap; transition:color 140ms ease-out; }
-.lq-sl-val::before{ content:''; position:absolute; left:-12px; right:-6px; top:-19px; bottom:-7px; }
-.lq-sl-val:focus-visible{ outline:none; box-shadow:0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .55); }
+.lq-sl-val::before{ content:''; position:absolute; left:-14px; right:-8px; top:-4px; bottom:-22px; }
+.lq-sl-val:focus-visible{ outline:none; box-shadow:0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .45); }
 .lq-sl-unit{ margin-left:.35em; color:${DIM}; }
 .lq-sl.grab .lq-sl-num{ color:${ACC}; }
 .lq-sl-hint{ flex:none; font-family:${MONO}; font-size:11px; line-height:18px; color:${FAINT}; white-space:nowrap; }
@@ -3008,6 +3107,7 @@ float floodSDF(vec2 p){
   }
   const decimals = x => { const s = String(x); if (/e-/i.test(s)) return Math.min(10, +s.split(/e-/i)[1]); return (s.split('.')[1] || '').length; };
   const resolveAccent = a => (typeof a === 'string' ? Liquid.ACCENTS[a] : a) || Liquid.ACCENTS.lime;
+  const clampN = (x, a, b) => (x > a ? (x < b ? x : b) : a);   // NaN -> a
   let uid = 0;
 
   Liquid.ui.slider = function slider(host, opts = {}) {
@@ -3097,10 +3197,12 @@ float floodSDF(vec2 p){
       const red = Liquid.state.reduce;
       const sq = red ? 0 : squash.x;
       const st = red ? 0 : Math.min(Math.abs(head.v) / 3200, 0.16);
-      const sx = (1 - sq) * (1 + st) * scale.x, sy = (1 + sq * 0.6) / (1 + st) * scale.x;
+      // bead scales stay in a sane band: a scale <= 0 flips the field's sign and floods the canvas
+      const sx = clampN((1 - sq) * (1 + st) * scale.x, 0.5, 1.6), sy = clampN((1 + sq * 0.6) / (1 + st) * scale.x, 0.5, 1.6);
+      const hx = clampN(head.x, G.x0 - G.R, G.x1 + G.R), tx = clampN(tail.x, G.x0 - G.R, G.x1 + G.R);
       surf.set('uTrack', G.x0, G.cy, G.x1, G.hh).set('uRn', G.R + G.gap).set('uDipK', Math.min(Math.max(Liquid.state.melt * 0.35, 1.5), 5))
-        .set('uHead', head.x, G.cy).set('uTail', tail.x, G.cy).set('uBead', G.R, sx, sy)
-        .set('uMag', magX, 4.2, Math.max(mag.x, 0)).set('uNotch', 3.1, 0.7);
+        .set('uHead', hx, G.cy).set('uTail', tx, G.cy).set('uBead', G.R, sx, sy)
+        .set('uMag', clampN(magX, G.x0, G.x1), 4.2, clampN(mag.x, 0, 1.2)).set('uNotch', 3.1, 0.7);
       const dx = dets.map(xOf).filter(x => x > G.lo + 1 && x < G.hi - 1);   // end stops need no notch
       for (let i = 0; i < NDET; i++) surf.set(`uDet[${i}]`, i < dx.length ? dx[i] : -1e4);
       surf.draw();
@@ -3109,6 +3211,7 @@ float floodSDF(vec2 p){
     const anim = Liquid.animator(dt => {
       if (dead) return false;
       if (!ready) return false;
+      dt = clampN(dt, 0, 1 / 30);   // never integrate backwards or across a stall (core also guards this)
       const red = Liquid.state.reduce;
       let magT = 0;
       if (dragging) {
@@ -3131,6 +3234,12 @@ float floodSDF(vec2 p){
       squash.target = dragging ? 0.2 * (1 - Math.exp(-over / 60)) : 0;
       mag.target = red ? 0 : magT;
       Liquid.stepSprings([head, tail, scale, squash, mag], dt);
+      // hard limits: head/tail stay on the track (± a bead), velocities stay physical, scales stay positive
+      const lo = G.x0 - G.R, hi = G.x1 + G.R;
+      for (const s of [head, tail]) { if (!(s.x >= lo && s.x <= hi)) { s.x = clampN(s.x, lo, hi); s.v = 0; } s.v = clampN(s.v, -9000, 9000); }
+      scale.x = clampN(scale.x, 0.6, 1.4); scale.v = clampN(scale.v, -12, 12);
+      squash.x = clampN(squash.x, -0.3, 0.35); squash.v = clampN(squash.v, -12, 12);
+      mag.x = clampN(mag.x, -0.2, 1.2); mag.v = clampN(mag.v, -40, 40);
       if (red) tail.set(head.x);
       const lag = tail.x - head.x, maxLag = G.R * 1.8;   // keep the trailing neck short: a drop, not a comet
       if (Math.abs(lag) > maxLag) { tail.x = head.x + Math.sign(lag) * maxLag; tail.v = head.v; }
@@ -3186,6 +3295,7 @@ float floodSDF(vec2 p){
     });
     track.addEventListener('pointermove', e => {
       if (!ptr || e.pointerId !== ptr.id) return;
+      if (ptr.active && e.pointerType === 'mouse' && e.buttons === 0) { endPtr(e, false); return; }   // missed pointerup (stall, release off-window)
       const [x, y] = loc(e);
       if (!ptr.active) {
         const dx = x - ptr.x0, dy = y - ptr.y0;
@@ -3204,6 +3314,30 @@ float floodSDF(vec2 p){
     track.addEventListener('pointerup', e => endPtr(e, false));
     track.addEventListener('pointercancel', e => endPtr(e, true));
     track.addEventListener('lostpointercapture', e => { if (ptr && ptr.active && e.pointerId === ptr.id) endPtr(e, false); });
+    const onBlur = () => { if (ptr && ptr.active) { ptr = null; release(); } };   // window lost focus mid-drag: commit where it is
+    window.addEventListener('blur', onBlur);
+
+    // value button hit zone overlaps the top of the track (it reaches y = 40 for a 44 px target):
+    // a tap there edits the value, a horizontal drag hands over to the track.
+    let valPtr = null, valDragged = false;
+    valBtn.addEventListener('pointerdown', e => {
+      if (disabled || ptr || (e.pointerType === 'mouse' && e.button !== 0) || !ready) return;
+      const [x, y] = loc(e);
+      valPtr = { id: e.pointerId, x0: x, y0: y, touch: e.pointerType === 'touch' }; valDragged = false;
+      try { valBtn.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    valBtn.addEventListener('pointermove', e => {
+      if (!valPtr || e.pointerId !== valPtr.id) return;
+      const [x, y] = loc(e), dx = x - valPtr.x0, dy = y - valPtr.y0;
+      if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) { valPtr = null; return; }
+      if (Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        const v = valPtr; valPtr = null; valDragged = true;
+        ptr = { id: v.id, touch: v.touch, x0: v.x0, y0: v.y0, active: true };
+        begin(v.x0, e); moveTo(x);
+      }
+    });
+    const valEnd = e => { if (valPtr && e.pointerId === valPtr.id) valPtr = null; };
+    valBtn.addEventListener('pointerup', valEnd); valBtn.addEventListener('pointercancel', valEnd);
 
     // ---------- keyboard ----------
     track.addEventListener('keydown', e => {
@@ -3263,7 +3397,7 @@ float floodSDF(vec2 p){
       inp.addEventListener('input', () => inp.classList.remove('bad'));
       inp.addEventListener('blur', () => ed.finish(isFinite(parse(inp.value)), false));
     }
-    valBtn.addEventListener('click', () => startEdit());
+    valBtn.addEventListener('click', e => { if (valDragged) { valDragged = false; e.preventDefault(); return; } startEdit(); });
 
     applyOptions();
     value = quantize(o.value === undefined ? o.min : o.value);
@@ -3298,7 +3432,8 @@ float floodSDF(vec2 p){
       focus() { track.focus(); return api; },
       destroy() {
         dead = true; if (editing) editing.finish(false);
-        surf.ro.disconnect(); surf.w = 0; surf.canvas.remove();
+        window.removeEventListener('blur', onBlur);
+        surf.destroy();
         host.innerHTML = ''; host.classList.remove('lq-sl', 'grab', 'dis'); host.style.height = '';
       }
     };
@@ -3327,6 +3462,206 @@ float floodSDF(vec2 p){
           hint: v => (0.115 + 0.04 * v).toFixed(3) + ' mm', onInput: say('offset', 'input'), onChange: say('offset', 'change') })
       ];
       host.appendChild(log);
+      host.lqWidgets = ws;
+      return { redraw() { ws.forEach(w => w.redraw()); } };
+    }
+  });
+})();
+
+/* ---- widgets/toggle.js ---- */
+/* Liquid toggle widget (compact switch for term rows and view menus).
+   The knob sits in a filleted dip carved from a pill track (track minus knob-plus-gap). Flipping, the
+   head springs across while a tapered tail lags behind it (stretch, neck, merge); ON floods the track
+   with accent liquid that pours in behind the knob. Off, the knob is a neutral bead; its tint follows
+   the flood. One small Surface per toggle (switch box + 16 px bleed); it only draws while moving. */
+Liquid.ui = Liquid.ui || {}; Liquid.uiDemo = Liquid.uiDemo || [];
+(() => {
+  'use strict';
+  const INK = 'var(--lq-ink, var(--ink, oklch(0.97 0.01 290)))';
+  const DIM = 'var(--lq-ink-dim, var(--ink-dim, oklch(0.78 0.02 290)))';
+  const CSS = `
+.lq-tg{ position:relative; height:44px; font-family:var(--lq-font, inherit); -webkit-tap-highlight-color:transparent; }
+.lq-tg-btn{ position:relative; display:inline-flex; align-items:center; gap:8px; height:44px; max-width:100%; margin:0; padding:0 8px 0 0; border:0;
+  background:none; font:inherit; color:${DIM}; cursor:pointer; text-align:left; border-radius:12px; outline:none; user-select:none; -webkit-user-select:none; }
+.lq-tg-btn.nolab{ padding:0; }
+.lq-tg.first .lq-tg-btn{ display:flex; width:100%; padding:0 0 0 2px; justify-content:space-between; }
+.lq-tg.first .lq-tg-sw{ order:2; }
+.lq-tg-sw{ position:relative; flex:none; height:44px; touch-action:pan-y; }
+.lq-tg-ring{ position:absolute; pointer-events:none; border-radius:999px; opacity:0; transition:opacity 140ms ease-out;
+  box-shadow:0 0 0 2px oklch(var(--al) var(--ac) var(--ah) / .45); }
+.lq-tg-btn:focus-visible .lq-tg-ring{ opacity:1; }
+.lq-tg-lab{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; font-weight:550; line-height:18px;
+  transition:color 140ms ease-out; }
+.lq-tg-btn[aria-checked=true] .lq-tg-lab{ color:${INK}; }
+.lq-tg-btn:disabled{ cursor:default; opacity:.45; }`;
+  function injectCSS() {
+    if (document.getElementById('lq-ui-toggle-css')) return;
+    const s = document.createElement('style'); s.id = 'lq-ui-toggle-css'; s.textContent = CSS; document.head.appendChild(s);
+  }
+  const GLSL = `
+#define BULGE 7.0
+#define SHADOW_DY 2.5
+#define SHADOW_A 0.34
+#define SHADOW_R 7.0
+uniform vec4 uT;    // track left, centre y, length, half height
+uniform vec4 uKb;   // head x, tail x, flood x, stretch
+uniform vec3 uKn;   // knob radius, gap, fillet
+float knobHead(vec2 p){ vec2 s = vec2(uKb.w, 1. / uKb.w); return (length((p - vec2(uKb.x, uT.y)) / s) - uKn.x) * min(s.x, s.y); }
+float trackSD(vec2 p){ return sdRoundBox(p - vec2(uT.x + uT.z * .5, uT.y), vec2(uT.z * .5, uT.w), uT.w); }
+float bodySDF(vec2 p){ return ssub(trackSD(p), knobHead(p) - uKn.y, uKn.z); }
+float accentSDF(vec2 p){
+  vec2 H = vec2(uKb.x, uT.y), T = vec2(uKb.y, uT.y);
+  float R = uKn.x;
+  return smin(knobHead(p), smin(sdTaper(p, H, T, R * .5, R * .26), length(p - T) - R * .42, R * .35), R * .45);
+}
+#define HAS_FLOOD
+float floodSDF(vec2 p){
+  vec2 a = vec2(uT.x + uT.w, uT.y), e = vec2(max(uKb.z, a.x), uT.y);
+  return max(sdCapsule(p, a, e, uT.w - 2.5), bodySDF(p) + 2.);
+}`;
+  const SIZES = { sm: { TW: 34, HH: 8, R: 8.6, gap: 1.6 }, md: { TW: 46, HH: 11, R: 11.8, gap: 2 } };   // knob just overhangs the track
+  const resolveAccent = a => (typeof a === 'string' ? Liquid.ACCENTS[a] : a) || Liquid.ACCENTS.lime;
+  const clampN = (x, a, b) => (x > a ? (x < b ? x : b) : a);
+
+  Liquid.ui.toggle = function toggle(host, opts = {}) {
+    injectCSS();
+    const o = { checked: false, label: '', size: 'sm', labelFirst: false, onChange: null, ariaLabel: '', accent: Liquid.ACCENTS.lime, ...opts };
+    const S = SIZES[o.size] || SIZES.sm;
+    const pad = Math.max((44 - S.TW) / 2, S.R - S.HH + 4);
+    const G = { ...S, L: pad, cy: 22, W: S.TW + 2 * pad, x0: pad + S.HH, x1: pad + S.TW - S.HH };
+    let on = !!o.checked, disabled = false, dead = false, ready = false;
+    let accent = resolveAccent(o.accent);
+    const neutral = () => ({ L: 0.8, C: 0.015, h: accent.h });
+
+    host.classList.add('lq-tg'); host.classList.toggle('first', !!o.labelFirst);
+    host.style.height = '44px';
+    host.innerHTML = `<button type="button" class="lq-tg-btn" role="switch"><span class="lq-tg-sw"><span class="lq-tg-ring"></span></span><span class="lq-tg-lab"></span></button>`;
+    const btn = host.firstChild, sw = btn.firstChild, ring = sw.firstChild, lab = btn.lastChild;
+    sw.style.width = G.W + 'px';
+    Object.assign(ring.style, { left: (G.L - 3) + 'px', top: (G.cy - G.HH - 3) + 'px', width: (G.TW + 6) + 'px', height: (2 * G.HH + 6) + 'px' });
+    function applyLabel() {
+      lab.textContent = o.label || ''; lab.hidden = !o.label; btn.classList.toggle('nolab', !o.label);
+      if (o.ariaLabel || !o.label) btn.setAttribute('aria-label', o.ariaLabel || 'Toggle'); else btn.removeAttribute('aria-label');
+    }
+    applyLabel();
+
+    const head = new Liquid.Spring(on ? G.x1 : G.x0, { k: 620, zeta: 0.66 });
+    const tail = new Liquid.Spring(head.x, { k: 240, zeta: 0.9 });
+    const flood = new Liquid.Spring(head.x, { k: 170, zeta: 0.86 });
+    let drag = null;   // { id, x0, h0, moved }
+
+    const surf = new Liquid.Surface(sw, { glsl: GLSL, bleed: 16, onResize() { ready = true; write(); } });
+
+    function write() {
+      if (!ready || dead) return;
+      const red = Liquid.state.reduce;
+      const st = red ? 1 : 1 + Math.min(Math.abs(head.v) / 1400, 0.22);
+      const lo = G.x0 - G.R, hi = G.x1 + G.R;
+      const hx = clampN(head.x, lo, hi), tx = clampN(tail.x, lo, hi), fx = clampN(flood.x, G.x0, G.x1);
+      surf.set('uT', G.L, G.cy, G.TW, G.HH).set('uKb', hx, tx, fx, st)
+        .set('uKn', G.R, G.gap, clampN(Liquid.state.melt * 0.2, 1, 3));
+      const u = clampN((fx - G.x0) / (G.x1 - G.x0), 0, 1);
+      surf.setAccent(Liquid.mixAccent(neutral(), accent, u)).setGlow(0.12 + 0.88 * u);   // off: no light
+      surf.draw();
+    }
+
+    const anim = Liquid.animator(dt => {
+      if (dead || !ready) return false;
+      dt = clampN(dt, 0, 1 / 30);
+      const dragging = !!(drag && drag.moved);
+      if (dragging) { head.k = 2400; head.zeta = 1; head.fixed = true; } else { head.target = on ? G.x1 : G.x0; head.k = 620; head.zeta = 0.66; head.fixed = false; }
+      tail.target = head.x;
+      flood.target = dragging ? Math.max(G.x0, head.x) : (on ? G.x1 : G.x0);   // pours in behind the knob, drains when off
+      Liquid.stepSprings([head, tail, flood], dt);
+      for (const s of [head, tail, flood]) { s.x = clampN(s.x, G.x0 - G.R, G.x1 + G.R); s.v = clampN(s.v, -4000, 4000); }
+      if (Liquid.state.reduce) tail.set(head.x);
+      const done = !dragging && head.settled() && tail.settled() && flood.settled() && Math.abs(tail.x - head.x) < 0.25;
+      if (done) { head.snap(); tail.set(head.x); flood.snap(); }
+      write();
+      return !done;
+    });
+
+    function mark() { btn.setAttribute('aria-checked', on); }
+    function flip(v, user) {
+      v = !!v; if (v === on) { anim.wake(); return; }
+      on = v; mark();
+      if (user) { Liquid.haptic(); o.onChange && o.onChange(on); }
+      anim.wake();
+    }
+    mark();
+
+    // click (pointer tap, label tap, Space/Enter) toggles; a horizontal drag on the switch slides the knob
+    let swallow = false;
+    btn.addEventListener('click', () => { if (swallow) { swallow = false; return; } if (!disabled) flip(!on, true); });
+    const lx = e => e.clientX - sw.getBoundingClientRect().left;
+    const rub = x => (x < G.x0 ? G.x0 - (G.x0 - x) * 0.25 / (1 + (G.x0 - x) / 40) : x > G.x1 ? G.x1 + (x - G.x1) * 0.25 / (1 + (x - G.x1) / 40) : x);
+    sw.addEventListener('pointerdown', e => {
+      if (disabled || drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      drag = { id: e.pointerId, x0: lx(e), y0: e.clientY, h0: head.x, moved: false };
+    });
+    sw.addEventListener('pointermove', e => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = lx(e) - drag.x0, dy = e.clientY - drag.y0;
+      if (!drag.moved) {
+        if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) { drag = null; return; }   // vertical: let the page scroll
+        if (Math.abs(dx) < 5) return;
+        drag.moved = true; try { sw.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+      head.target = rub(drag.h0 + dx); anim.wake();
+    });
+    const end = (e, cancel) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const d = drag; drag = null;
+      if (!d.moved) return;                         // a tap: the click handler flips
+      swallow = true; setTimeout(() => { swallow = false; }, 0);
+      if (!cancel) flip(head.x + head.v * 0.06 > (G.x0 + G.x1) / 2, true);
+      anim.wake();
+    };
+    sw.addEventListener('pointerup', e => end(e, false));
+    sw.addEventListener('pointercancel', e => end(e, true));
+    sw.addEventListener('lostpointercapture', e => end(e, false));
+
+    const api = {
+      get: () => on,
+      set(v, { silent = true, instant = false } = {}) {
+        v = !!v; const changed = v !== on;
+        on = v; mark();
+        if (instant && ready && !drag) { const x = on ? G.x1 : G.x0; head.set(x); tail.set(x); flood.set(x); write(); } else anim.wake();
+        if (!silent && changed && o.onChange) o.onChange(on);
+        return api;
+      },
+      setLabel(t) { o.label = t; applyLabel(); return api; },
+      setAccent(a) { accent = resolveAccent(a); write(); return api; },
+      setDisabled(b) { disabled = !!b; btn.disabled = disabled; if (disabled) drag = null; return api; },
+      redraw() { write(); return api; },
+      focus() { btn.focus(); return api; },
+      destroy() {
+        dead = true; surf.destroy();
+        host.innerHTML = ''; host.classList.remove('lq-tg', 'first'); host.style.height = '';
+      }
+    };
+    return api;
+  };
+
+  // ---------- demo ----------
+  Liquid.uiDemo.push({
+    id: 'toggle', title: 'Toggle',
+    note: 'Compact switches for term rows and view menus. Flip: the knob stretches across, the track floods.',
+    mount(host) {
+      host.innerHTML = `
+<div class="tg-row" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px"></div>
+<div class="tg-menu" style="margin-top:8px;padding:4px 12px;border-radius:14px;background:oklch(1 0 0 / .03);box-shadow:inset 0 0 0 1px var(--hair)"></div>
+<p class="out" style="margin-top:8px;font-size:13px;color:var(--ink-faint)">changed: none</p>`;
+      const out = host.querySelector('.out'), row = host.querySelector('.tg-row'), menu = host.querySelector('.tg-menu');
+      const mk = p => { const d = document.createElement('div'); p.appendChild(d); return d; };
+      const say = n => v => { out.textContent = `changed: ${n} = ${v}`; };
+      const ws = [];
+      [['sin x', true], ['cos y', false], ['sin z', true], ['xyz', false]].forEach(([t, c]) =>
+        ws.push(Liquid.ui.toggle(mk(row), { label: t, checked: c, size: 'sm', onChange: say(t) })));
+      [['Bounding box', true, 'aqua'], ['Clip cap', false, 'aqua'], ['Axes', true, 'aqua']].forEach(([t, c, a]) =>
+        ws.push(Liquid.ui.toggle(mk(menu), { label: t, checked: c, size: 'sm', labelFirst: true, accent: a, onChange: say(t) })));
+      const big = mk(host); big.style.marginTop = '6px';
+      ws.push(Liquid.ui.toggle(big, { label: 'Auto-run', checked: false, size: 'md', accent: 'violet', onChange: say('auto-run') }));
       host.lqWidgets = ws;
       return { redraw() { ws.forEach(w => w.redraw()); } };
     }
@@ -3901,7 +4236,7 @@ document.getElementById('sWall').addEventListener('input',function(){wallVal=par
 document.getElementById('sPipeR').addEventListener('input',function(){pipeRVal=parseFloat(this.value);document.getElementById('vPipeR').textContent=pipeRVal.toFixed(2);updateMMHints();updateEq();rebuildShader();onSurfaceChange();});
 document.getElementById('sCells').addEventListener('input',function(){cellMult=parseFloat(this.value);document.getElementById('vCells').textContent=cellMult.toFixed(2)+'×';updateMMHints();rebuildShader();});
 
-// ── Cell size (mm) display layer — does NOT affect JSON export ────────
+// ── Cell size (mm) display layer — geometry export unaffected (recipe display block only) ──
 // Converts internal cell domain [-π, π] to user-specified physical units.
 // Conversion: 1 internal length = cellSizeMM / (2π) mm
 // Only annotates sliders where mm interpretation is unambiguous:
@@ -4952,10 +5287,12 @@ function buildExportJSON(){
   }
   const out={
     meta:{version:'1.1.0',timestamp:new Date().toISOString(),
-      preset:rawPresetFn?rawPresetFn.label:(terms.length?currentPreset:'custom')},
+      preset:rawPresetFn?rawPresetFn.label:(terms.length?currentPreset:'custom'),
+      tool:'f13ld.tpms'},
     surface:surfaceBlock,surface_b:surfaceBBlock,geometry:geometryBlock
   };
   if(homogBlock)out.homogenization=homogBlock;
+  out.display={cell_size_mm:cellSizeMM};   // display only (mm read-outs); Mesh and Lab ignore it
   return out;
 }
 
@@ -5247,7 +5584,7 @@ html.f13w{--rail-w:72px}
 html.f13w [data-native]{display:none!important}
 /* header: the send control replaces Queue / Mesh / Lab; the queue client's own buttons stay
    mounted (invisible, no pointer) so its menus and feedback still work when the send item triggers them */
-html.f13w #w-send{flex:none}
+html.f13w #w-recipe{flex:none}
 html.f13w .fh-right>.f13ldq-split,html.f13w .fh-right>.f13ldq-main{position:absolute;right:14px;top:calc(env(safe-area-inset-top) + 8px);pointer-events:none;z-index:-1}
 html.f13w .fh-right>.f13ldq-split>.f13ldq-main,html.f13w .fh-right>.f13ldq-split>.f13ldq-caret,html.f13w .fh-right>.f13ldq-main{opacity:0}
 html.f13w .fh-right>.f13ldq-split>:not(.f13ldq-main):not(.f13ldq-caret){pointer-events:auto}
@@ -5291,7 +5628,7 @@ html.f13w #w-clip>.clip-lbl{margin:0}
 html.f13w #sectionsRail>.f13w-rail{margin:14px 0 0 4px}
 html.f13w .sb-fallback{display:none}
 html.f13w #sectionsBar{border-top:none;padding:0 8px env(safe-area-inset-bottom)}
-#w-send:not(.lq-wsd),#w-mode:not(.lq-seg),#w-preset:not(.lq-wd),#w-run:not(.lq-pb),#w-clip:empty{display:none}
+#w-recipe:not(.lq-wsd),#w-mode:not(.lq-seg),#w-preset:not(.lq-wd),#w-run:not(.lq-pb),#w-clip:empty{display:none}
 /* liquid dropdowns for field B, its frequency and the Analyze grid */
 html.f13w #w-fieldB{flex:1 1 120px;min-width:0}
 html.f13w .f13w-at{display:flex;align-items:center;gap:8px;flex:none;margin-left:auto}
@@ -5302,6 +5639,14 @@ html.f13w .homo-controls .f13w-dd-c{align-self:flex-start}
 .f13w-show::after{content:'';position:absolute;left:50%;top:50%;width:max(100%,44px);height:44px;transform:translate(-50%,-50%)}
 .f13w-show:hover{color:var(--accent);border-color:var(--accent-line)}
 .f13w-flash{border-radius:12px;animation:f13wFlash 1.4s var(--ease)}
+/* toggles (natives hidden as state; the term switches are rebuilt by renderList, so hide them by class) */
+html.f13w #termlist .sw.tog{display:none}
+.f13w-tg-term{flex:none;width:44px}
+.f13w-tg-sw{width:max-content;max-width:100%}
+html.f13w .f13v-p{padding:2px 10px 6px 12px;min-width:184px;gap:0}
+.f13w-tg-menu{width:100%}
+html.f13w .f13v-p .f13v-r{margin-top:4px;min-height:28px;padding:0 10px;position:relative}
+html.f13w .f13v-p .f13v-r::after{content:'';position:absolute;left:-6px;right:-6px;top:-8px;bottom:-8px}
 @keyframes f13wFlash{0%,60%{box-shadow:0 0 0 2px var(--accent-line),0 0 0 6px var(--accent-soft)}100%{box-shadow:0 0 0 0 transparent}}
 </style>
 <script id="f13ui-wire">
@@ -5419,37 +5764,43 @@ html.f13w .homo-controls .f13w-dd-c{align-self:flex-start}
     W.run.setDisabled(runBtn.disabled&&!running);
   },['disabled']);
 
-  // ---- send: Queue / Mesh / Lab / Export JSON in one header control ----
+  // ---- recipe: one two-way header menu — Open recipe… / Export JSON / Queue / Mesh / Lab ----
+  // (open = #f13-recipe-import; the rest hand the current recipe on)
+  const I=Liquid.ICONS;
+  I.recipe=I.recipe||'<path d="M14 3.5H7.5a1 1 0 0 0-1 1v15a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V7z"/><path d="M14 3.5V7h3.5"/><path d="M10 17.5v-6M8 13.3l2-2 2 2"/><path d="M14 11v6.2M12 15.2l2 2 2-2"/>';
+  I.open=I.open||'<path d="M12 15.5V4.6M7.2 9.2 12 4.4l4.8 4.8"/><path d="M5 19.5h14"/>';
   const qMain=()=>document.querySelector('.fh-right .f13ldq-main'),qCaret=()=>document.querySelector('.fh-right .f13ldq-caret');
   const exportBtn=$('exportBtn');
   const ACTIONS={
+    open(){if(window.F13Recipe)F13Recipe.open();},
+    json(){exportBtn.click();},
     queue(){const m=qMain();if(m)m.click();else say('Queue is still loading — try again in a moment.');},
     choose(){const c=qCaret();if(c)c.click();},
-    mesh(){openInMesh();},lab(){openInLab();},
-    json(){exportBtn.click();}
+    mesh(){openInMesh();},lab(){openInLab();}
   };
-  let sendKey='';
-  function mountSend(){
-    const real=!!qMain(),offline=!real&&!!$('f13ldq-fallback'),key=(real?'r':'')+(real&&qCaret()?'c':'')+(offline?'o':'');
-    if(key===sendKey&&W.send)return;sendKey=key;
-    if(W.send)W.send.destroy();
-    const items=[{id:'queue',label:'Queue',icon:'queue'}];
-    if(real&&qCaret())items.push({id:'choose',label:'Choose queue…',icon:'folder'});
-    items.push({id:'mesh',label:'Mesh',icon:'layers'},{id:'lab',label:'Lab',icon:'flask'},{id:'json',label:exportBtn.textContent.replace(/^Copied.*$/,'Export JSON'),icon:'download'});
-    W.send=Liquid.ui.send($('w-send'),{label:'Send',icon:'send',accent:ACC,ariaLabel:'Send to',items,onSelect:id=>ACTIONS[id]&&ACTIONS[id]()});
-    if(offline)W.send.setItemState('queue',{disabled:true,label:'Queue (offline)'});
+  const jsonLabel=()=>exportBtn.textContent.trim().replace(/^Copied.*$/,'Export JSON');
+  function recipeItems(){
+    const real=!!qMain(),choose=real&&!!qCaret(),offline=!real&&!!$('f13ldq-fallback');
+    const items=[{id:'open',label:'Open recipe…',icon:'open'},{id:'json',label:jsonLabel(),icon:'download'},
+      {id:'queue',label:offline?'Queue (offline)':'Queue',icon:'queue',disabled:offline}];
+    if(choose)items.push({id:'choose',label:'Choose queue…',icon:'folder'});
+    items.push({id:'mesh',label:'Mesh',icon:'layers'},{id:'lab',label:'Lab',icon:'flask'});
+    return {key:(real?'r':'')+(choose?'c':'')+(offline?'o':''),items};
   }
+  let recipeKey;
+  {const r=recipeItems();recipeKey=r.key;
+   W.recipe=W.send=Liquid.ui.send($('w-recipe'),{label:'Recipe',icon:'recipe',accent:ACC,ariaLabel:'Recipe',items:r.items,onSelect:id=>ACTIONS[id]&&ACTIONS[id]()});}
+  function syncRecipe(){const r=recipeItems();if(r.key===recipeKey)return;recipeKey=r.key;W.recipe.setItems(r.items);}
   let qText='Queue';
-  mountSend();
   watch(document.querySelector('.fh-right'),()=>{                  // the queue client mounts later, async
-    mountSend();
+    syncRecipe();
     const m=qMain(),t=m?m.textContent.trim():'Queue';             // its button text is its feedback (saved, error…)
     if(t!==qText){qText=t;if(t&&t!=='Queue')say(t);}
   });
   watch(exportBtn,()=>{
     const t=exportBtn.textContent.trim();
     if(/^Copied/.test(t))say('Recipe JSON copied and downloaded.');
-    else if(W.send)W.send.setItemState('json',{label:t});
+    else W.recipe.setItemState('json',{label:t});
   });
 
   // ---- sections: rail (desktop) + tab bar (phone), Analyze badge ----
@@ -5459,7 +5810,7 @@ html.f13w .homo-controls .f13w-dd-c{align-self:flex-start}
   W.bar=Liquid.ui.sections(mk($('sectionsBar'),'f13w-bar'),{items:SECTIONS,value:UI.active,orientation:'horizontal',
     accent:ACC,ariaLabel:'Sections',onChange:id=>UI.showSection(id)});
   let badge=null;                                                    // 'running' | 'new' | 'stale' | null
-  function setBadge(b){badge=b;const v=b?'dot':null;W.rail.setBadge('analyze',v);W.bar.setBadge('analyze',v);}
+  function setBadge(b){badge=b;const v=b?'dot':null,o={accent:b==='stale'?'amber':'coral'};W.rail.setBadge('analyze',v,o);W.bar.setBadge('analyze',v,o);}
   const analyzeSeen=()=>UI.active==='analyze';                       // one section at a time: seen = shown
   const clearIfSeen=()=>{if(badge&&badge!=='running'&&analyzeSeen())setBadge(null);};
   hook('onSectionChange',id=>{W.rail.set(id);W.bar.set(id);clearIfSeen();});
@@ -5517,7 +5868,7 @@ html.f13w .homo-controls .f13w-dd-c{align-self:flex-start}
   // ---- help: the engine has no "show control" action, so each drawer card whose control lives in a
   // section gets one here; it switches to that section, brings the control into view and flashes it ----
   const HELP_TARGET={presets:'#grp-preset',terms:'#eqbar-wrap',mode:'#grp-mode',offset:'#grp-offset',wall:'#grp-wall',
-    pipe:'#grp-piper',fieldb:'#w-fieldB',pishift:'.pi-title',pinorm:'#piNormToggle',pichips:'.pi-chips',cells:'#grp-cells',
+    pipe:'#grp-piper',fieldb:'#w-fieldB',pishift:'.pi-title',pinorm:'#w-piNorm',pichips:'.pi-chips',cells:'#grp-cells',
     cellsize:'#grp-cellsize',grid:'#w-grid',es:'#Es',nu:'#nu',run:'#w-run',export:'#exportBtn'};
   UI.revealControl=function(sel){
     const el=typeof sel==='string'?document.querySelector(sel):sel;if(!el)return false;
@@ -5544,26 +5895,53 @@ html.f13w .homo-controls .f13w-dd-c{align-self:flex-start}
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(addShowButtons,0));else setTimeout(addShowButtons,0);
 
-  /* ---- TODO(toggles): wire Liquid.ui.toggle when the kit ships it. Native switches to replace -------
-     All are <button class="sw" role="switch"> except the view menu, which is checkboxes.
-     1. View menu (shared F13LD-VIEW block, do not edit it): '#cw .f13v-p input[type=checkbox]', five in
-        order shadows · occlusion · warmCool · cutFaces · limeEdges (labels: the parent <label> text).
-        Read: input.checked (also f13View.opts[key]). Write: input.checked=v + dispatch 'change' (its
-        listener stores f13View.opts, saves localStorage 'f13ld.tpms.view', redraws). The menu's
-        'reset' button (.f13v-r) sets .checked directly with no event: mirror via mirrorValue-style
-        override of 'checked' (HTMLInputElement.prototype) or re-read on its click.
-     2. '#shellNormToggle' (Volume, under wall t, thin wall only) → app var shellNormalize.
-        Read: aria-checked==='true' (or .on). Write: .click() toggles (the handler flips the var,
-        sets .on + aria-checked, rebuilds). No other code writes it.
-     3. '#piNormToggle' (Volume, PI-TPMS panel) → app var piNormalize. Same read/write as 2.
-        Both carry the native look via .sw; mark them data-native="toggle" once replaced and mount the
-        widget beside them (help rows: the 'pinorm' card has no inline i).
-     4. Per-term on/off: '#termlist .sw.tog[data-act="tog"]' with data-id=term id; rebuilt by
-        renderList() (innerHTML) on every term edit, preset, mode or field-tab change, so remount
-        after each render (MutationObserver childList on #termlist, or wrap renderList).
-        Read: aria-checked (state is term.on in editTerms()). Write: .click() on the native button
-        (delegated #termlist click handler toggles term.on, marks field B custom, re-renders).
-  ------------------------------------------------------------------------------------------------- */
+  // ---- toggles: liquid switches over the native ones (natives stay hidden as the state source) ----
+  // Native → widget: aria-checked / checked is re-read on change. Widget → native: .click() / checked + change.
+  const TG={size:'sm',accent:ACC};
+  function tgHost(cls,id){const h=document.createElement('div');h.className='f13w-tg '+cls;if(id)h.id=id;return h;}
+  // 1. normalize switches (<button role=switch>; their click handler flips the app var and rebuilds)
+  function liquidSwitch(nat,id){
+    const host=tgHost('f13w-tg-sw',id),on=()=>nat.getAttribute('aria-checked')==='true';
+    nat.before(host);nat.setAttribute('data-native','toggle');
+    const w=Liquid.ui.toggle(host,{...TG,checked:on(),label:nat.textContent.trim(),onChange:v=>{if(on()!==v)nat.click();}});
+    host.querySelector('button').title=nat.title;
+    new MutationObserver(()=>w.set(on())).observe(nat,{attributes:true,attributeFilter:['aria-checked']});
+    return w;
+  }
+  W.shellNorm=liquidSwitch($('shellNormToggle'),'w-shellNorm');
+  W.piNorm=liquidSwitch($('piNormToggle'),'w-piNorm');
+  // 2. per-term on/off: renderList() rebuilds #termlist on every edit, so after each render the live
+  // widget for each term id moves into its fresh row (no remount; a flip animation keeps playing)
+  const termTg=new Map();                                            // term id → {host, w}
+  const termNat=id=>document.querySelector('#termlist .sw.tog[data-id="'+id+'"]');
+  function mountTermToggles(){
+    const seen=new Set();
+    document.querySelectorAll('#termlist .sw.tog[data-act="tog"]').forEach(nat=>{
+      const id=nat.dataset.id,on=nat.getAttribute('aria-checked')==='true';seen.add(id);
+      let t=termTg.get(id);
+      if(!t){const host=tgHost('f13w-tg-term');
+        t={host,w:Liquid.ui.toggle(host,{...TG,checked:on,ariaLabel:'Term on',
+          onChange:v=>{const n=termNat(id);if(n&&(n.getAttribute('aria-checked')==='true')!==v)n.click();}})};
+        termTg.set(id,t);}
+      else t.w.set(on);
+      nat.before(t.host);
+    });
+    for(const [id,t] of termTg)if(!seen.has(id)){t.w.destroy();termTg.delete(id);}
+  }
+  const renderList0=renderList;
+  renderList=function(){renderList0.apply(this,arguments);mountTermToggles();};
+  mountTermToggles();
+  W.terms=termTg;
+  // 3. view menu (shared F13LD-VIEW block, untouched): checkbox rows → label-first toggles. Its reset
+  // button sets .checked with no event, so resync after it runs.
+  const vp=document.querySelector('#cw .f13v-p');
+  W.view=vp?[...vp.querySelectorAll('input[type=checkbox]')].map(cb=>{
+    const row=cb.closest('label')||cb,host=tgHost('f13w-tg-menu');
+    row.before(host);row.setAttribute('data-native','toggle');
+    return {cb,w:Liquid.ui.toggle(host,{...TG,checked:cb.checked,label:row.textContent.trim(),labelFirst:true,
+      onChange:v=>{cb.checked=v;fire(cb,'change');}})};
+  }):[];
+  if(vp){const r=vp.querySelector('.f13v-r');if(r)r.addEventListener('click',()=>W.view.forEach(({cb,w})=>w.set(cb.checked)));}
 })();
 </script>
 <!-- ==================  END F13LD UI · liquid widgets wiring  =========== -->
@@ -5749,7 +6127,7 @@ html.f13w .homo-controls .f13w-dd-c{align-self:flex-start}
       { id:'cellsize', label:'cell size', range:'mm · display only', anchor:{row:'#cellSizeMM'},
         what:'Real-world edge length of one unit cell.',
         see:'No change to the shape — rescales the mm read-outs and the physical size block.',
-        why:'Anchors the dimensionless model to physical units; does not touch the exported JSON.' }
+        why:'Anchors the dimensionless model to physical units. Saved with the recipe as display info only; the geometry does not change.' }
     ]},
     { title:'Analyze · homogenization', items:[
       { id:'grid', label:'grid', range:'32³ / 48³ / 64³', anchor:{row:'#gridsize'},
@@ -5780,9 +6158,9 @@ html.f13w .homo-controls .f13w-dd-c{align-self:flex-start}
         why:'Preview fidelity only — it does not change the geometry or what gets exported.' }
     ]},
     { title:'Handoff', items:[
-      { id:'export', label:'Export JSON / Queue / Mesh / Lab',
-        what:'Saves the current recipe as JSON (bottom of Analyze), or hands it on from the header: Queue adds it to your F13LD.queue (the arrow picks which queue), Mesh opens it in F13LD.mesh, Lab opens it in F13LD.lab.',
-        see:'Downloads a file; in F13LD.mesh the recipe becomes a watertight, printable 3MF. In F13LD.lab it is homogenized by the FFT solver.',
+      { id:'export', label:'Recipe · open / export / queue / mesh / lab',
+        what:'The Recipe menu in the header. Open recipe… loads a saved recipe JSON (or drop a .json anywhere on the tool, or paste recipe JSON); Undo in the message puts back what you had. Export JSON saves the current recipe (also at the bottom of Analyze); Queue adds it to your F13LD.queue; Mesh opens it in F13LD.mesh; Lab opens it in F13LD.lab.',
+        see:'Opening sets every control from the recipe; run the analysis again for its stiffness. Export downloads a file; in F13LD.mesh the recipe becomes a watertight, printable 3MF; in F13LD.lab it is homogenized by the FFT solver.',
         why:'The bridge from surface design to meshing and printing.' }
     ]}
   ];
@@ -5958,14 +6336,21 @@ html.f13w .homo-controls .f13w-dd-c{align-self:flex-start}
       if(a) r.insertBefore(b,a); else r.appendChild(b);
     }
     // Inline message under the header (replaces alert()).
+    // o (optional): {action:{label, run}} adds a button after the text; {note} a dim second line; {ms} the time shown.
     var msgT=null;
-    function showHdrMsg(t){
+    function showHdrMsg(t,o){
       var m=document.getElementById('hdrMsg'); if(!m) return;
-      m.textContent=t; m.hidden=false; clearTimeout(msgT);
-      msgT=setTimeout(function(){ m.hidden=true; }, 5000);
+      o=o||{}; m.textContent=t; m.hidden=false; clearTimeout(msgT);
+      if(o.action){
+        var b=document.createElement('button'); b.type='button'; b.className='hdr-msg-act'; b.textContent=o.action.label;
+        b.addEventListener('click', function(e){ e.stopPropagation(); m.hidden=true; o.action.run(); });
+        m.appendChild(document.createTextNode(' · ')); m.appendChild(b);
+      }
+      if(o.note){ var n=document.createElement('div'); n.className='hdr-msg-note'; n.textContent=o.note; m.appendChild(n); }
+      msgT=setTimeout(function(){ m.hidden=true; }, o.ms||(o.action?8000:5000));
     }
     window.F13UI=window.F13UI||{}; window.F13UI.message=showHdrMsg;
-    document.addEventListener('click', function(e){ var m=document.getElementById('hdrMsg'); if(m&&!m.hidden&&!e.target.closest('#f13ldq-fallback')) m.hidden=true; });
+    document.addEventListener('click', function(e){ var m=document.getElementById('hdrMsg'); if(m&&!m.hidden&&!e.target.closest('#f13ldq-fallback,#hdrMsg')) m.hidden=true; });
     function load(retry){
       var sc=document.createElement('script');
       sc.src='https://mshomper.github.io/f13ld.queue/f13ld-queue.js';
@@ -5976,6 +6361,246 @@ html.f13w .homo-controls .f13w-dd-c{align-self:flex-start}
     load(true);
   })();
   </script>
+<!-- ===================================================================== -->
+<!-- ========  F13LD RECIPE IMPORT  ·  reference implementation  ========= -->
+<!-- Opens a recipe JSON three ways — Recipe → Open recipe…, a .json       -->
+<!-- dropped anywhere on the tool, or recipe JSON pasted (focus outside a  -->
+<!-- text field) — and applies it through the tool's own controls, with   -->
+<!-- an Undo in the header message. Per tool: the TOOL block only; the     -->
+<!-- generic part and the style are identical across F13LD tools.          -->
+<!-- API: F13Recipe.apply(recipe) → {ok, warnings[], error?, label?}       -->
+<!--      F13Recipe.importText(text, source) · F13Recipe.open()            -->
+<!-- ===================================================================== -->
+<style id="f13-recipe-style">
+.f13r-drop{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;pointer-events:none;opacity:0;visibility:hidden;
+  background:oklch(0.10 0.01 265 / 0.6);transition:opacity 160ms ease-out,visibility 0s linear 160ms}
+.f13r-drop.on{opacity:1;visibility:visible;transition:opacity 160ms ease-out}
+.f13r-drop::before{content:'';position:absolute;inset:max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));border-radius:24px;
+  box-shadow:inset 0 0 0 2px var(--accent),inset 0 0 40px var(--accent-soft),0 0 0 6px var(--accent-soft)}
+.f13r-card{position:relative;display:flex;align-items:center;gap:14px;padding:14px 22px 14px 14px;border-radius:24px;background:var(--card);
+  box-shadow:inset 0 1px 0 oklch(1 0 0 / 0.06),0 2px 0 oklch(0 0 0 / 0.35),0 18px 40px oklch(0 0 0 / 0.45);
+  transform:translateY(8px) scale(.96);transition:transform 220ms cubic-bezier(.3,1.4,.5,1)}
+.f13r-drop.on .f13r-card{transform:none}
+.f13r-drop-ic{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:50%;color:var(--accent-ink);
+  background:radial-gradient(circle at 34% 28%,oklch(0.98 0.07 123) 0,var(--accent) 46%,oklch(0.74 0.17 128) 100%);
+  box-shadow:0 0 22px var(--accent-line),inset 0 -3px 6px oklch(0.5 0.12 128 / 0.35)}
+.f13r-drop-ic svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+.f13r-card b{display:block;font:650 15px/20px var(--lq-font);color:var(--ink)}
+.f13r-card small{display:block;font:400 13px/18px var(--lq-font);color:var(--ink-dim)}
+@media (prefers-reduced-motion:reduce){.f13r-card{transform:none;transition:none}}
+.hdr-msg-act{position:relative;margin:0;padding:0;border:0;background:none;color:var(--accent);font:600 13px/1.45 var(--lq-font);cursor:pointer}
+.hdr-msg-act::after{content:'';position:absolute;left:50%;top:50%;width:max(100%,44px);height:44px;transform:translate(-50%,-50%)}
+.hdr-msg-act:hover{text-decoration:underline;text-underline-offset:3px}
+.hdr-msg-note{margin-top:4px;color:var(--ink-dim);font-size:13px}
+</style>
+<script id="f13-recipe-import">
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const fire=(el,type)=>el.dispatchEvent(new Event(type,{bubbles:true}));
+
+  /* ============ PER-TOOL (F13LD.tpms) ================================== */
+  // What a tool must supply: id, name, major version, exportRecipe(), looksLike(r) for recipes with no
+  // meta.tool, plan(r, warn) — validate + normalize, never touches the app, throws Error(message) to
+  // refuse — apply(plan, warn) — set the app through its own controls — and label() for the message.
+  const MODE_BTN={solid:'mSolid',shell:'mShell','pi-tpms':'mPi'};
+  const NAME={sOffset:'offset',sWall:'wall t',sPipeR:'pipe r',sCells:'cells',piX:'Δx/T',piY:'Δy/T',piZ:'Δz/T'};
+  const isRaw=k=>!!(PRESETS.hasOwnProperty(k)&&PRESETS[k]._fn);
+  const isTermsPreset=k=>PRESETS.hasOwnProperty(k)&&Array.isArray(PRESETS[k]);
+  const hasOption=(sel,v)=>[...sel.options].some(o=>o.value===v);
+  // a number for a native range: missing → the control's default; clamped to its range
+  function num(id,v,warn){
+    const el=$(id),lo=+el.min,hi=+el.max,def=+el.defaultValue;
+    if(v==null)return def;
+    if(typeof v!=='number'||!isFinite(v)){warn(NAME[id]+': not a number, using '+def);return def;}
+    if(v<lo){warn(NAME[id]+' '+v+' → '+lo+' (min)');return lo;}
+    if(v>hi){warn(NAME[id]+' '+v+' → '+hi+' (max)');return hi;}
+    return v;
+  }
+  function bool(name,v,def,warn){
+    if(v==null)return def;
+    if(typeof v!=='boolean'){warn(name+': not true/false, using '+def);return def;}
+    return v;
+  }
+  function freq(v,warn){
+    const vals=[...$('fieldBFreq').options].map(o=>+o.value),lo=Math.min(...vals),hi=Math.max(...vals);
+    if(v==null)return 1;
+    if(typeof v!=='number'||!isFinite(v)){warn('field B frequency: not a number, using 1×');return 1;}
+    let k=Math.round(v);if(k!==v)warn('field B frequency '+v+' → '+k+'× (whole numbers only)');
+    if(k<lo||k>hi){const c=Math.min(hi,Math.max(lo,k));warn('field B frequency '+k+'× → '+c+'×');k=c;}
+    return k;
+  }
+  function term(t,i,what){
+    const bad=m=>{throw new Error(what+', term '+(i+1)+': '+m+'.');};
+    if(!t||typeof t!=='object')bad('not a term');
+    const coef=t.coef==null?1:t.coef;
+    if(typeof coef!=='number'||!isFinite(coef))bad('coefficient is not a number');
+    if(!Array.isArray(t.factors))bad('no factors');
+    const factors=t.factors.map(f=>{
+      if(!f||OPTS.indexOf(f.trig)<0)bad('unknown factor “'+(f&&f.trig)+'”');
+      const q={trig:f.trig};
+      for(const k of ['fx','fy','fz']){const v=f[k]==null?1:f[k];if(typeof v!=='number'||!isFinite(v))bad(k+' is not a number');q[k]=v;}
+      return q;});
+    return {on:t.on!==false,coef,factors};
+  }
+  const sameTerms=(a,b)=>a.length===b.length&&a.every((t,i)=>t.on===b[i].on&&t.coef===b[i].coef&&t.factors.length===b[i].factors.length&&
+    t.factors.every((f,j)=>{const g=b[i].factors[j];return f.trig===g.trig&&f.fx===g.fx&&f.fy===g.fy&&f.fz===g.fz;}));
+  // a surface block → {kind:'preset', key} (the app's preset path) or {kind:'terms', preset, terms}
+  function surface(s,what){
+    if(!s||typeof s!=='object')throw new Error('The '+what+' block is missing.');
+    if(s.type==='raw_preset'){
+      let key=s.preset;
+      if(!PRESETS.hasOwnProperty(key))key=Object.keys(PRESETS).find(k=>isRaw(k)&&PRESETS[k]._label===s.label);
+      if(!key)throw new Error('Unknown '+what+' preset “'+(s.preset||s.label)+'”.');
+      return {kind:'preset',key};
+    }
+    if(s.type==='terms'||(s.type==null&&Array.isArray(s.terms))){
+      if(!Array.isArray(s.terms))throw new Error('The '+what+' block has no terms.');
+      const list=s.terms.map((t,i)=>term(t,i,what)),preset=typeof s.preset==='string'?s.preset:'custom';
+      if(isTermsPreset(preset)&&sameTerms(list,PRESETS[preset]))return {kind:'preset',key:preset};
+      return {kind:'terms',preset,terms:list};
+    }
+    throw new Error('Unknown '+what+' type “'+s.type+'”.');
+  }
+  function plan(r,warn){
+    const g=r.geometry&&typeof r.geometry==='object'?r.geometry:{};
+    if(!MODE_BTN[g.mode])throw new Error('Unknown geometry mode “'+g.mode+'”.');
+    const pi=g.mode==='pi-tpms',shell=g.mode==='shell';
+    const P={mode:g.mode,A:surface(r.surface,'surface'),B:{kind:'same'},freq:1,range:{},phase:null,cellMM:null};
+    if(pi){
+      if(r.surface_b!=null)P.B=surface(r.surface_b,'field B');   // v1.0 recipes: no surface_b → same as A
+      P.freq=freq(g.field_b_freq,warn);
+      P.range.sPipeR=num('sPipeR',g.pipe_radius,warn);
+      P.piNorm=bool('normalize',g.pi_normalize,true,warn);
+      const ps=g.phase_shift&&typeof g.phase_shift==='object'?g.phase_shift:{};
+      P.phase={x:num('piX',ps.x,warn),y:num('piY',ps.y,warn),z:num('piZ',ps.z,warn)};
+    } else P.range.sOffset=num('sOffset',g.offset,warn);
+    if(shell){P.range.sWall=num('sWall',g.wall_thickness,warn);P.shellNorm=bool('normalize',g.shell_normalize,true,warn);}
+    P.range.sCells=num('sCells',g.cell_scale,warn);
+    const d=r.display&&typeof r.display==='object'?r.display:null;
+    if(d&&d.cell_size_mm!=null){
+      const v=d.cell_size_mm;
+      if(typeof v!=='number'||!isFinite(v))warn('cell size: not a number, kept '+cellSizeMM+' mm');
+      else if(v<0){warn('cell size '+v+' → 0 mm');P.cellMM=0;}
+      else P.cellMM=v;
+    }
+    return P;   // homogenization results are not restored (re-run: it is quick)
+  }
+  const appTerm=t=>({id:tid++,on:t.on,coef:t.coef,factors:t.factors.map(f=>({...f}))});
+  function apply(P,warn){
+    // one shader rebuild and one surface-change at the end, not one per control
+    const rb=rebuildShader,sc=onSurfaceChange;
+    rebuildShader=function(){};onSurfaceChange=function(){};
+    try{
+      $(MODE_BTN[P.mode]).click();                                   // mode first: it decides which controls exist
+      const ps=$('presetSel');editTarget='A';openTermId=null;         // surface A
+      if(P.A.kind==='preset'){ps.value=P.A.key;loadPreset(P.A.key);}
+      else{if(hasOption(ps,P.A.preset))ps.value=P.A.preset;rawPresetFn=null;terms=P.A.terms.map(appTerm);renderList();}
+      const fb=$('fieldBSel'),ff=$('fieldBFreq');                    // field B, then its frequency
+      if(P.B.kind!=='terms'){fb.value=P.B.kind==='same'?'same':P.B.key;fire(fb,'change');}
+      else{fieldB.src='set';fieldB.raw=null;fieldB.presetKey='custom';fieldB.terms=P.B.terms.map(appTerm);syncFieldBUI();renderList();}
+      ff.value=String(P.freq);fire(ff,'change');
+      for(const id in P.range){                                       // sliders through their native inputs
+        const el=$(id),v=P.range[id];el.value=v;fire(el,'input');fire(el,'change');
+        if(Math.abs(+el.value-v)>1e-9)warn(NAME[id]+' '+v+' → '+(+el.value)+' (slider step)');
+      }
+      if(P.shellNorm!=null&&shellNormalize!==P.shellNorm)$('shellNormToggle').click();
+      if(P.piNorm!=null&&piNormalize!==P.piNorm)$('piNormToggle').click();
+      if(P.phase)['x','y','z'].forEach(a=>setAxisValue(a,P.phase[a],false));
+      if(P.cellMM!=null){const el=$('cellSizeMM');el.value=P.cellMM;fire(el,'input');}   // stored like a typed value
+    }finally{rebuildShader=rb;onSurfaceChange=sc;}
+    updateEq();updateMMHints();rebuildShader();onSurfaceChange();   // results from before go stale
+  }
+  const TOOL={
+    id:'f13ld.tpms',name:'F13LD.tpms',major:1,
+    exportRecipe:()=>buildExportJSON(),
+    looksLike:r=>!!(r.surface&&typeof r.surface==='object'&&r.geometry&&MODE_BTN[r.geometry.mode]),
+    plan,apply,
+    label(){
+      if(rawPresetFn)return rawPresetFn.label;
+      if(!terms.length)return 'custom surface';
+      const o=$('presetSel').selectedOptions[0];return o?o.textContent:'custom surface';
+    }
+  };
+  /* ============ END PER-TOOL =========================================== */
+
+  /* ============ GENERIC (identical across F13LD tools) ================== */
+  // legacy meta.tool values still in use (never rename them: Lab and Mesh route on them)
+  const LEGACY={'noise-scaffold-explorer':'F13LD.noise',grain:'F13LD.grain',beam:'F13LD.beam','beam-builder':'F13LD.beam','bundle-builder':'F13LD.bundle'};
+  const toolName=t=>LEGACY[String(t).toLowerCase()]||String(t).replace(/^f13ld\./i,'F13LD.');
+  const say=(t,o)=>setTimeout(()=>{if(window.F13UI&&F13UI.message)F13UI.message(t,o);},0);
+  function check(r){
+    if(!r||typeof r!=='object'||Array.isArray(r))return 'Not a recipe.';
+    if(!r.meta||typeof r.meta!=='object')return 'Not a recipe: it has no meta block.';
+    const tool=r.meta.tool;
+    if(typeof tool==='string'&&tool&&tool.toLowerCase()!==TOOL.id)return 'This recipe is from '+toolName(tool)+'. Open it there.';
+    if(!tool&&!TOOL.looksLike(r))return 'Not an '+TOOL.name+' recipe.';
+    return '';
+  }
+  // → {ok, warnings, error?, label?, before?}. Unknown keys are ignored; nothing changes unless ok.
+  function applyRecipe(r){
+    const warnings=[],warn=m=>{if(warnings.indexOf(m)<0)warnings.push(m);};
+    const err=check(r);if(err)return {ok:false,error:err,warnings};
+    const v=String(r.meta.version||'1.0');
+    if(parseInt(v,10)>TOOL.major)warn('Made by a newer '+TOOL.name+' ('+v+'); parts it does not know were skipped.');
+    let P;try{P=TOOL.plan(r,warn);}catch(e){return {ok:false,error:e.message,warnings};}
+    const before=TOOL.exportRecipe();
+    try{TOOL.apply(P,warn);}
+    catch(e){console.error(e);try{TOOL.apply(TOOL.plan(before,()=>{}),()=>{});}catch(_){}
+      return {ok:false,error:'Could not apply this recipe ('+e.message+').',warnings};}
+    return {ok:true,warnings,label:TOOL.label(),before};
+  }
+  function importRecipe(r){
+    const res=applyRecipe(r);
+    if(!res.ok){say(res.error);return res;}
+    const w=res.warnings,note=w.length?w.slice(0,3).join(' · ')+(w.length>3?' · +'+(w.length-3)+' more':''):'';
+    say('Imported '+res.label,{note,action:{label:'Undo',run:()=>{
+      const u=applyRecipe(res.before);say(u.ok?'Back to '+u.label+'.':u.error);}}});
+    return res;
+  }
+  // source: 'file' | 'drop' | 'paste'. Pasted text that is not a recipe is ignored quietly.
+  function importText(text,source){
+    let r;
+    try{r=JSON.parse(text);}catch(e){if(source!=='paste')say('That file is not valid JSON.');return null;}
+    if(source==='paste'&&(!r||typeof r!=='object'||!r.meta||typeof r.meta!=='object'))return null;
+    return importRecipe(r);
+  }
+  function readFile(f){
+    if(!/\.json$/i.test(f.name)&&!/json/i.test(f.type)){say('Not a recipe file. Use a .json exported from '+TOOL.name+'.');return Promise.resolve(null);}
+    if(f.size>5e6){say('That file is too large to be a recipe.');return Promise.resolve(null);}
+    return f.text().then(t=>importText(t,'file'),()=>{say('Could not read that file.');return null;});
+  }
+  // Open recipe…
+  const fi=document.createElement('input');fi.type='file';fi.accept='.json,application/json';fi.hidden=true;fi.id='f13r-file';
+  document.body.appendChild(fi);
+  fi.addEventListener('change',()=>{const f=fi.files&&fi.files[0];fi.value='';if(f)readFile(f);});
+  // drop anywhere: overlay while a file is dragged over the window
+  const ov=document.createElement('div');ov.className='f13r-drop';ov.setAttribute('aria-hidden','true');
+  ov.innerHTML='<div class="f13r-card"><span class="f13r-drop-ic"><svg viewBox="0 0 24 24"><path d="M12 15.5V4.6M7.2 9.2 12 4.4l4.8 4.8"/><path d="M5 19.5h14"/></svg></span>'+
+    '<span><b>Drop to open recipe</b><small>'+TOOL.name+' .json</small></span></div>';
+  document.body.appendChild(ov);
+  const hasFiles=e=>!!(e.dataTransfer&&[...e.dataTransfer.types].indexOf('Files')>=0);
+  let hideT=0;
+  const overlay=on=>{clearTimeout(hideT);ov.classList.toggle('on',on);};
+  window.addEventListener('dragenter',e=>{if(hasFiles(e)){e.preventDefault();overlay(true);}});
+  window.addEventListener('dragover',e=>{if(!hasFiles(e))return;e.preventDefault();e.dataTransfer.dropEffect='copy';
+    overlay(true);hideT=setTimeout(()=>overlay(false),400);});   // dragover repeats while inside; silence = gone
+  window.addEventListener('dragleave',e=>{if(!e.relatedTarget)overlay(false);});
+  window.addEventListener('drop',e=>{if(!hasFiles(e))return;e.preventDefault();overlay(false);
+    const fs=[...e.dataTransfer.files],f=fs.find(x=>/\.json$/i.test(x.name))||fs[0];if(f)readFile(f);});
+  // paste (Ctrl/Cmd+V) outside text fields
+  const typing=t=>!!t&&(t.isContentEditable||/^(TEXTAREA|SELECT)$/.test(t.tagName)||
+    (t.tagName==='INPUT'&&!/^(checkbox|radio|range|button|submit|reset|file|color)$/i.test(t.type)));
+  document.addEventListener('paste',e=>{
+    if(typing(e.target)||typing(document.activeElement))return;
+    const s=((e.clipboardData&&e.clipboardData.getData('text/plain'))||'').trim();
+    if(s[0]!=='{'||s.length>5e6)return;
+    if(importText(s,'paste'))e.preventDefault();
+  });
+  window.F13Recipe={apply:applyRecipe,importRecipe,importText,readFile,open:()=>fi.click(),TOOL};
+})();
+</script>
+<!-- =====================  END F13LD RECIPE IMPORT  ===================== -->
 </body>
 </html>
 

@@ -87,7 +87,7 @@ where Hᵢ are the MIL fabric tensor eigenvalues.
 
 ## Usage
 
-Open [https://mshomper.github.io/tpms-builder](https://mshomper.github.io/f13ld.tpms) in any modern browser with WebGL support (Chrome, Firefox, Edge, Safari).
+Open [https://mshomper.github.io/f13ld.tpms](https://mshomper.github.io/f13ld.tpms) in any modern browser with WebGL support (Chrome, Firefox, Edge, Safari).
 
 No login, no install, no data sent anywhere — everything runs locally in your browser.
 

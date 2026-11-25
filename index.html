@@ -2,184 +2,344 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TPMS Builder — Radial</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>F13LD.tpms</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
+/* ── Tokens (OKLCH). Depth comes from lighter surfaces: bg < panel < card < input. ── */
+:root{
+  --bg:oklch(0.13 0.012 265);
+  --panel:oklch(0.17 0.014 265);
+  --card:oklch(0.215 0.016 265);
+  --input:oklch(0.255 0.018 265);
+  --hair:oklch(1 0 0 / 0.09);
+  --hair-strong:oklch(1 0 0 / 0.17);
+  --ink:oklch(0.95 0.01 265);          /* 16.5:1 on panel */
+  --ink-dim:oklch(0.75 0.018 265);     /* 8.6:1 on panel  */
+  --ink-faint:oklch(0.60 0.018 265);   /* 4.8:1 on panel  */
+  --accent:oklch(0.908 0.201 123);     /* TPMS lime (#c8f542) — the one action colour */
+  --accent-ink:oklch(0.22 0.06 125);   /* dark text on lime */
+  --accent-soft:oklch(0.908 0.201 123 / 0.14);
+  --accent-line:oklch(0.908 0.201 123 / 0.45);
+  --family:oklch(0.76 0.105 168);      /* TPMS family teal (#5ecaa5), wordmark only */
+  --axis-x:oklch(0.797 0.134 211.5);   /* #22d3ee */
+  --axis-y:oklch(0.748 0.207 322.2);   /* #e879f9 */
+  --axis-z:oklch(0.861 0.173 91.9);    /* #facc15 */
+  --warn:oklch(0.807 0.126 74.3);
+  --danger:oklch(0.68 0.19 25);
+  --lq-ink:var(--ink);--lq-ink-dim:var(--ink-dim);--lq-ink-faint:var(--ink-faint);
+  --lq-font:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --lq-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --hdr-h:48px;
+  --pane-w:clamp(400px,30vw,440px);
+  --rail-w:56px;
+  --peek:45dvh;
+  --full:88dvh;
+  --ease:cubic-bezier(.4,0,.2,1);
+}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{min-height:100%;background:#06080f;color:#e0e0ff;font-family:system-ui,sans-serif}
-#wrap{max-width:1100px;margin:0 auto;padding:20px 16px}
-h1{font-size:13px;font-weight:500;color:#7c8aaa;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px}
-#cw{position:relative;background:#06080f;border-radius:12px 12px 0 0;overflow:hidden;border:0.5px solid #2a2a3a}
-canvas#c{display:block;width:100%;touch-action:none}
+html,body{height:100%;background:var(--bg);color:var(--ink);font:400 13px/1.45 var(--lq-font);overflow:hidden;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+.ic{width:16px;height:16px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;display:block}
+.ic.sm{width:14px;height:14px}
+/* 44px hit areas: the drawn element may be smaller; ::after carries the hit box */
+.hit{position:relative}
+.hit::after{content:'';position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+
+/* ── Shell ── */
+#app{height:100dvh;display:flex;flex-direction:column}
+#main{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) var(--pane-w)}
+#viewPane{position:relative;min-width:0;min-height:0}
+#cw{position:absolute;inset:0;background:var(--bg);overflow:hidden}
+canvas#c{display:block;width:100%;height:100%;touch-action:none}
 #axisCanvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:12}
-#qualityOverlay{position:absolute;bottom:10px;left:10px;display:flex;gap:4px;z-index:10}
-#qualityOverlay button{background:rgba(6,8,15,0.85);color:#555;border:0.5px solid #2a2a3a;border-radius:5px;font-size:10px;padding:3px 7px;cursor:pointer;transition:color 0.15s,border-color 0.15s}
-#qualityOverlay button.active{color:#c8f542;border-color:#c8f542}
-#clipOverlay{position:absolute;bottom:44px;left:10px;display:flex;gap:6px;z-index:10}
-.clip-pill{background:rgba(6,8,15,0.85);color:#555;border:0.5px solid #2a2a3a;border-radius:5px;font-size:11px;font-weight:600;letter-spacing:0.04em;padding:4px 9px;cursor:pointer;transition:color 0.15s,border-color 0.15s;font-family:inherit;line-height:1}
-#panel{background:#111118;border:0.5px solid #2a2a3a;border-top:none;border-radius:0 0 12px 12px;padding:12px 14px}
-.termcard{background:#0e0e1a;border:0.5px solid #2a2a3a;border-radius:8px;padding:8px 10px;margin-bottom:6px}
-.termcard.off{opacity:0.35}
-.term-hdr{display:flex;align-items:center;gap:6px;margin-bottom:6px}
-.coef-lbl{font-size:11px;color:#555;white-space:nowrap}
-.coef-inp{width:58px;font-size:12px;padding:2px 4px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff;text-align:center}
-.factor-row{display:grid;grid-template-columns:14px 86px 14px 1fr 14px 1fr 14px 1fr 20px;gap:3px 4px;align-items:center;margin-bottom:3px}
-.fdot{font-size:13px;color:#555;text-align:center;font-weight:500}
-.flbl{font-size:10px;color:#555;text-align:center}
-.fsel{font-size:11px;padding:2px 2px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff;width:100%}
-.finp{font-size:12px;padding:2px 3px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff;width:100%;text-align:center}
-.delf{font-size:14px;background:none;border:none;color:#555;cursor:pointer;padding:0;text-align:center;width:100%;line-height:1}
-.delf:hover{color:#e24b4a}
-.delf:disabled{opacity:0.18;cursor:default}
-.addf-btn{font-size:11px;padding:2px 9px;border:0.5px solid #2a2a3a;border-radius:20px;background:transparent;color:#666;cursor:pointer;margin-top:4px;display:inline-block}
-.addf-btn:hover{color:#e0e0ff;border-color:#3a3a5a}
-.tog{font-size:10px;padding:2px 6px;border:0.5px solid #3a3a5a;border-radius:12px;background:transparent;color:#888;cursor:pointer}
-.tog.on{background:#7c6ff7;color:#fff;border-color:#7c6ff7}
-.del-term{font-size:15px;background:none;border:none;color:#555;cursor:pointer;padding:0 2px;line-height:1;margin-left:auto}
-.del-term:hover{color:#e24b4a}
-#toolbar{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
-#toolbar button{font-size:12px;padding:3px 10px;border:0.5px solid #3a3a5a;border-radius:20px;background:transparent;color:#888;cursor:pointer}
-#toolbar button:hover{background:#1a1a2e;color:#e0e0ff}
-#eqbar-wrap{margin-bottom:8px}
-#eqbar-label{font-size:10px;color:#c8f542;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px}
-#eqbar{font-size:14px;font-family:monospace;color:#aaa;padding:10px 12px;background:#060e0a;border:0.5px solid #c8f542;border-radius:8px;line-height:2;word-break:break-all;min-height:36px;box-shadow:0 0 12px rgba(200,245,66,0.07)}
-#eqbar b{color:#e0e0ff;font-weight:600}
-.divider{border:none;border-top:0.5px solid #2a2a3a;margin:10px 0}
-.surf-controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:8px}
-.sc-group{display:flex;align-items:center;gap:6px}
-.sc-group label{font-size:12px;color:#888;white-space:nowrap}
-.sc-group input[type=range]{width:88px;accent-color:#7c6ff7}
-.sc-group .sv{font-size:12px;font-weight:500;color:#e0e0ff;min-width:38px;font-variant-numeric:tabular-nums}
-.mm-hint{font-size:10px;color:#666;font-variant-numeric:tabular-nums;margin-left:2px;white-space:nowrap}
-.mm-hint.show{color:#7a8aaa}
-.cellsize-inp{width:50px;font-size:11px;padding:2px 4px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff;text-align:center}
-.mode-btn{font-size:11px;padding:3px 10px;border:0.5px solid #3a3a5a;border-radius:20px;background:transparent;color:#888;cursor:pointer}
-.mode-btn.active{background:#7c6ff7;color:#fff;border-color:#7c6ff7}
-/* PI-TPMS mode button gets distinct accent */
-.mode-btn.pi-active{background:#c8ff80;color:#0a1a00;border-color:#c8ff80;font-weight:600}
-.mode-strip{display:flex;gap:4px}
-/* PI-TPMS shift controls */
-#pi-controls{display:none;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:8px;padding:8px 10px;background:#0a1a0a;border:0.5px solid #1a4a1a;border-radius:8px}
-#pi-controls.visible{display:flex}
-#pi-controls label.pi-lbl{font-size:11px;color:#7aaa7a;white-space:nowrap}
-#pi-controls .pi-title{font-size:10px;color:#c8ff80;text-transform:uppercase;letter-spacing:0.08em;width:100%;margin-bottom:2px}
-.pi-snap{display:flex;flex-direction:column;gap:2px}
-.pi-snap input[type=range]{width:88px;accent-color:#c8ff80}
-.pi-snap .snap-ticks{display:flex;justify-content:space-between;width:88px}
-.pi-snap .snap-ticks span{font-size:7px;color:#3a6a3a}
-.pi-val{font-size:11px;font-weight:500;color:#c8ff80;min-width:28px;font-variant-numeric:tabular-nums}
-.pi-norm-toggle,.pi-snap-toggle{font-size:11px;padding:3px 11px;border:0.5px solid #1a4a1a;border-radius:14px;background:transparent;color:#7aaa7a;cursor:pointer;font-family:inherit;transition:background 0.15s,color 0.15s,border-color 0.15s}
-.pi-norm-toggle:hover,.pi-snap-toggle:hover{color:#c8ff80;border-color:#2a6a2a}
-.pi-norm-toggle.on,.pi-snap-toggle.on{background:#1a4a1a;color:#c8ff80;border-color:#c8ff80}
-.pi-norm-toggle.on:hover,.pi-snap-toggle.on:hover{background:#205820}
-.pi-num-inp{display:none;width:58px;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:2px 4px;background:#0e1e0e;border:0.5px solid #1a4a1a;border-radius:4px;color:#c8ff80;text-align:center;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
-.pi-num-inp::-webkit-outer-spin-button,.pi-num-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-.pi-num-inp:focus{outline:none;border-color:#c8ff80}
-.pi-chips{display:none;align-items:center;gap:6px;width:100%;margin-top:6px;padding-top:8px;border-top:0.5px solid #1a2a1a;flex-wrap:wrap}
-.pi-chips-label{font-size:11px;color:#7aaa7a}
-.pi-chip{font-size:11px;padding:3px 11px;border:0.5px solid #1a4a1a;border-radius:14px;background:transparent;color:#c8ff80;cursor:pointer;font-family:inherit;transition:background 0.15s,border-color 0.15s}
-.pi-chip:hover{background:#1a4a1a;border-color:#c8ff80}
-#pi-controls.snap-off .snap-ticks{display:none}
-#pi-controls.snap-off .pi-val{display:none}
-#pi-controls.snap-off .pi-num-inp{display:inline-block}
-#pi-controls.snap-off .pi-chips{display:flex}
-.pi-sel{font-size:11px;padding:2px 4px;background:#0e1e0e;border:0.5px solid #1a4a1a;border-radius:5px;color:#c8ff80;font-family:inherit;cursor:pointer}
-.pi-sel:focus{outline:none;border-color:#c8ff80}
-#pi-warn{display:none;width:100%;font-size:11px;line-height:1.5;color:#f0b35b;background:rgba(240,179,91,0.06);border:0.5px solid #5a4214;border-radius:6px;padding:5px 9px}
-.ab-tabs{display:flex;gap:4px;margin-bottom:6px;align-items:center;flex-wrap:wrap}
-.ab-tab{font-size:11px;padding:3px 12px;border:0.5px solid #3a3a5a;border-radius:14px;background:transparent;color:#888;cursor:pointer;font-family:inherit}
-.ab-tab.on{background:#1a4a1a;color:#c8ff80;border-color:#c8ff80}
-.ab-hint{font-size:10px;color:#555;margin-left:4px}
-.homo-controls{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:10px}
-.homo-controls label{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
-.homo-controls select,.homo-controls input[type=number]{font-size:12px;padding:2px 4px;background:#1a1a2e;border:0.5px solid #3a3a5a;border-radius:5px;color:#e0e0ff}
-.homo-controls select{width:70px}
-.homo-controls input[type=number]{width:56px;text-align:center}
-#runBtn{font-size:12px;padding:4px 14px;border:0.5px solid #7c6ff7;border-radius:20px;background:#7c6ff7;color:#fff;cursor:pointer;font-weight:500}
-#runBtn:hover{background:#6a5ef0}
-#runBtn:disabled{opacity:0.5;cursor:default}
-.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
-.metric{background:#0e0e1a;border:0.5px solid #2a2a3a;border-radius:8px;padding:7px 8px;text-align:center}
-.metric .mv{font-size:16px;font-weight:500;color:#e0e0ff}
-.metric .ml{font-size:10px;color:#555;margin-top:1px}
-.metric .mu{font-size:10px;color:#888}
-#viz-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.viz-card{background:#0e0e1a;border:0.5px solid #2a2a3a;border-radius:8px;padding:8px}
-.viz-title{font-size:10px;color:#555;margin-bottom:5px}
-canvas.vcv{width:100%;display:block}
+#ctrlPane{position:relative;min-height:0;min-width:0;display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);background:var(--panel);border-left:1px solid var(--hair)}
+#sectionsRail{grid-column:1;grid-row:1;min-height:0;position:relative}
+#ctrlScroll{grid-column:2;grid-row:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 14px,#000 calc(100% - 18px),transparent 100%);
+          mask-image:linear-gradient(to bottom,transparent 0,#000 14px,#000 calc(100% - 18px),transparent 100%)}
+#sheetHandle,#sectionsBar{display:none}
+
+/* ── Sections ── */
+.sec{padding:20px 16px 22px 4px;border-bottom:1px solid var(--hair);min-width:0}
+.sec:last-child{border-bottom:none;padding-bottom:40px}
+.sec-h{display:flex;align-items:baseline;gap:8px;font-size:15px;font-weight:600;color:var(--ink);letter-spacing:0.01em;margin-bottom:14px}
+.sec-h .sec-n{font:500 11px/1 var(--lq-mono);color:var(--ink-faint)}
+.sub-h{font-size:11px;font-weight:600;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.08em;margin:14px 0 6px;display:flex;align-items:center}
+
+/* ── Control rows (help system ROW_SEL = .sc-group) ── */
+.sc-group{display:flex;align-items:center;gap:8px;min-width:0}
+.sc-group>label,.lbl{font-size:13px;color:var(--ink-dim);white-space:nowrap;display:inline-flex;align-items:center}
+.sc-group .sv{font:500 13px/1 var(--lq-mono);color:var(--ink);font-variant-numeric:tabular-nums;text-align:right;min-width:44px}
+.mm-hint{font:400 11px/1 var(--lq-mono);color:var(--ink-faint);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.mm-hint.show{color:var(--ink-faint)}
+/* slider row: label · mm hint · value on top, full-width slider beneath */
+.sl{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:8px;margin:2px 0 4px}
+.sl>label{grid-column:1;grid-row:1}
+.sl>.mm-hint{grid-column:2;grid-row:1;justify-self:end}
+.sl>.sv,.sl>.pi-num-inp{grid-column:3;grid-row:1}
+.sl>input[type=range]{grid-column:1/-1;grid-row:2}
+.sl>.row-extra{grid-column:1/-1;grid-row:3}
+input[type=range]{width:100%;height:44px;margin:0;accent-color:var(--accent);background:transparent;cursor:pointer;touch-action:pan-y}
+/* text / number / select fields */
+.fld,.cellsize-inp,.coef-inp,.finp,.fsel,.pi-sel,.pi-num-inp,.homo-controls select,.homo-controls input[type=number],#presetSel{
+  height:44px;min-width:44px;padding:0 10px;background:var(--input);border:1px solid transparent;border-radius:10px;color:var(--ink);
+  font:400 13px var(--lq-font);outline:none;transition:border-color .15s var(--ease)}
+.cellsize-inp,.coef-inp,.finp,.pi-num-inp,.homo-controls input[type=number]{font-family:var(--lq-mono);text-align:center;font-variant-numeric:tabular-nums;-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.fld:focus,.cellsize-inp:focus,.coef-inp:focus,.finp:focus,.fsel:focus,.pi-sel:focus,.pi-num-inp:focus,.homo-controls select:focus,.homo-controls input:focus,#presetSel:focus{border-color:var(--accent-line)}
+select{cursor:pointer}
+.cellsize-inp{width:72px}
+.unit{font-size:13px;color:var(--ink-faint)}
+
+/* ── Switch (normalize, term on/off) ── */
+.sw{display:inline-flex;align-items:center;gap:8px;min-height:44px;background:none;border:0;padding:0 2px;color:var(--ink-dim);font-size:13px;white-space:nowrap}
+.sw-t{position:relative;width:30px;height:18px;border-radius:9px;background:var(--input);box-shadow:inset 0 0 0 1px var(--hair-strong);transition:background .18s var(--ease);flex:0 0 auto}
+.sw-t::after{content:'';position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--ink-faint);transition:transform .18s var(--ease),background .18s var(--ease)}
+.sw.on .sw-t{background:var(--accent);box-shadow:none}
+.sw.on .sw-t::after{transform:translateX(12px);background:var(--accent-ink)}
+.sw:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;border-radius:8px}
+
+/* ── Surface ── */
+#presetSel{width:100%;flex:1;min-width:0}
+#grp-preset{flex-wrap:wrap}
+#grp-preset>label{width:100%;font-size:11px;font-weight:600;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.08em}
+#eqbar-wrap{margin:14px 0 10px}
+#eqbar-label{font-size:11px;font-weight:600;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;display:flex;align-items:center}
+#eqbar{font:400 15px/1.75 var(--lq-mono);color:var(--ink-dim);padding:10px 12px;background:var(--card);border:1px solid var(--accent-line);border-radius:12px;min-height:44px;overflow-wrap:break-word;word-break:normal}
+#eqbar b{color:var(--ink);font-weight:500;display:inline-block;max-width:100%;overflow-wrap:anywhere}
+#eqbar sub{font-size:11px}
+#eqbar .eq-dim{color:var(--ink-faint)}
+#eqbar .eq-at{color:var(--ink-faint);font-size:13px}
+/* term list: one line per term, tap to edit in place */
+.term{background:var(--card);border-radius:12px;margin-bottom:6px;min-width:0}
+.term-line{display:flex;align-items:center;gap:2px;min-height:44px;padding:0 2px 0 2px}
+.term-line .tog{min-width:44px;justify-content:center}
+.term-expr{flex:1;min-width:0;min-height:44px;display:flex;align-items:center;gap:6px;background:none;border:0;text-align:left;font:400 13px/1.35 var(--lq-mono);color:var(--ink);padding:6px 4px;overflow-wrap:anywhere}
+.term-expr .chev{margin-left:auto;color:var(--ink-faint);transition:transform .2s var(--ease)}
+.term.open .term-expr .chev{transform:rotate(180deg)}
+.term.off .term-expr{color:var(--ink-faint)}
+.term.off .term-expr .tx{text-decoration:line-through;text-decoration-color:var(--hair-strong)}
+.term-ed{padding:4px 10px 10px;border-top:1px solid var(--hair)}
+.ed-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.coef-inp{width:72px}
+.coef-lbl{font-size:13px;color:var(--ink-dim);white-space:nowrap}
+.fac-head,.factor-row{display:grid;grid-template-columns:14px minmax(76px,1fr) 46px 46px 46px 40px;gap:4px;align-items:center}
+.fac-head{margin-top:4px}
+.fac-head span{font-size:11px;color:var(--ink-faint);text-align:center}
+.fac-head span:nth-child(2){text-align:left;padding-left:2px}
+.factor-row{margin-bottom:4px}
+.fdot{font:500 13px var(--lq-mono);color:var(--ink-faint);text-align:center}
+.fsel{width:100%;padding:0 6px;font-family:var(--lq-mono)}
+.finp{width:100%;padding:0 2px}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:44px;background:none;border:0;border-radius:10px;color:var(--ink-faint);transition:color .15s var(--ease),background .15s var(--ease)}
+.icon-btn:hover{color:var(--ink);background:var(--input)}
+.icon-btn.danger:hover{color:var(--danger)}
+.icon-btn:disabled{opacity:0.25;cursor:default;background:none}
+.del-term{margin-left:auto}
+.ghost-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 14px;background:none;border:1px dashed var(--hair-strong);border-radius:12px;color:var(--ink-dim);font-size:13px;transition:color .15s var(--ease),border-color .15s var(--ease)}
+.ghost-btn:hover{color:var(--ink);border-color:var(--ink-faint)}
+.addf-btn{margin-top:4px;min-height:40px;border-radius:10px}
+#addBtn{width:100%;margin-top:4px}
+.term-note{font-size:13px;color:var(--ink-faint);padding:10px 4px;line-height:1.5}
+.ab-tabs{display:flex;gap:6px;margin-bottom:8px;align-items:center;flex-wrap:wrap}
+.ab-tab{min-height:36px;padding:0 14px;border:1px solid var(--hair-strong);border-radius:999px;background:transparent;color:var(--ink-dim);font-size:13px}
+.ab-tab.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-line)}
+.ab-hint{font-size:11px;color:var(--ink-faint);width:100%}
+
+/* ── Volume ── */
+#grp-mode{margin-bottom:8px}
+#grp-mode>label{min-width:52px}
+.mode-strip{flex:1;min-width:0;display:flex;gap:2px;padding:3px;background:var(--input);border-radius:13px}
+.mode-btn{flex:1 1 0;min-width:0;height:38px;padding:0 6px;border:0;border-radius:10px;background:transparent;color:var(--ink-dim);font-size:13px;font-weight:500;white-space:nowrap;transition:background .18s var(--ease),color .18s var(--ease)}
+.mode-btn{position:relative}
+.mode-btn::after{content:'';position:absolute;left:0;right:0;top:-3px;bottom:-3px}
+.mode-btn:hover{color:var(--ink)}
+.mode-btn.active,.mode-btn.pi-active{background:var(--accent);color:var(--accent-ink)}
+#pi-controls{display:none;margin-top:10px;padding:12px 12px 10px;background:var(--card);border-radius:14px}
+#pi-controls.visible{display:block}
+.pi-title{font-size:11px;font-weight:600;color:var(--ink-dim);text-transform:uppercase;letter-spacing:0.06em;display:flex;align-items:center;gap:6px;line-height:1.4;margin-bottom:4px}
+.pi-title .ic{color:var(--accent)}
+#pi-controls .sc-group{flex-wrap:wrap}
+#pi-controls label.pi-lbl{font-size:13px;color:var(--ink-dim);white-space:nowrap}
+.pi-sel{flex:1;min-width:0}
+#fieldBFreq{flex:0 0 72px}
+.pi-val{display:none}
+.pi-num-inp{width:68px;font-size:13px}
+/* phase-shift rows: label · slider · typed value on one line */
+#pi-controls .sl{grid-template-columns:44px minmax(0,1fr) auto;margin:0}
+#pi-controls .sl>input[type=range]{grid-column:2;grid-row:1}
+.pi-chips{display:flex;align-items:center;gap:0 3px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px solid var(--hair)}
+.pi-chips-label{font-size:11px;color:var(--ink-faint);margin-right:2px}
+.pi-chip{min-height:44px;min-width:44px;padding:0;background:none;border:0;color:var(--ink-dim);font-size:13px}
+.pi-chip>span{display:block;padding:5px 8px;border:1px solid var(--hair-strong);border-radius:999px;transition:background .15s var(--ease),border-color .15s var(--ease),color .15s var(--ease)}
+.pi-chip:hover>span{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+#pi-warn{display:none;font-size:13px;line-height:1.5;color:var(--warn);background:oklch(0.807 0.126 74.3 / 0.08);border-radius:10px;padding:8px 10px;margin-top:8px}
+#pi-warn .ic{display:inline-block;vertical-align:-3px;margin-right:6px}
+
+/* ── Cell ── */
+#grp-cellsize{margin:2px 0 10px}
+#grp-cellsize>label{min-width:64px}
+.phys{background:var(--card);border-radius:12px;padding:10px 12px}
+.phys-h{font-size:11px;font-weight:600;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px}
+.phys dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.phys dt{font-size:13px;color:var(--ink-dim)}
+.phys dd{font:500 13px var(--lq-mono);color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+.phys .pr[hidden]{display:none}
+.phys .pr{display:contents}
+.phys-note{font-size:11px;color:var(--ink-faint);margin-top:6px;line-height:1.45}
+
+/* ── Analyze ── */
+.homo-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.homo-controls .sc-group{flex-direction:column;align-items:stretch;gap:4px}
+.homo-controls .sc-group>label{font-size:11px;color:var(--ink-faint)}
+.homo-controls select,.homo-controls input[type=number]{width:100%}
+#runBtn{width:100%;height:44px;border:0;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-size:15px;font-weight:600;transition:filter .15s var(--ease),transform .1s var(--ease)}
+#runBtn:hover{filter:brightness(1.06)}
+#runBtn:active{transform:scale(0.985)}
+#runBtn:disabled{opacity:0.55;cursor:default;transform:none}
+#homo-status{font:400 11px/1.4 var(--lq-mono);color:var(--ink-dim);margin:8px 0;min-height:15px}
 #homo-results{display:none}
-#homo-status{font-size:11px;color:#555;margin-bottom:7px;min-height:15px}
-.homo-method{font-size:11px;line-height:1.5;margin:2px 0 8px;padding:6px 9px;border-radius:6px;border:0.5px solid #2a2a3a;background:#0e0e1a;color:#9aa0b8}
-.homo-method b{color:#e0e0ff;font-weight:600}
-.homo-method.pred{border-color:#1a4a1a;background:#0a1a0a}
-.homo-method.pred b{color:#c8ff80}
-.homo-method.bound b{color:#f0b35b}
-.homo-method .warn{color:#f0b35b}
-.vixiv-link{display:inline-flex;align-items:center;vertical-align:middle;padding:2px 7px;margin:0 3px 0 0;border:0.5px solid #2e4a2e;border-radius:5px;background:rgba(200,255,128,0.04);transition:border-color .15s,background .15s}
-.vixiv-link:hover{border-color:#c8ff80;background:rgba(200,255,128,0.1)}
-.vixiv-link:focus-visible{outline:2px solid #c8ff80;outline-offset:2px}
+.homo-method{font-size:13px;line-height:1.5;margin:2px 0 10px;padding:8px 10px;border-radius:10px;background:var(--card);color:var(--ink-dim)}
+.homo-method b{color:var(--ink);font-weight:600}
+.homo-method.pred b{color:var(--accent)}
+.homo-method.bound b{color:var(--warn)}
+.homo-method .warn{color:var(--warn)}
+.vixiv-link{display:inline-flex;align-items:center;vertical-align:middle;padding:2px 7px;margin:0 4px 0 0;border:1px solid var(--hair-strong);border-radius:6px;background:oklch(1 0 0 / 0.03);transition:border-color .15s,background .15s}
+.vixiv-link:hover{border-color:var(--accent-line);background:var(--accent-soft)}
+.vixiv-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .vixiv-link img{height:13px;width:auto;display:block}
 .method-note .vixiv-link{padding:1px 5px;margin:0 2px}
-.method-note .vixiv-link img{height:10px}
-.method-note{font-size:10px;color:#555;margin-top:8px;line-height:1.5;border-top:0.5px solid #2a2a3a;padding-top:7px}
-#footer{font-size:11px;color:#444;margin-top:7px}
-.bell-row{display:grid;grid-template-columns:26px 1fr 52px;gap:4px;align-items:center;margin-bottom:5px}
-.bell-lbl{font-size:11px;font-weight:500;text-align:center}
-.bell-val{font-size:10px;font-variant-numeric:tabular-nums;text-align:right;padding-left:4px}
-.bounds-section{margin-top:10px}
-.bounds-title{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
-.bounds-note{font-size:10px;color:#444;margin-bottom:8px;line-height:1.5}
-.bell-row{display:grid;grid-template-columns:26px 1fr 52px;gap:4px;align-items:center;margin-bottom:5px}
-.bell-lbl{font-size:11px;font-weight:500;text-align:center}
-.bell-val{font-size:10px;font-variant-numeric:tabular-nums;text-align:right;padding-left:4px;line-height:1.4}
-.f13ld-header{display:flex;align-items:center;justify-content:space-between;background:#06080f;border-bottom:0.5px solid #1a2a1a;padding:0 14px;height:48px;flex-shrink:0;font-family:'Exo 2',system-ui,sans-serif;}
+.method-note .vixiv-link img{height:11px}
+#viz-row{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin-bottom:8px}
+.viz-card{background:var(--card);border-radius:12px;padding:10px}
+.viz-title{font-size:11px;color:var(--ink-faint);margin-bottom:6px}
+canvas.vcv{width:100%;display:block}
+#metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+#metric-grid>.metric:last-child:nth-child(3n+1){grid-column:1/-1}
+.metrics{display:grid;gap:6px}
+.metric{background:var(--card);border-radius:10px;padding:8px 6px;text-align:center;min-width:0}
+.metric .mv{font:500 20px/1.2 var(--lq-mono);color:var(--ink);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.metric .ml{font-size:11px;color:var(--ink-dim);margin-top:2px}
+.metric .mu{font-size:11px;color:var(--ink-faint)}
+.metric.sav{text-align:left;padding:10px}
+.sav-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px}
+.sav-row #sav-bar-wrap{order:3;flex-basis:100%}
+.zener-row{display:flex;align-items:center;gap:6px;margin:6px 0 4px}
+.zener-k{font-size:13px;color:var(--ink-dim)}
+#zener-val{font:500 15px var(--lq-mono);color:var(--ink-dim);min-width:32px}
+#zener-label{font-size:13px;color:var(--ink-faint);flex:1;text-align:right}
+.zener-track{position:relative;height:5px;background:var(--input);border-radius:3px;margin-bottom:4px}
+.zener-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-dim);font-weight:500}
+.bell-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:6px !important}
+#bell-title{font-size:11px;font-weight:600;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
+#bell-sub{font-size:11px;color:var(--ink-faint);margin-bottom:6px;line-height:1.5}
+#homog-mm-row{margin-top:8px;padding:8px 10px;background:var(--card);border-radius:10px;font-size:11px;color:var(--ink-dim);flex-wrap:wrap;gap:4px 12px;justify-content:space-between}
+#homog-mm-row b{color:var(--ink);font-weight:500;font-family:var(--lq-mono)}
+.method-note{font-size:11px;color:var(--ink-faint);margin-top:10px;line-height:1.5;border-top:1px solid var(--hair);padding-top:8px}
+#exportBtn{width:100%;margin-top:12px;border-style:solid}
+#exportBtn.has-homog{border-color:var(--accent-line);color:var(--accent)}
+#exportBtn.done{border-color:var(--accent);color:var(--accent)}
+#footer{font-size:11px;color:var(--ink-faint);margin-top:12px;line-height:1.5}
+
+/* ── Viewer overlays ── */
+.vw-bl{position:absolute;left:10px;bottom:10px;z-index:14;display:flex;align-items:center;gap:6px}
+#clipOverlay{display:flex;align-items:center;gap:2px;padding:0 4px 0 10px;height:40px;background:oklch(0.13 0.012 265 / 0.82);border:1px solid var(--hair);border-radius:12px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.clip-lbl{font-size:11px;color:var(--ink-faint);margin-right:4px}
+.clip-pill{width:36px;height:30px;display:inline-flex;align-items:center;justify-content:center;background:transparent;color:var(--ink-dim);border:1px solid transparent;border-radius:8px;font:600 13px/1 var(--lq-font);transition:color .15s var(--ease),border-color .15s var(--ease),background .15s var(--ease)}
+.clip-pill:hover{color:var(--ink)}
+.clip-pill.active{background:oklch(1 0 0 / 0.06)}
+#cw .f13v{top:10px;left:10px}
+#cw .f13v>button{display:inline-flex;align-items:center;gap:6px;height:44px;padding:0 12px;font:500 13px var(--lq-font);color:var(--ink-dim);background:oklch(0.13 0.012 265 / 0.82);border:1px solid var(--hair);border-radius:12px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#cw .f13v>button:hover,#cw .f13v>button[aria-expanded=true]{color:var(--ink);border-color:var(--hair-strong)}
+#cw .f13v-p{background:oklch(0.17 0.014 265 / 0.95);border:1px solid var(--hair);border-radius:12px;padding:6px 12px 8px 10px;font:400 13px var(--lq-font)}
+#cw .f13v-p label{font-size:13px;color:var(--ink);min-height:36px}
+#cw .f13v-p input{width:16px;height:16px;accent-color:var(--accent)}
+#cw .f13v-p .f13v-r{font:400 13px var(--lq-font);color:var(--ink-dim);border:1px solid var(--hair-strong);border-radius:8px;padding:6px 12px}
+
+/* ── Header (shared F13LD markup, restyled to tokens) ── */
+.f13ld-header{display:flex;align-items:center;justify-content:space-between;background:var(--bg);border-bottom:1px solid var(--hair);padding:0 14px;padding-top:env(safe-area-inset-top);min-height:48px;flex:0 0 auto;font-family:'Exo 2',system-ui,sans-serif;position:relative;z-index:60}
 .fh-left{display:flex;align-items:center;gap:10px}
 .fh-brand{display:flex;align-items:center;gap:8px;text-decoration:none}
 .fh-wordmark{font-size:17px;font-weight:700;letter-spacing:0.1em;line-height:1}
-.fh-divider{width:0.5px;height:24px;background:#1a2a1a}
-.fh-tool-name{font-size:15px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;line-height:1}
-.fh-right{display:flex;align-items:center;gap:10px}
-.fh-version{font-size:10px;color:#2a3a2a;letter-spacing:0.1em;font-family:'Exo 2',system-ui,sans-serif}
+.fh-divider{width:1px;height:24px;background:var(--hair)}
+.fh-tool-name{font-size:15px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;line-height:1;color:var(--family)}
+.fh-right{display:flex;align-items:center;gap:8px}
+.fh-version{font-size:11px;color:var(--ink-faint);letter-spacing:0.08em;font-family:'Exo 2',system-ui,sans-serif}
 .fh-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.fh-mesh-btn{font-size:11px;padding:4px 12px;border:0.5px solid #1D9E75;border-radius:20px;background:rgba(29,158,117,0.08);color:#1D9E75;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap;transition:background 0.15s}
-.fh-mesh-btn:hover{background:rgba(29,158,117,0.18)}
-/* ── Header handoff buttons (same in every F13LD design tool) ──
-   Short labels so they fit on phones; each tooltip carries the full name.
-   Queue's ▾ (pick which queue) is joined to the Queue pill as one split control. */
+.fh-mesh-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--hair-strong);border-radius:999px;background:var(--card);color:var(--ink-dim);font:500 13px var(--lq-font);white-space:nowrap;transition:color .15s var(--ease),border-color .15s var(--ease),background .15s var(--ease)}
+.fh-mesh-btn:hover{color:var(--ink);border-color:var(--ink-faint)}
+.fh-mesh-btn::after{content:'';position:absolute;left:0;right:0;top:50%;height:44px;transform:translateY(-50%)}
+/* Queue button comes from the external queue client: its icon is a drawn SVG mask, so it survives text changes */
+.f13ldq-main::before,#f13ldq-fallback::before{content:'';width:16px;height:16px;flex:0 0 auto;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M2.5 4h8M2.5 8h8M2.5 12h4.5M12.5 9.5v5M10 12h5'/%3E%3C/svg%3E") center/16px 16px no-repeat;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M2.5 4h8M2.5 8h8M2.5 12h4.5M12.5 9.5v5M10 12h5'/%3E%3C/svg%3E") center/16px 16px no-repeat}
 .fh-right .f13ldq-split{gap:0}
-.fh-right .f13ldq-split .f13ldq-main{border-radius:20px 0 0 20px;border-right:none;padding-right:9px}
-.fh-right .f13ldq-split .f13ldq-caret{border-radius:0 20px 20px 0;padding-left:7px;padding-right:8px;border-left:0.5px solid rgba(29,158,117,0.4)}
-/* Phones: brand + help/version/icon on the top row; Queue, Mesh and Lab share
+.fh-right .f13ldq-split .f13ldq-main{border-radius:999px 0 0 999px;border-right:none;padding-right:9px}
+.fh-right .f13ldq-split .f13ldq-caret{border-radius:0 999px 999px 0;padding-left:8px;padding-right:9px;border-left:1px solid var(--hair-strong);font-size:0}
+.fh-right .f13ldq-split .f13ldq-caret::before{content:'';width:12px;height:12px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E") center/12px 12px no-repeat;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E") center/12px 12px no-repeat}
+.hdr-msg{position:absolute;right:12px;top:calc(100% + 8px);max-width:min(340px,calc(100vw - 24px));padding:10px 12px;background:var(--card);border:1px solid var(--hair-strong);border-radius:12px;color:var(--ink);font:400 13px/1.45 var(--lq-font);box-shadow:0 8px 24px oklch(0 0 0 / 0.4);z-index:70}
+.hdr-msg[hidden]{display:none}
+/* help system (engine untouched): bigger hit areas and type ≥ 11px, tool-side */
+.f13ld-header .f13h-trigger{position:relative;width:32px;height:32px;font-size:15px;border:1px solid var(--hair-strong);color:var(--ink-dim)}
+.f13ld-header .f13h-trigger::after{content:'';position:absolute;inset:-7px}
+body .f13h-i{position:relative;width:18px;height:18px;font-size:11px;border-width:1px}
+body .f13h-i::after{content:'';position:absolute;inset:-14px}
+body .f13h-head h2 span,body .f13h-range,body .f13h-section-t,body .f13h-tut{font-size:11px}
+body .f13h-tag{font-size:11px;width:44px;letter-spacing:0.04em}
+body .f13h-line{font-size:13px}
+body .f13h-intro{font-size:13px}
+body .f13h-name{font-size:13px}
+body .f13h-close{width:44px;height:44px}
+
+/* Phones (header): brand + help/version/icon on the top row; Queue, Mesh and Lab share
    one row underneath (the ::after is a zero-height line break between them). */
 @media (max-width:560px){
-  .f13ld-header{flex-wrap:wrap;height:auto;padding:8px 12px 10px;row-gap:0;column-gap:8px}
+  .f13ld-header{flex-wrap:wrap;padding:8px 12px 10px;padding-top:calc(8px + env(safe-area-inset-top));row-gap:0;column-gap:8px}
   .f13ld-header::after{content:'';order:1;flex:0 0 100%;height:0}
   .fh-right{display:contents}
   .fh-left{order:0;margin-right:auto}
-  .f13ld-header .f13h-trigger,.fh-version,.fh-icon{order:1}
+  .f13ld-header .f13h-trigger,.fh-version,.fh-icon,#w-send{order:1}
   .fh-right .fh-mesh-btn,.fh-right .f13ldq-split{order:2;margin-top:8px}
-  .fh-mesh-btn{flex:1 1 0;min-width:0;text-align:center;padding:7px 6px}
+  .fh-mesh-btn{flex:1 1 0;min-width:0;height:36px;padding:0 6px}
   .fh-right .f13ldq-split{flex:1.4 1 0;min-width:0;display:flex}
   .fh-right .f13ldq-split .f13ldq-main{flex:1 1 0;margin-top:0}
-  .fh-right .f13ldq-split .f13ldq-caret{flex:0 0 26px;padding:7px 0;margin-top:0}
+  .fh-right .f13ldq-split .f13ldq-caret{flex:0 0 30px;padding:0;margin-top:0}
 }
-/* ── Phones: results panel stacks in one column (header layout: see the
-   shared header-button block above). ── */
-@media (max-width:560px){
-  #viz-row{grid-template-columns:1fr !important}
-  #metric-grid{grid-template-columns:repeat(3,minmax(0,1fr)) !important}
-  .sav-row{text-align:left}
-  .sav-row #sav-bar-wrap{order:3;flex-basis:100%}
-  #metric-grid>.metric:last-child:nth-child(3n+1){grid-column:1/-1}
-  .bell-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;row-gap:6px !important}
+
+/* ── Phone / narrow (< 900px): viewer on top, controls in a draggable bottom sheet ── */
+@media (max-width:899px){
+  #main{display:block;position:relative}
+  #viewPane{height:calc(100dvh - var(--hdr-h) - var(--peek))}
+  #ctrlPane{position:fixed;left:0;right:0;bottom:0;z-index:50;height:var(--sheet-h,var(--peek));max-height:calc(100dvh - var(--hdr-h));
+    display:flex;flex-direction:column;border-left:none;border-radius:18px 18px 0 0;
+    box-shadow:0 -1px 0 var(--hair-strong),0 -12px 32px oklch(0 0 0 / 0.35);transition:height .26s var(--ease)}
+  #ctrlPane.dragging{transition:none}
+  #sectionsRail{display:none}
+  #sheetHandle{display:flex;flex:0 0 22px;align-items:center;justify-content:center;position:relative;touch-action:none;cursor:grab;background:none;border:0;width:100%}
+  #sheetHandle::before{content:'';width:36px;height:4px;border-radius:2px;background:var(--hair-strong)}
+  #sheetHandle::after{content:'';position:absolute;left:0;right:0;top:-12px;bottom:-10px}
+  #ctrlScroll{flex:1 1 auto;padding:0 16px}
+  .sec{display:none;padding:6px 0 20px;border-bottom:none}
+  .sec.on{display:block}
+  #sectionsBar{display:block;flex:0 0 auto;border-top:1px solid var(--hair);padding-bottom:env(safe-area-inset-bottom);background:var(--panel)}
 }
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:0s !important;animation-duration:0s !important}
+}
+/* fallback section tabs in #sectionsBar (the lead's tab bar replaces .sb-fallback) */
+.sb-fallback{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.sb-fallback button{min-height:52px;background:none;border:0;color:var(--ink-faint);font-size:13px;font-weight:500}
+.sb-fallback button.on{color:var(--accent)}
 </style>
 </head>
 <body>
-<div id="wrap">
+<div id="app">
   <div class="f13ld-header">
   <div class="fh-left">
     <a class="fh-brand" href="https://f13ld.app" target="_blank">
@@ -200,11 +360,12 @@ canvas.vcv{width:100%;display:block}
       <div class="fh-wordmark"><span style="color:#1D9E75">F</span><span style="color:#c8f542">1</span><span style="color:#c8f542">3</span><span style="color:#1D9E75">LD</span></div>
     </a>
     <div class="fh-divider"></div>
-    <div class="fh-tool-name" style="color:#085041">TPMS</div>
+    <div class="fh-tool-name">TPMS</div>
   </div>
   <div class="fh-right">
-    <button class="fh-mesh-btn" onclick="openInMesh()" title="Open in F13LD.mesh — build a watertight, printable 3MF" aria-label="Open in F13LD.mesh">⬡ Mesh</button>
-    <button class="fh-mesh-btn" onclick="openInLab()" title="Open in F13LD.lab — homogenize in the validated FFT solver" aria-label="Open in F13LD.lab">▦ Lab</button>
+    <div id="w-send"></div>
+    <button class="fh-mesh-btn" onclick="openInMesh()" title="Open in F13LD.mesh — build a watertight, printable 3MF" aria-label="Open in F13LD.mesh"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l5.5 3.2v6.4L8 14.4 2.5 11.2V4.8z"/><path d="M8 8v6.4M8 8L2.5 4.8M8 8l5.5-3.2"/></svg><span>Mesh</span></button>
+    <button class="fh-mesh-btn" onclick="openInLab()" title="Open in F13LD.lab — homogenize in the validated FFT solver" aria-label="Open in F13LD.lab"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.2 1.8h3.6M6.7 1.8v4.4L2.9 12.6a1.2 1.2 0 0 0 1 1.8h8.2a1.2 1.2 0 0 0 1-1.8L9.3 6.2V1.8"/><path d="M4.6 10h6.8"/></svg><span>Lab</span></button>
     <span class="fh-version">v1.3.0</span>
     <div class="fh-icon" style="background:#E1F5EE">
       <svg width="18" height="18" viewBox="0 0 40 40">
@@ -214,215 +375,255 @@ canvas.vcv{width:100%;display:block}
       </svg>
     </div>
   </div>
+  <div class="hdr-msg" id="hdrMsg" role="status" aria-live="polite" hidden></div>
 </div>
-  <div id="cw">
-    <canvas id="c" height="420"></canvas>
-    <canvas id="axisCanvas"></canvas>
-    <div id="clipOverlay">
-      <button class="clip-pill" id="clipPillX" onclick="onClipPill(1)">X</button>
-      <button class="clip-pill" id="clipPillY" onclick="onClipPill(2)">Y</button>
-      <button class="clip-pill" id="clipPillZ" onclick="onClipPill(3)">Z</button>
-    </div>
-    <div id="qualityOverlay">
-      <button id="btnQLow" class="active" onclick="onQualityChange('low')">Low</button>
-      <button id="btnQMed" onclick="onQualityChange('medium')">Med</button>
-      <button id="btnQHigh" onclick="onQualityChange('high')">High</button>
-    </div>
-  </div>
-  <div id="panel">
-    <div id="eqbar-wrap">
-      <div id="eqbar-label">implicit equation</div>
-      <div id="eqbar"></div>
-    </div>
-    <div class="surf-controls">
-      <div class="sc-group">
-        <label>mode</label>
-        <div class="mode-strip">
-          <button class="mode-btn active" id="mSolid">solid</button>
-          <button class="mode-btn" id="mShell">thin wall</button>
-          <button class="mode-btn" id="mPi">PI-TPMS</button>
-        </div>
-      </div>
-      <div class="sc-group">
-        <label>cells</label>
-        <input type="range" id="sCells" min="0.5" max="3" step="0.25" value="1">
-        <span class="sv" id="vCells">1.00×</span>
-        <span class="mm-hint" id="vCells_mm"></span>
-      </div>
-      <div class="sc-group">
-        <label>cell size</label>
-        <input type="number" id="cellSizeMM" class="cellsize-inp" min="0" step="0.1" value="2" title="Real-world unit cell edge length in mm. Display-only — does not affect JSON export. Stored per-browser via localStorage.">
-        <span style="font-size:11px;color:#888">mm</span>
-      </div>
-      <div class="sc-group" id="grp-offset">
-        <label>offset</label>
-        <input type="range" id="sOffset" min="-2" max="2" step="0.05" value="0">
-        <span class="sv" id="vOffset">0.00</span>
-        <span class="mm-hint" id="vOffset_mm"></span>
-      </div>
-      <div class="sc-group" id="grp-wall">
-        <label>wall t</label>
-        <input type="range" id="sWall" min="0.02" max="1.5" step="0.02" value="0.3">
-        <span class="sv" id="vWall">0.30</span>
-        <span class="mm-hint" id="vWall_mm"></span>
-        <button class="pi-norm-toggle on" id="shellNormToggle" style="margin-left:6px" title="Divide |φ − offset| by |∇φ| so wall thickness is a perpendicular distance, giving uniform-thickness walls. Off = raw |φ − offset| level set, thickness varies with local gradient (retains original variation pattern).">normalize: on</button>
-      </div>
-      <div class="sc-group" id="grp-piper">
-        <label>pipe r</label>
-        <input type="range" id="sPipeR" min="0.02" max="1.45" step="0.01" value="0.18">
-        <span class="sv" id="vPipeR">0.18</span>
-        <span class="mm-hint" id="vPipeR_mm"></span>
-      </div>
-    </div>
 
-    <!-- PI-TPMS phase shift controls -->
-    <div id="pi-controls">
-      <div class="pi-title">⬡ PI-TPMS — field pair + phase shift δ on field B (× its period T)</div>
-      <div class="sc-group">
-        <button class="pi-norm-toggle on" id="piNormToggle" title="Use angle-corrected perpendicular distance to the intersection curve {φ=0 ∩ φ_δ=0}. Gives true cylindrical pipes with radius r in spatial units, independent of how the two surfaces meet. Off = raw max(|φ|, |φ_δ|) level set with axis-aligned, angle-skewed cross-sections (retains original variation pattern).">normalize: on</button>
-        <button class="pi-snap-toggle on" id="piSnapToggle" title="Snap slider stops to eighths of one period (8 reachable phases per axis). Off lets you set any value 0–1 of T continuously, enables typed-in values, and unlocks the quick-set chips for off-grid biomimetic ratios (π/6, π/3, 2π/5, 2π/3, golden).">snap: on</button>
-      </div>
-      <div class="sc-group">
-        <label class="pi-lbl">field B</label>
-        <select id="fieldBSel" class="pi-sel" title="Second surface the pipes are cut from. 'same as A' is classic PI-TPMS (A crossed with a shifted copy of itself)."></select>
-        <label class="pi-lbl">at</label>
-        <select id="fieldBFreq" class="pi-sel" title="Field B frequency as a whole-number multiple of field A. Whole numbers keep one cell periodic, so it still tiles in F13LD.mesh.">
-          <option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option><option value="5">5×</option>
-        </select>
-      </div>
-      <div class="sc-group">
-        <label class="pi-lbl">Δx/T</label>
-        <div class="pi-snap">
-          <input type="range" id="piX" min="0" max="1" step="0.125" value="0">
-          <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
+<div id="main">
+  <!-- ═══ Viewer pane ═══ -->
+  <section id="viewPane" aria-label="3D view">
+    <div id="cw">
+      <canvas id="c" height="420"></canvas>
+      <canvas id="axisCanvas"></canvas>
+      <div class="vw-bl">
+        <div id="w-clip"></div>
+        <div id="clipOverlay" data-native="clip" role="group" aria-label="Clip plane">
+          <span class="clip-lbl">clip</span>
+          <button class="clip-pill hit" id="clipPillX" onclick="onClipPill(1)" aria-pressed="false" aria-label="Clip along X">X</button>
+          <button class="clip-pill hit" id="clipPillY" onclick="onClipPill(2)" aria-pressed="false" aria-label="Clip along Y">Y</button>
+          <button class="clip-pill hit" id="clipPillZ" onclick="onClipPill(3)" aria-pressed="false" aria-label="Clip along Z">Z</button>
         </div>
-        <span class="pi-val" id="vPiX">0</span>
-        <input type="number" class="pi-num-inp" id="iPiX" min="0" max="1" step="0.001" value="0.000">
       </div>
-      <div class="sc-group">
-        <label class="pi-lbl">Δy/T</label>
-        <div class="pi-snap">
-          <input type="range" id="piY" min="0" max="1" step="0.125" value="0.125">
-          <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
-        </div>
-        <span class="pi-val" id="vPiY">⅛</span>
-        <input type="number" class="pi-num-inp" id="iPiY" min="0" max="1" step="0.001" value="0.125">
-      </div>
-      <div class="sc-group">
-        <label class="pi-lbl">Δz/T</label>
-        <div class="pi-snap">
-          <input type="range" id="piZ" min="0" max="1" step="0.125" value="0.5">
-          <div class="snap-ticks"><span>0</span><span>⅛</span><span>¼</span><span>⅜</span><span>½</span><span>⅝</span><span>¾</span><span>⅞</span><span>1</span></div>
-        </div>
-        <span class="pi-val" id="vPiZ">½</span>
-        <input type="number" class="pi-num-inp" id="iPiZ" min="0" max="1" step="0.001" value="0.500">
-      </div>
-      <div class="pi-chips">
-        <span class="pi-chips-label">quick set →</span>
-        <button class="pi-chip" data-frac="0.08333" title="π/6 — hexagonal symmetry">π/6</button>
-        <button class="pi-chip" data-frac="0.16667" title="π/3 — hexagonal symmetry">π/3</button>
-        <button class="pi-chip" data-frac="0.20000" title="2π/5 — pentagonal / 5-fold">2π/5</button>
-        <button class="pi-chip" data-frac="0.33333" title="2π/3 — triangulation">2π/3</button>
-        <button class="pi-chip" data-frac="0.38197" title="1/φ² — golden, quasi-periodic biomimetic">golden</button>
-      </div>
-      <div id="pi-warn"></div>
     </div>
+  </section>
 
-    <hr class="divider">
-    <div style="margin-bottom:6px">
-      <div style="font-size:10px;color:#c8f542;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">preset surfaces</div>
-      <select id="presetSel" style="width:100%;font-size:11px;padding:4px 8px;border:0.5px solid #3a3a5a;border-radius:6px;background:#0e0e1a;color:#aaa;cursor:pointer">
-        <optgroup label="cubic symmetry">
-          <option value="gyroid">gyroid</option>
-          <option value="schwarzP">schwarz P</option>
-          <option value="schwarzD">schwarz D</option>
-          <option value="neovius">neovius</option>
-          <option value="iwp">I-WP</option>
-          <option value="splitP">split-P</option>
-          <option value="frd">F-RD</option>
-          <option value="fks">Fischer-Koch S</option>
-          <option value="gyroidHarmonic">gyroid-harmonic</option>
-          <option value="primitiveC">primitive-C (G6)</option>
-          <option value="octo">octo (G8)</option>
-          <option value="pHarmonic">P-harmonic</option>
-        </optgroup>
-        <optgroup label="threefold symmetry">
-          <option value="lidinoid">lidinoid</option>
-        </optgroup>
-      </select>
-    </div>
-    <div id="termlist"></div>
-    <hr class="divider">
-    <div class="homo-controls">
-      <label>grid <select id="gridsize"><option value="32">32³</option><option value="48" selected>48³</option><option value="64">64³</option></select></label>
-      <label>E_s (GPa) <input type="number" id="Es" value="100" min="1" max="1000" step="10"></label>
-      <label>ν <input type="number" id="nu" value="0.3" min="0" max="0.49" step="0.01"></label>
-      <button id="runBtn">Run homogenization</button>
-    </div>
-    <div id="homo-status"></div>
-    <div id="homo-results">
-      <div id="homo-method" class="homo-method"></div>
-      <div id="viz-row" style="display:grid;grid-template-columns:minmax(180px,260px) 1fr;gap:8px;margin-bottom:8px;align-items:start">
-        <div class="viz-card" style="padding:8px">
-          <div class="viz-title">directional stiffness surface</div>
-          <canvas id="ellcv" style="width:100%;max-width:244px;aspect-ratio:1;display:block;margin:0 auto;border-radius:6px;cursor:default"></canvas>
-          <div style="margin-top:5px">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-              <div style="font-size:12px;color:#555;white-space:nowrap">A =</div>
-              <div id="zener-val" style="font-size:15px;font-weight:500;color:#888;min-width:32px">—</div>
-              <div id="zener-label" style="font-size:12px;color:#555;flex:1;text-align:right">—</div>
-            </div>
-            <div style="position:relative;height:5px;background:#1a1a2a;border-radius:3px;margin-bottom:3px">
-              <div style="position:absolute;left:0;top:0;bottom:0;width:100%;border-radius:3px;background:linear-gradient(90deg,#e879f9 0%,#555 40%,#555 60%,#22d3ee 100%);opacity:0.4"></div>
-              <div style="position:absolute;left:40%;top:-1px;width:1px;height:7px;background:#555;opacity:0.8"></div>
-              <div id="zener-marker" style="position:absolute;top:-2px;width:2px;height:9px;background:#e0e0ff;border-radius:1px;left:40%;transition:left 0.4s"></div>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:13px;color:#aaa;font-weight:500">
-              <span>axial</span><span>A=1</span><span>diagonal</span>
-            </div>
+  <!-- ═══ Control pane: desktop column / phone bottom sheet ═══ -->
+  <aside id="ctrlPane" aria-label="Controls">
+    <button id="sheetHandle" type="button" aria-label="Drag to resize the controls"></button>
+    <nav id="sectionsRail" aria-label="Sections"></nav>
+    <div id="ctrlScroll">
+
+      <!-- 1 · Surface -->
+      <section class="sec" id="sec-surface" data-section="surface">
+        <h2 class="sec-h"><span class="sec-n">01</span>Surface</h2>
+        <div class="sc-group" id="grp-preset">
+          <label for="presetSel">preset surface</label>
+          <select id="presetSel" data-native="preset">
+            <optgroup label="cubic symmetry">
+              <option value="gyroid">gyroid</option>
+              <option value="schwarzP">schwarz P</option>
+              <option value="schwarzD">schwarz D</option>
+              <option value="neovius">neovius</option>
+              <option value="iwp">I-WP</option>
+              <option value="splitP">split-P</option>
+              <option value="frd">F-RD</option>
+              <option value="fks">Fischer-Koch S</option>
+              <option value="gyroidHarmonic">gyroid-harmonic</option>
+              <option value="primitiveC">primitive-C (G6)</option>
+              <option value="octo">octo (G8)</option>
+              <option value="pHarmonic">P-harmonic</option>
+            </optgroup>
+            <optgroup label="threefold symmetry">
+              <option value="lidinoid">lidinoid</option>
+            </optgroup>
+          </select>
+          <div id="w-preset"></div>
+        </div>
+        <div id="eqbar-wrap">
+          <div id="eqbar-label">implicit equation</div>
+          <div id="eqbar"></div>
+        </div>
+        <div class="sub-h">terms</div>
+        <div id="termlist"></div>
+      </section>
+
+      <!-- 2 · Volume -->
+      <section class="sec" id="sec-volume" data-section="volume">
+        <h2 class="sec-h"><span class="sec-n">02</span>Volume</h2>
+        <div class="sc-group" id="grp-mode">
+          <label>mode</label>
+          <div id="w-mode"></div>
+          <div class="mode-strip" data-native="mode" role="radiogroup" aria-label="Mode">
+            <button class="mode-btn active" id="mSolid" role="radio" aria-checked="true">solid</button>
+            <button class="mode-btn" id="mShell" role="radio" aria-checked="false">thin wall</button>
+            <button class="mode-btn" id="mPi" role="radio" aria-checked="false">PI-TPMS</button>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
-        <div id="metric-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;align-content:start">
-          <div class="metric"><div class="mv" id="rv" style="font-size:22px">—</div><div class="ml" style="font-size:13px">vol. fraction</div></div>
-          <div class="metric"><div class="mv" id="rex" style="color:#22d3ee;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>x</sub><span class="mu stiff-unit" style="font-size:11px"> GPa</span></div></div>
-          <div class="metric"><div class="mv" id="rey" style="color:#e879f9;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>y</sub><span class="mu stiff-unit" style="font-size:11px"> GPa</span></div></div>
-          <div class="metric"><div class="mv" id="rez" style="color:#facc15;font-size:22px">—</div><div class="ml" style="font-size:13px">E<sub>z</sub><span class="mu stiff-unit" style="font-size:11px"> GPa</span></div></div>
-          <div class="metric"><div class="mv" id="rani" style="font-size:22px">—</div><div class="ml" style="font-size:13px">Zener A</div></div>
-          <div class="metric"><div class="mv" id="rgxy" style="color:#a78bfa;font-size:22px">—</div><div class="ml" style="font-size:13px">G<sub>xy</sub><span class="mu stiff-unit" style="font-size:11px"> GPa</span></div></div>
-          <div class="metric"><div class="mv" id="rnu" style="font-size:22px">—</div><div class="ml" style="font-size:13px">Poisson's ratio</div></div>
+        <div class="sc-group sl" id="grp-offset" data-w-slider="sOffset">
+          <label for="sOffset">offset</label>
+          <span class="mm-hint" id="vOffset_mm"></span>
+          <span class="sv" id="vOffset">0.00</span>
+          <input type="range" id="sOffset" min="-2" max="2" step="0.05" value="0">
         </div>
-        <div class="metrics" id="sav-block" style="grid-template-columns:1fr">
-          <div class="metric" style="background:#0d1520;border-color:#1a2a40">
-            <div class="sav-row" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px">
-              <div style="text-align:left">
-                <div class="mv" id="rsav" style="font-size:22px">—</div>
-                <div class="ml" style="font-size:13px">surface complexity (0–1)</div>
-              </div>
-              <div id="sav-bar-wrap" style="flex:1 1 120px;min-width:0;height:8px;background:#0e0e1a;border-radius:4px;overflow:hidden">
-                <div id="sav-bar" style="height:100%;width:0%;border-radius:4px;transition:width 0.4s,background 0.4s"></div>
-              </div>
-              <div style="text-align:right;font-size:13px;min-width:54px;font-weight:500" id="sav-note">—</div>
-            </div>
+        <div class="sc-group sl" id="grp-wall" data-w-slider="sWall">
+          <label for="sWall">wall t</label>
+          <span class="mm-hint" id="vWall_mm"></span>
+          <span class="sv" id="vWall">0.30</span>
+          <input type="range" id="sWall" min="0.02" max="1.5" step="0.02" value="0.3">
+          <div class="row-extra">
+            <button class="sw on pi-norm-toggle" id="shellNormToggle" role="switch" aria-checked="true" title="Divide |φ − offset| by |∇φ| so wall thickness is a perpendicular distance, giving uniform-thickness walls. Off = raw |φ − offset| level set, thickness varies with local gradient (retains original variation pattern)."><span class="sw-t"></span>normalize</button>
           </div>
         </div>
-        <div id="bell-wrap">
-          <div id="bell-title" style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Likely range of true stiffness</div>
-          <div id="bell-sub" style="font-size:10px;color:#444;margin-bottom:6px;line-height:1.5"></div>
-          <div id="bell-rows"></div>
+        <div class="sc-group sl" id="grp-piper" data-w-slider="sPipeR">
+          <label for="sPipeR">pipe r</label>
+          <span class="mm-hint" id="vPipeR_mm"></span>
+          <span class="sv" id="vPipeR">0.18</span>
+          <input type="range" id="sPipeR" min="0.02" max="1.45" step="0.01" value="0.18">
         </div>
+
+        <!-- PI-TPMS: field pair + phase shift -->
+        <div id="pi-controls">
+          <div class="pi-title"><svg class="ic sm" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l5.5 3.2v6.4L8 14.4 2.5 11.2V4.8z"/></svg><span>PI-TPMS · field pair + phase shift δ on field B (× its period T)</span></div>
+          <div class="sc-group">
+            <button class="sw on pi-norm-toggle" id="piNormToggle" role="switch" aria-checked="true" title="Use angle-corrected perpendicular distance to the intersection curve {φ=0 ∩ φ_δ=0}. Gives true cylindrical pipes with radius r in spatial units, independent of how the two surfaces meet. Off = raw max(|φ|, |φ_δ|) level set with axis-aligned, angle-skewed cross-sections (retains original variation pattern)."><span class="sw-t"></span>normalize</button>
+          </div>
+          <div class="sc-group">
+            <label class="pi-lbl" for="fieldBSel">field B</label>
+            <select id="fieldBSel" class="pi-sel" title="Second surface the pipes are cut from. 'same as A' is classic PI-TPMS (A crossed with a shifted copy of itself)."></select>
+            <label class="pi-lbl" for="fieldBFreq">at</label>
+            <select id="fieldBFreq" class="pi-sel" title="Field B frequency as a whole-number multiple of field A. Whole numbers keep one cell periodic, so it still tiles in F13LD.mesh.">
+              <option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option><option value="5">5×</option>
+            </select>
+          </div>
+          <div class="sc-group sl" data-w-slider="piX">
+            <label class="pi-lbl" for="piX">Δx/T</label>
+            <span class="pi-val" id="vPiX">0</span>
+            <input type="number" class="pi-num-inp" id="iPiX" min="0" max="1" step="0.001" value="0.000" aria-label="Δx as a fraction of T">
+            <input type="range" id="piX" min="0" max="1" step="0.001" value="0">
+          </div>
+          <div class="sc-group sl" data-w-slider="piY">
+            <label class="pi-lbl" for="piY">Δy/T</label>
+            <span class="pi-val" id="vPiY">⅛</span>
+            <input type="number" class="pi-num-inp" id="iPiY" min="0" max="1" step="0.001" value="0.125" aria-label="Δy as a fraction of T">
+            <input type="range" id="piY" min="0" max="1" step="0.001" value="0.125">
+          </div>
+          <div class="sc-group sl" data-w-slider="piZ">
+            <label class="pi-lbl" for="piZ">Δz/T</label>
+            <span class="pi-val" id="vPiZ">½</span>
+            <input type="number" class="pi-num-inp" id="iPiZ" min="0" max="1" step="0.001" value="0.500" aria-label="Δz as a fraction of T">
+            <input type="range" id="piZ" min="0" max="1" step="0.001" value="0.5">
+          </div>
+          <div class="pi-chips">
+            <span class="pi-chips-label">quick set</span>
+            <button class="pi-chip" data-frac="0.08333" title="π/6 — hexagonal symmetry"><span>π/6</span></button>
+            <button class="pi-chip" data-frac="0.16667" title="π/3 — hexagonal symmetry"><span>π/3</span></button>
+            <button class="pi-chip" data-frac="0.20000" title="2π/5 — pentagonal / 5-fold"><span>2π/5</span></button>
+            <button class="pi-chip" data-frac="0.33333" title="2π/3 — triangulation"><span>2π/3</span></button>
+            <button class="pi-chip" data-frac="0.38197" title="1/φ² — golden, quasi-periodic biomimetic"><span>golden</span></button>
+          </div>
+          <div id="pi-warn" role="status"></div>
         </div>
-      </div>
-      <div id="homog-mm-row" style="display:none;margin-top:6px;padding:6px 10px;background:#0a141a;border:0.5px solid #1a3a3a;border-radius:6px;font-size:11px;color:#7a9aaa;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between">
-        <span>cell = <b id="mm-cellVol" style="color:#aac6c6">—</b></span>
-        <span>solid vol = <b id="mm-solidVol" style="color:#aac6c6">—</b></span>
-        <span id="mm-sav-wrap">area / cell vol = <b id="mm-savReal" style="color:#aac6c6">—</b></span>
-      </div>
-      <div class="method-note" id="method-note">MIL-HS method: MIL fabric eigenvalues give anisotropy ratios · HS+ bound gives isotropic stiffness ceiling from ρ · directional E_i = E_HS+ × normalized MIL weight · surface complexity = SA/V normalized to [0,1] · bell curves show combined uncertainty.</div>
+      </section>
+
+      <!-- 3 · Cell -->
+      <section class="sec" id="sec-cell" data-section="cell">
+        <h2 class="sec-h"><span class="sec-n">03</span>Cell</h2>
+        <div class="sc-group sl" id="grp-cells" data-w-slider="sCells">
+          <label for="sCells">cells</label>
+          <span class="mm-hint" id="vCells_mm"></span>
+          <span class="sv" id="vCells">1.00×</span>
+          <input type="range" id="sCells" min="0.5" max="3" step="0.25" value="1">
+        </div>
+        <div class="sc-group" id="grp-cellsize">
+          <label for="cellSizeMM">cell size</label>
+          <input type="number" id="cellSizeMM" class="cellsize-inp" min="0" step="0.1" value="2" inputmode="decimal" title="Real-world unit cell edge length in mm. Display-only — does not affect JSON export. Stored per-browser via localStorage.">
+          <span class="unit">mm</span>
+        </div>
+        <div class="phys" id="physReadout">
+          <div class="phys-h">physical size</div>
+          <dl>
+            <div class="pr" id="pr-edge"><dt>cell edge</dt><dd id="prEdge">—</dd></div>
+            <div class="pr" id="pr-vol"><dt>cell volume</dt><dd id="prVol">—</dd></div>
+            <div class="pr" id="pr-view"><dt>in view</dt><dd id="prView">—</dd></div>
+            <div class="pr" id="pr-wall" hidden><dt>wall</dt><dd id="prWall">—</dd></div>
+            <div class="pr" id="pr-pipe" hidden><dt>pipe Ø</dt><dd id="prPipe">—</dd></div>
+            <div class="pr" id="pr-off"><dt>offset</dt><dd id="prOff">—</dd></div>
+          </dl>
+          <div class="phys-note">Display only. ~ marks values that depend on the local gradient.</div>
+        </div>
+      </section>
+
+      <!-- 4 · Analyze -->
+      <section class="sec" id="sec-analyze" data-section="analyze">
+        <h2 class="sec-h"><span class="sec-n">04</span>Analyze</h2>
+        <div class="homo-controls">
+          <div class="sc-group"><label for="gridsize">grid</label><select id="gridsize"><option value="32">32³</option><option value="48" selected>48³</option><option value="64">64³</option></select></div>
+          <div class="sc-group"><label for="Es">E_s (GPa)</label><input type="number" id="Es" value="100" min="1" max="1000" step="10" inputmode="decimal"></div>
+          <div class="sc-group"><label for="nu">ν</label><input type="number" id="nu" value="0.3" min="0" max="0.49" step="0.01" inputmode="decimal"></div>
+        </div>
+        <div id="w-run"></div>
+        <button id="runBtn" data-native="run">Run homogenization</button>
+        <div id="homo-status" role="status"></div>
+        <div id="homo-results">
+          <div id="homo-method" class="homo-method"></div>
+          <div id="viz-row">
+            <div class="viz-card">
+              <div class="viz-title">directional stiffness surface</div>
+              <canvas id="ellcv" style="width:100%;max-width:244px;aspect-ratio:1;display:block;margin:0 auto;border-radius:8px;cursor:default"></canvas>
+              <div class="zener-row">
+                <div class="zener-k">A =</div>
+                <div id="zener-val">—</div>
+                <div id="zener-label">—</div>
+              </div>
+              <div class="zener-track">
+                <div style="position:absolute;inset:0;border-radius:3px;background:linear-gradient(90deg,var(--axis-y) 0%,var(--ink-faint) 40%,var(--ink-faint) 60%,var(--axis-x) 100%);opacity:0.4"></div>
+                <div style="position:absolute;left:40%;top:-1px;width:1px;height:7px;background:var(--ink-faint);opacity:0.8"></div>
+                <div id="zener-marker" style="position:absolute;top:-2px;width:2px;height:9px;background:var(--ink);border-radius:1px;left:40%;transition:left 0.3s"></div>
+              </div>
+              <div class="zener-ends"><span>axial</span><span>A=1</span><span>diagonal</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+              <div id="metric-grid">
+                <div class="metric"><div class="mv" id="rv">—</div><div class="ml">vol. fraction</div></div>
+                <div class="metric"><div class="mv" id="rex" style="color:var(--axis-x)">—</div><div class="ml">E<sub>x</sub><span class="mu stiff-unit"> GPa</span></div></div>
+                <div class="metric"><div class="mv" id="rey" style="color:var(--axis-y)">—</div><div class="ml">E<sub>y</sub><span class="mu stiff-unit"> GPa</span></div></div>
+                <div class="metric"><div class="mv" id="rez" style="color:var(--axis-z)">—</div><div class="ml">E<sub>z</sub><span class="mu stiff-unit"> GPa</span></div></div>
+                <div class="metric"><div class="mv" id="rani">—</div><div class="ml">Zener A</div></div>
+                <div class="metric"><div class="mv" id="rgxy" style="color:#a78bfa">—</div><div class="ml">G<sub>xy</sub><span class="mu stiff-unit"> GPa</span></div></div>
+                <div class="metric"><div class="mv" id="rnu">—</div><div class="ml">Poisson's ratio</div></div>
+              </div>
+              <div class="metrics" id="sav-block">
+                <div class="metric sav">
+                  <div class="sav-row">
+                    <div>
+                      <div class="mv" id="rsav">—</div>
+                      <div class="ml">surface complexity (0–1)</div>
+                    </div>
+                    <div id="sav-bar-wrap" style="min-width:0;height:8px;background:var(--input);border-radius:4px;overflow:hidden">
+                      <div id="sav-bar" style="height:100%;width:0%;border-radius:4px;transition:width 0.3s,background 0.3s"></div>
+                    </div>
+                    <div style="text-align:right;font-size:13px;min-width:54px;font-weight:500" id="sav-note">—</div>
+                  </div>
+                </div>
+              </div>
+              <div id="bell-wrap">
+                <div id="bell-title">Likely range of true stiffness</div>
+                <div id="bell-sub"></div>
+                <div id="bell-rows"></div>
+              </div>
+            </div>
+          </div>
+          <div id="homog-mm-row" style="display:none">
+            <span>cell = <b id="mm-cellVol">—</b></span>
+            <span>solid vol = <b id="mm-solidVol">—</b></span>
+            <span id="mm-sav-wrap">area / cell vol = <b id="mm-savReal">—</b></span>
+          </div>
+          <div class="method-note" id="method-note">MIL-HS method: MIL fabric eigenvalues give anisotropy ratios · HS+ bound gives isotropic stiffness ceiling from ρ · directional E_i = E_HS+ × normalized MIL weight · surface complexity = SA/V normalized to [0,1] · bell curves show combined uncertainty.</div>
+        </div>
+        <button id="exportBtn" class="ghost-btn">Export JSON</button>
+        <div id="footer">Drag to rotate · scroll or pinch to zoom · drag the ring to move a clip plane</div>
+      </section>
+
     </div>
-    <button id="exportBtn" style="width:100%;margin-top:8px;font-size:12px;padding:6px 14px;border:0.5px solid #3a3a5a;border-radius:20px;background:transparent;color:#888;cursor:pointer">Export JSON</button>
-    <div id="footer">Drag to rotate · Scroll or pinch to zoom · Color = surface normal direction · Trackball rotation</div>
-  </div>
+    <nav id="sectionsBar" aria-label="Sections">
+      <div class="sb-fallback">
+        <button type="button" data-section="surface" class="on">Surface</button>
+        <button type="button" data-section="volume">Volume</button>
+        <button type="button" data-section="cell">Cell</button>
+        <button type="button" data-section="analyze">Analyze</button>
+      </div>
+    </nav>
+  </aside>
+</div>
 </div>
 
 <script>
@@ -550,24 +751,32 @@ function f13ViewInit(cfg){
 // All shaders are GLSL ES 3.00 → WebGL2 is required (a WebGL1 fallback can never compile them).
 const gl=canvas.getContext('webgl2',{preserveDrawingBuffer:true});
 if(!gl){canvas.parentElement.innerHTML='<p style="color:#888;padding:40px;text-align:center">This tool needs WebGL2, which this browser or GPU does not provide.</p>';throw new Error('WebGL2 unavailable');}
-let currentQuality='low';
-function onQualityChange(q){
-  currentQuality=q;
-  document.getElementById('btnQLow').classList.toggle('active',q==='low');
-  document.getElementById('btnQMed').classList.toggle('active',q==='medium');
-  document.getElementById('btnQHigh').classList.toggle('active',q==='high');
-  rebuildShader();
-}
-
-function resize(){
-  const cssW=canvas.parentElement.clientWidth;
-  const dpr=Math.min(window.devicePixelRatio||1,1.5);
-  const cssH=Math.min(cssW,420);
+// ── Adaptive render quality (replaces the Low/Med/High switch) ─────────
+// The ray-march step limit and hit threshold are uniforms, so quality never
+// recompiles. While the user orbits, zooms, drags a slider or types (and while
+// auto-rotate runs) frames use Q_INT; ~150 ms after the last interaction one
+// refined frame is drawn with Q_HI. Rendering is on demand: nothing is drawn
+// unless something changed (requestRender / kick).
+const Q_INT={steps:384,thresh:1.0,dpr:1.5},Q_HI={steps:768,thresh:0.5,dpr:2};
+const IDLE_MS=150;
+let renderDirty=true,refinePending=false,lastInteract=0;
+function requestRender(){renderDirty=true;}
+function kick(){lastInteract=performance.now();renderDirty=true;}
+// Size the drawing buffer from the viewer pane (not a fixed 420 px strip).
+function resize(q){
+  q=q||Q_INT;
+  const host=canvas.parentElement;
+  const cssW=Math.max(1,host.clientWidth),cssH=Math.max(1,host.clientHeight);
+  const dpr=Math.min(window.devicePixelRatio||1,q.dpr);
   const w=Math.round(cssW*dpr),h=Math.round(cssH*dpr);
   if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
-  canvas.style.height=cssH+'px';
 }
-resize();window.addEventListener('resize',resize);
+resize();
+window.addEventListener('resize',requestRender);
+if(window.ResizeObserver)new ResizeObserver(requestRender).observe(canvas.parentElement);
+// Any edit to a control counts as interaction (sliders, selects, number fields).
+document.addEventListener('input',kick,true);
+document.addEventListener('change',kick,true);
 
 function toFloat(v){const s=parseFloat(parseFloat(v).toFixed(6)).toString();return s.includes('.')?s:s+'.0';}
 const OPTS=['sin(x)','cos(x)','sin(y)','cos(y)','sin(z)','cos(z)'];
@@ -668,36 +877,63 @@ function renderList(){
   const list=B?fieldB.terms:terms;
   if(raw){
     const note=document.createElement('div');
-    note.style.cssText='font-size:11px;color:#555;padding:8px 4px;font-style:italic';
+    note.className='term-note';
     note.textContent=raw.label+' — uses double-frequency terms (sin 2x, cos 2x) and cannot be edited term by term. '+
       (B?'Pick "custom" for field B to edit its terms.':'Switch to a standard preset to use the equation editor.');
     el.appendChild(note);
     updateEq();return;
   }
+  // One line per term (its expression + on/off); tapping the line opens the
+  // full editor in place. One term is open at a time (openTermId).
   list.forEach(t=>{
-    const card=document.createElement('div');card.className='termcard'+(t.on?'':' off');
-    let html='<div class="term-hdr">'+
-      '<button class="tog'+(t.on?' on':'')+'" data-id="'+t.id+'" data-act="tog">'+(t.on?'on':'off')+'</button>'+
-      '<span class="coef-lbl">coef</span>'+
-      '<input type="number" class="coef-inp" data-id="'+t.id+'" data-f="coef" value="'+dn(t.coef)+'" step="0.25">'+
-      '<button class="del-term" data-id="'+t.id+'" data-act="del">×</button></div>';
-    t.factors.forEach((f,fi)=>{
-      html+='<div class="factor-row">'+
-        '<span class="fdot">'+(fi===0?'':' ·')+'</span>'+
-        '<select class="fsel" data-id="'+t.id+'" data-fi="'+fi+'" data-f="trig">'+OPTS.map(o=>'<option'+(o===f.trig?' selected':'')+'>'+o+'</option>').join('')+'</select>'+
-        '<span class="flbl">x</span><input type="number" class="finp" data-id="'+t.id+'" data-fi="'+fi+'" data-f="fx" value="'+dn(f.fx)+'" step="0.5" min="0.1">'+
-        '<span class="flbl">y</span><input type="number" class="finp" data-id="'+t.id+'" data-fi="'+fi+'" data-f="fy" value="'+dn(f.fy)+'" step="0.5" min="0.1">'+
-        '<span class="flbl">z</span><input type="number" class="finp" data-id="'+t.id+'" data-fi="'+fi+'" data-f="fz" value="'+dn(f.fz)+'" step="0.5" min="0.1">'+
-        '<button class="delf" data-id="'+t.id+'" data-fi="'+fi+'" data-act="delf"'+(t.factors.length>1?'':' disabled')+'>−</button></div>';
-    });
-    html+='<button class="addf-btn" data-id="'+t.id+'" data-act="addf">+ factor</button>';
+    const open=t.id===openTermId;
+    const card=document.createElement('div');card.className='term'+(t.on?'':' off')+(open?' open':'');card.dataset.id=t.id;
+    let html='<div class="term-line">'+
+      '<button class="sw tog'+(t.on?' on':'')+'" role="switch" aria-checked="'+(t.on?'true':'false')+'" aria-label="Term on" data-id="'+t.id+'" data-act="tog"><span class="sw-t"></span></button>'+
+      '<button class="term-expr" data-id="'+t.id+'" data-act="expand" aria-expanded="'+(open?'true':'false')+'"><span class="tx">'+termExprHTML(t)+'</span>'+ICON.chev+'</button></div>';
+    if(open){
+      html+='<div class="term-ed"><div class="ed-row">'+
+        '<span class="coef-lbl">coef</span>'+
+        '<input type="number" class="coef-inp" data-id="'+t.id+'" data-f="coef" value="'+dn(t.coef)+'" step="0.25" inputmode="decimal" aria-label="Coefficient">'+
+        '<button class="icon-btn danger del-term" data-id="'+t.id+'" data-act="del" aria-label="Delete term" title="Delete term">'+ICON.x+'</button></div>'+
+        '<div class="fac-head" aria-hidden="true"><span></span><span>factor</span><span>x</span><span>y</span><span>z</span><span></span></div>';
+      t.factors.forEach((f,fi)=>{
+        html+='<div class="factor-row">'+
+          '<span class="fdot">'+(fi===0?'':'·')+'</span>'+
+          '<select class="fsel" data-id="'+t.id+'" data-fi="'+fi+'" data-f="trig" aria-label="Factor">'+OPTS.map(o=>'<option'+(o===f.trig?' selected':'')+'>'+o+'</option>').join('')+'</select>'+
+          '<input type="number" class="finp" data-id="'+t.id+'" data-fi="'+fi+'" data-f="fx" value="'+dn(f.fx)+'" step="0.5" min="0.1" inputmode="decimal" aria-label="x frequency">'+
+          '<input type="number" class="finp" data-id="'+t.id+'" data-fi="'+fi+'" data-f="fy" value="'+dn(f.fy)+'" step="0.5" min="0.1" inputmode="decimal" aria-label="y frequency">'+
+          '<input type="number" class="finp" data-id="'+t.id+'" data-fi="'+fi+'" data-f="fz" value="'+dn(f.fz)+'" step="0.5" min="0.1" inputmode="decimal" aria-label="z frequency">'+
+          '<button class="icon-btn delf" data-id="'+t.id+'" data-fi="'+fi+'" data-act="delf" aria-label="Remove factor"'+(t.factors.length>1?'':' disabled')+'>'+ICON.minus+'</button></div>';
+      });
+      html+='<button class="ghost-btn addf-btn" data-id="'+t.id+'" data-act="addf">'+ICON.plus+'factor</button></div>';
+    }
     card.innerHTML=html;el.appendChild(card);
   });
   const addBtn=document.createElement('button');
-  addBtn.id='addBtn';addBtn.textContent='+ term';addBtn.style.cssText='margin-top:6px;width:100%';
-  addBtn.addEventListener('click',function(){editTerms().push(mk([mkF('sin(x)'),mkF('cos(y)')],1));markBCustom();renderList();rebuildShader();onSurfaceChange();});
+  addBtn.id='addBtn';addBtn.className='ghost-btn';addBtn.innerHTML=ICON.plus+'term';
+  addBtn.addEventListener('click',function(){const nt=mk([mkF('sin(x)'),mkF('cos(y)')],1);editTerms().push(nt);openTermId=nt.id;markBCustom();renderList();rebuildShader();onSurfaceChange();});
   el.appendChild(addBtn);
   updateEq();
+}
+let openTermId=null;
+// Drawn icons (stroke = currentColor). No glyph icons anywhere in the tool.
+const ICON={
+  x:'<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+  minus:'<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9"/></svg>',
+  plus:'<svg class="ic sm" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>',
+  chev:'<svg class="ic sm chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>',
+  warn:'<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2L14.5 13.5h-13z"/><path d="M8 6.5v3.2"/><circle cx="8" cy="11.6" r="0.4"/></svg>'
+};
+// One factor as written in the equation font: sin(x), cos(2y)…
+function factorText(f){
+  const ax=f.trig.charAt(4),k=ax==='x'?f.fx:ax==='y'?f.fy:f.fz;
+  return f.trig.slice(0,3)+'('+(parseFloat(k)===1?'':dn(k))+ax+')';
+}
+// Collapsed term line: "+1 · sin(x)·cos(y)"
+function termExprHTML(t){
+  const c=parseFloat(t.coef)||0;
+  return (c<0?'−':'+')+dn(Math.abs(c))+' · '+t.factors.map(factorText).join('·');
 }
 // Editing field B's terms turns its menu entry into "custom".
 function markBCustom(){if(editingB()){fieldB.presetKey='custom';syncFieldBUI();}}
@@ -707,11 +943,18 @@ document.getElementById('termlist').addEventListener('change',function(e){
   const t=editTerms().find(x=>x.id===id);if(!t)return;
   if(f==='coef'){const v=parseFloat(e.target.value);if(!isNaN(v))t.coef=v;}
   else if(fi!==null&&fi>=0){const fac=t.factors[fi];if(!fac)return;if(f==='trig')fac.trig=e.target.value;else{const v=parseFloat(e.target.value);if(!isNaN(v))fac[f]=v;}}
+  // keep the collapsed one-line summary of this term in step with the editor
+  const tx=document.querySelector('#termlist .term[data-id="'+id+'"] .term-expr .tx');if(tx)tx.innerHTML=termExprHTML(t);
   markBCustom();updateEq();rebuildShader();onSurfaceChange();
 });
 document.getElementById('termlist').addEventListener('click',function(e){
   const btn=e.target.closest('[data-act]');if(!btn)return;
   const id=parseInt(btn.dataset.id),fi=btn.dataset.fi!==undefined?parseInt(btn.dataset.fi):null,act=btn.dataset.act;
+  if(act==='expand'){   // view only: no rebuild
+    openTermId=openTermId===id?null:id;renderList();
+    const c=openTermId!==null&&document.querySelector('#termlist .term[data-id="'+openTermId+'"]');
+    if(c&&c.scrollIntoView)c.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
+    return;}
   const L=editTerms();
   const t=L.find(x=>x.id===id);
   if(act==='del'){const i=L.findIndex(x=>x.id===id);if(i>=0)L.splice(i,1);}
@@ -726,7 +969,7 @@ document.getElementById('presetSel').addEventListener('change',function(){loadPr
 const FRAC_LABELS=['0','⅛','¼','⅜','½','⅝','¾','⅞','1'];
 const TWO_PI=2*Math.PI;
 let piShift={x:0,y:0.125,z:0.5}; // fraction of period T, in [0,1] — default: connected 3-D pipe network
-let piSnap=true;            // slider stops at eighths of T; off = continuous (0.001 step)
+let piSnap=false;           // continuous 0.001 steps; magnetic snap to eighths on slider release (SNAP_R)
 let lastFocusedAxis='x';    // remembers last-touched axis; chip clicks apply here
 let piNormalize=true;       // divide |φ| by |∇φ| → cylindrical pipes (r in distance units)
 let shellNormalize=true;    // divide |φ−offset| by |∇φ| → constant-thickness walls
@@ -782,24 +1025,18 @@ function setAxisValue(axis,frac,rebuild){
 
 document.getElementById('piNormToggle').addEventListener('click',function(){
   piNormalize=!piNormalize;
-  this.textContent='normalize: '+(piNormalize?'on':'off');
-  this.classList.toggle('on',piNormalize);
+  this.classList.toggle('on',piNormalize);this.setAttribute('aria-checked',piNormalize?'true':'false');
   updateEq();updateMMHints();rebuildShader();onSurfaceChange();
 });
 
-document.getElementById('piSnapToggle').addEventListener('click',function(){
-  piSnap=!piSnap;
-  this.textContent='snap: '+(piSnap?'on':'off');
-  this.classList.toggle('on',piSnap);
-  document.getElementById('pi-controls').classList.toggle('snap-off',!piSnap);
-  // update slider step; snap-on re-snaps current values to nearest eighth
-  ['x','y','z'].forEach(ax=>{
-    const slider=document.getElementById('pi'+ax.toUpperCase());
-    slider.step=piSnap?0.125:0.001;
-    const target=piSnap?(Math.round(piShift[ax]*8)/8):piShift[ax];
-    setAxisValue(ax,target,false);
+// Snap toggle removed: sliders are continuous, releasing within SNAP_R of an
+// eighth of T lands exactly on it, typed values and quick-set chips stay exact.
+const SNAP_R=0.02;
+['x','y','z'].forEach(ax=>{
+  document.getElementById('pi'+ax.toUpperCase()).addEventListener('change',function(){
+    const v=parseFloat(this.value),k=Math.round(v*8)/8;
+    if(Math.abs(v-k)<SNAP_R&&Math.abs(v-k)>1e-9)setAxisValue(ax,k);
   });
-  rebuildShader();onSurfaceChange();
 });
 
 document.querySelectorAll('.pi-chip').forEach(chip=>{
@@ -811,8 +1048,7 @@ document.querySelectorAll('.pi-chip').forEach(chip=>{
 
 document.getElementById('shellNormToggle').addEventListener('click',function(){
   shellNormalize=!shellNormalize;
-  this.textContent='normalize: '+(shellNormalize?'on':'off');
-  this.classList.toggle('on',shellNormalize);
+  this.classList.toggle('on',shellNormalize);this.setAttribute('aria-checked',shellNormalize?'true':'false');
   updateEq();updateMMHints();rebuildShader();onSurfaceChange();
 });
 
@@ -851,11 +1087,11 @@ function syncFieldBUI(){
 function eqHTML(f){
   if(f.raw)return '<b>'+f.raw.label+'</b>';
   const a=f.terms.filter(t=>t.on&&t.factors&&t.factors.length);
-  if(!a.length)return '<i style="color:#555">no active terms</i>';
+  if(!a.length)return '<i class="eq-dim">no active terms</i>';
   return a.map((t,i)=>{
     const c=Math.abs(t.coef),cs=c===1?'':dn(c)+'·';
     const sign=i===0?(t.coef<0?'−':''):(t.coef<0?' − ':' + ');
-    return sign+'<b>'+cs+t.factors.map(f=>f.trig).join('·')+'</b>';
+    return sign+'<b>'+cs+t.factors.map(factorText).join('·')+'</b>';
   }).join('');
 }
 function updateEq(){
@@ -869,12 +1105,12 @@ function updateEq(){
   if(modePi){
     const k=fieldB.freq;
     const bExpr=fieldB.src==='same'?'φ<sub>A</sub>':eqHTML(fieldBResolved());
-    const at='<span style="color:#7aaa7a"> &nbsp;evaluated at '+(k===1?'':k+'·')+'p + δ</span>';
+    const at='<span class="eq-at"> evaluated at '+(k===1?'':k+'·')+'p + δ</span>';
     const left=piNormalize?'dist(p, {φ<sub>A</sub>=0} ∩ {φ<sub>B</sub>=0})':'max(|φ<sub>A</sub>|, |φ<sub>B</sub>|)';
     bar.innerHTML='φ<sub>A</sub> = '+eqHTML(A)+'<br>φ<sub>B</sub> = '+bExpr+at+'<br>'+left+' &lt; '+pipeR.toFixed(2);
     return;
   }
-  if(!A.raw&&!A.terms.some(t=>t.on&&t.factors&&t.factors.length)){bar.innerHTML='<i style="color:#555">no active terms</i>';return;}
+  if(!A.raw&&!A.terms.some(t=>t.on&&t.factors&&t.factors.length)){bar.innerHTML='<i class="eq-dim">no active terms</i>';return;}
   const eq=eqHTML(A);
   const offStr=off===0?'':' − '+off.toFixed(2);
   const lhs=modeShell
@@ -888,14 +1124,16 @@ let shellMode=false,piMode=false,offsetVal=0,wallVal=0.3,pipeRVal=0.18,cellMult=
 
 function syncModeUI(){
   // show/hide controls
-  document.getElementById('grp-offset').style.display=piMode?'none':'flex';
-  document.getElementById('grp-wall').style.display=(shellMode&&!piMode)?'flex':'none';
-  document.getElementById('grp-piper').style.display=piMode?'flex':'none';
+  document.getElementById('grp-offset').style.display=piMode?'none':'';
+  document.getElementById('grp-wall').style.display=(shellMode&&!piMode)?'':'none';
+  document.getElementById('grp-piper').style.display=piMode?'':'none';
   document.getElementById('pi-controls').classList.toggle('visible',piMode);
   // button states
   document.getElementById('mSolid').classList.toggle('active',!shellMode&&!piMode);
   document.getElementById('mShell').classList.toggle('active',shellMode&&!piMode);
   document.getElementById('mPi').classList.toggle('pi-active',piMode);
+  [['mSolid',!shellMode&&!piMode],['mShell',shellMode&&!piMode],['mPi',piMode]].forEach(([id,on])=>document.getElementById(id).setAttribute('aria-checked',on?'true':'false'));
+  if(window.F13UI&&window.F13UI.onModeChange)window.F13UI.onModeChange(piMode?'pi':shellMode?'shell':'solid');
   renderList();
 }
 
@@ -978,8 +1216,22 @@ function updateMMHints(){
     offEl.textContent = '';
     offEl.classList.remove('show');
   }
+  updatePhysReadout(factor);
   // Refresh homogenization mm row in case cellSizeMM changed after a run
   updateHomogMMHints();
+}
+// Cell section: every mm value in one block (same maths as the hints above).
+function updatePhysReadout(factor){
+  const ok=cellSizeMM>0,set=(id,v)=>{document.getElementById(id).textContent=ok?v:'—';},show=(id,on)=>{document.getElementById(id).hidden=!on;};
+  set('prEdge',cellSizeMM.toFixed(2)+' mm');
+  set('prVol',Math.pow(cellSizeMM,3).toFixed(3)+' mm³');
+  set('prView',(cellMult*cellSizeMM).toFixed(2)+' mm');
+  const wallOn=shellMode&&!piMode;show('pr-wall',wallOn);
+  if(wallOn)set('prWall',(shellNormalize?'':'~')+(2*wallVal*factor).toFixed(3)+' mm');
+  show('pr-pipe',piMode);
+  if(piMode){const pre=piNormalize?'':'~';set('prPipe',pre+(2*pipeRVal*factor).toFixed(3)+' mm  (r '+pre+(pipeRVal*factor).toFixed(3)+')');}
+  show('pr-off',!piMode);
+  if(!piMode)set('prOff','~'+(offsetVal*factor).toFixed(3)+' mm');
 }
 function updateHomogMMHints(){
   const row = document.getElementById('homog-mm-row');
@@ -1115,6 +1367,7 @@ float gradMagBase(vec3 p, float H){
 'out vec4 fragColor;',
 'uniform vec2 res;uniform mat3 rot;uniform float zoom;',
 'uniform float uClipAxis;uniform float uClipPos;uniform float uClipSide;',
+'uniform int uMaxSteps;uniform float uThreshScale;',
 baseFunc,
 'float implicit(vec3 p,float H){return '+implicitExpr+';}',
 // Box SDF for clipping — intersection with implicit gives solid clipped to cube
@@ -1139,7 +1392,7 @@ F13_SHADE_GLSL,
 // Feature size drives thresh, maxStep, and normal e — different per mode
 '  float featureSize='+toFloat(piMode ? pipeRVal : shellMode ? wallVal : Math.PI*cellMult*0.25)+';',
 '  float camScale=clamp(zoom/16.0,0.15,1.0);',
-'  float thresh=featureSize*0.008*camScale;',
+'  float thresh=featureSize*0.008*camScale*uThreshScale;',
 '  float maxStep=featureSize*0.25*camScale;',
 '  float nrmE=featureSize*0.06*camScale;',
 // SDF marcher — starts at box entry, exits at box exit
@@ -1150,7 +1403,8 @@ F13_SHADE_GLSL,
 '  float tEx=min(min(tma.x,tma.y),tma.z);',
 '  if(tEn>tEx||tEx<0.0){fragColor=bg;return;}',
 '  float t=max(tEn,0.001);bool hit=false;',
-'  for(int i=0;i<'+(currentQuality==='high'?'384':currentQuality==='medium'?'192':'96')+';i++){',
+'  for(int i=0;i<768;i++){',
+'    if(i>=uMaxSteps)break;',
 '    vec3 p=ro+rd*t;float d=sceneSDF(p,H);',
 '    if(d<thresh){hit=true;break;}',
 '    if(t>tEx+0.01)break;',
@@ -1195,7 +1449,10 @@ function rebuildShader(){
   else gl.bindBuffer(gl.ARRAY_BUFFER,quadBuf);
   const loc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
   uRes=gl.getUniformLocation(prog,'res');uRot=gl.getUniformLocation(prog,'rot');uZoom=gl.getUniformLocation(prog,'zoom');uClipAxis=gl.getUniformLocation(prog,'uClipAxis');uClipPos=gl.getUniformLocation(prog,'uClipPos');uClipSide=gl.getUniformLocation(prog,'uClipSide');
+  uMaxSteps=gl.getUniformLocation(prog,'uMaxSteps');uThreshScale=gl.getUniformLocation(prog,'uThreshScale');
+  kick();
 }
+let uMaxSteps,uThreshScale;
 
 let rotMat=[1,0,0,0,1,0,0,0,1];let clipState={axis:0,pos:0.0,side:1};let uClipAxis,uClipPos,uClipSide;
 function mat3Mul(A,B){const r=new Array(9);for(let c=0;c<3;c++)for(let row=0;row<3;row++)r[c*3+row]=A[0*3+row]*B[c*3+0]+A[1*3+row]*B[c*3+1]+A[2*3+row]*B[c*3+2];return r;}
@@ -1229,7 +1486,7 @@ rotMat=mat3Mul(rotAxisAngle(0,1,0,0.7),rotAxisAngle(1,0,0,0.5));
 let drag=false,scrub=false,lx=0,ly=0,camZoom=16,autoRot=true;
 function hitHandle(cx,cy){var hs=window.__clipHandleScreen;if(!hs)return false;var rect=canvas.getBoundingClientRect();return Math.hypot((cx-rect.left)-hs.x,(cy-rect.top)-hs.y)<16;}
 function applyScrub(cx,cy){var hs=window.__clipHandleScreen;if(!hs)return;var pd=(cx-lx)*hs.dirx+(cy-ly)*hs.diry;var dPos=(pd*(hs.axisStep/(hs.len||1)))/(Math.PI*cellMult);clipState.pos=Math.max(-1.0,Math.min(1.0,clipState.pos+dPos));}
-canvas.addEventListener('mousedown',e=>{lx=e.clientX;ly=e.clientY;autoRot=false;if(hitHandle(e.clientX,e.clientY)){scrub=true;}else{drag=true;}});
+canvas.addEventListener('mousedown',e=>{lx=e.clientX;ly=e.clientY;autoRot=false;kick();if(hitHandle(e.clientX,e.clientY)){scrub=true;}else{drag=true;}});
 // Touch: one finger rotates (or scrubs the clip handle); two fingers pinch to zoom.
 let pinch=null;   // {d0, z0} while two fingers are down
 const touchDist=ts=>Math.hypot(ts[0].clientX-ts[1].clientX,ts[0].clientY-ts[1].clientY);
@@ -1244,18 +1501,18 @@ canvas.addEventListener('touchend',e=>{
   // one finger left after a pinch: resume rotating from where it is, without a jump
   if(e.touches.length===1){lx=e.touches[0].clientX;ly=e.touches[0].clientY;drag=true;scrub=false;}
 },{passive:true});
-window.addEventListener('mouseup',()=>{drag=false;scrub=false;});window.addEventListener('touchend',e=>{if(!e.touches||e.touches.length===0){drag=false;scrub=false;pinch=null;}});
-window.addEventListener('mousemove',e=>{if(scrub){applyScrub(e.clientX,e.clientY);lx=e.clientX;ly=e.clientY;}else if(drag){applyDelta(e.clientX-lx,e.clientY-ly);lx=e.clientX;ly=e.clientY;}});
+window.addEventListener('mouseup',()=>{if(drag||scrub)kick();drag=false;scrub=false;});window.addEventListener('touchend',e=>{if(!e.touches||e.touches.length===0){if(drag||scrub||pinch)kick();drag=false;scrub=false;pinch=null;}});
+window.addEventListener('mousemove',e=>{if(scrub){applyScrub(e.clientX,e.clientY);lx=e.clientX;ly=e.clientY;kick();}else if(drag){applyDelta(e.clientX-lx,e.clientY-ly);lx=e.clientX;ly=e.clientY;kick();}});
 window.addEventListener('touchmove',e=>{
-  if(pinch&&e.touches.length>=2){camZoom=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,pinch.z0*pinch.d0/(touchDist(e.touches)||1)));e.preventDefault();return;}
-  if(scrub){applyScrub(e.touches[0].clientX,e.touches[0].clientY);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();}
-  else if(drag){applyDelta(e.touches[0].clientX-lx,e.touches[0].clientY-ly);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();}
+  if(pinch&&e.touches.length>=2){camZoom=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,pinch.z0*pinch.d0/(touchDist(e.touches)||1)));e.preventDefault();kick();return;}
+  if(scrub){applyScrub(e.touches[0].clientX,e.touches[0].clientY);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();kick();}
+  else if(drag){applyDelta(e.touches[0].clientX-lx,e.touches[0].clientY-ly);lx=e.touches[0].clientX;ly=e.touches[0].clientY;e.preventDefault();kick();}
 },{passive:false});
 const ZOOM_MIN=6,ZOOM_MAX=90;   // camera distance; was 6–30
-canvas.addEventListener('wheel',e=>{camZoom=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,camZoom*Math.exp(e.deltaY*0.0012)));e.preventDefault();},{passive:false});
+canvas.addEventListener('wheel',e=>{camZoom=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,camZoom*Math.exp(e.deltaY*0.0012)));e.preventDefault();kick();},{passive:false});
 
-function onClipPill(axis){if(clipState.axis===axis){clipState.axis=0;}else{clipState.axis=axis;clipState.pos=0.0;clipState.side=1;}updateClipPills();}
-function updateClipPills(){var cols={1:'#22d3ee',2:'#e879f9',3:'#facc15'},nm={1:'X',2:'Y',3:'Z'};[1,2,3].forEach(function(a){var el=document.getElementById('clipPill'+nm[a]);if(!el)return;if(clipState.axis===a){el.classList.add('active');el.style.color=cols[a];el.style.borderColor=cols[a];}else{el.classList.remove('active');el.style.color='#555';el.style.borderColor='#2a2a3a';}});}
+function onClipPill(axis){if(clipState.axis===axis){clipState.axis=0;}else{clipState.axis=axis;clipState.pos=0.0;clipState.side=1;}updateClipPills();kick();}
+function updateClipPills(){var cols={1:'var(--axis-x)',2:'var(--axis-y)',3:'var(--axis-z)'},nm={1:'X',2:'Y',3:'Z'};[1,2,3].forEach(function(a){var el=document.getElementById('clipPill'+nm[a]);if(!el)return;var on=clipState.axis===a;el.classList.toggle('active',on);el.setAttribute('aria-pressed',on?'true':'false');el.style.color=on?cols[a]:'';el.style.borderColor=on?cols[a]:'';});if(window.F13UI&&window.F13UI.onClipChange)window.F13UI.onClipChange(clipState.axis);}
 function drawClipHandle(rotMat,canvasW,canvasH,camZoom){window.__clipHandleScreen=null;if(clipState.axis<1)return;var cv=document.getElementById('axisCanvas');if(!cv||cv.style.display==='none')return;var ctx=cv.getContext('2d');var H_HALF=Math.PI*cellMult;function proj(p){var tx=rotMat[0]*p[0]+rotMat[1]*p[1]+rotMat[2]*p[2];var ty=rotMat[3]*p[0]+rotMat[4]*p[1]+rotMat[5]*p[2];var tz=rotMat[6]*p[0]+rotMat[7]*p[1]+rotMat[8]*p[2];var pcz=tz-camZoom;if(pcz>-0.1)return null;var sscl=Math.min(canvasW,canvasH);return [canvasW/2+(-1.6*tx/pcz)*sscl,canvasH/2-(-1.6*ty/pcz)*sscl];}var aIdx=clipState.axis-1,cp=clipState.pos*H_HALF;var c=[0,0,0];c[aIdx]=cp;var sc=proj(c);if(!sc)return;var col=['#22d3ee','#e879f9','#facc15'][aIdx];ctx.save();var free=[0,1,2].filter(function(k){return k!==aIdx;});var sg=[[-1,-1],[1,-1],[1,1],[-1,1]];var pts=sg.map(function(g){var p=[0,0,0];p[aIdx]=cp;p[free[0]]=g[0]*H_HALF;p[free[1]]=g[1]*H_HALF;return proj(p);});if(pts.every(Boolean)){ctx.globalAlpha=0.5;ctx.lineWidth=1.5;ctx.strokeStyle=col;ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);ctx.lineTo(pts[1][0],pts[1][1]);ctx.lineTo(pts[2][0],pts[2][1]);ctx.lineTo(pts[3][0],pts[3][1]);ctx.closePath();ctx.stroke();}ctx.globalAlpha=0.95;ctx.lineWidth=2;ctx.strokeStyle=col;ctx.beginPath();ctx.arc(sc[0],sc[1],9,0,6.2832);ctx.stroke();ctx.globalAlpha=1;ctx.fillStyle=col;ctx.beginPath();ctx.arc(sc[0],sc[1],3.2,0,6.2832);ctx.fill();ctx.restore();var e=[0,0,0];e[aIdx]=cp+0.4;var se=proj(e);var dirx=0,diry=0,len=0;if(se){var dx=se[0]-sc[0],dy=se[1]-sc[1];len=Math.hypot(dx,dy)||1;dirx=dx/len;diry=dy/len;}window.__clipHandleScreen={x:sc[0],y:sc[1],dirx:dirx,diry:diry,len:len,axisStep:0.4};}
 function drawAxisGizmo(rotMat,canvasW,canvasH,camZoom){
   var cv=document.getElementById('axisCanvas');
@@ -1360,7 +1617,8 @@ function piCheck(){
   let msg='';
   if(near===0)msg='The two surfaces barely cross inside one cell, so expect few or no pipes. Try another phase shift or field pairing.';
   else if(par/near>0.3)msg='The surfaces nearly coincide along about '+Math.round(100*par/near)+'% of where they meet. Pipes swell into sheets or blobs there. Try another phase shift or field pairing.';
-  el.textContent=msg?'⚠ '+msg:'';
+  el.textContent='';
+  if(msg){el.insertAdjacentHTML('afterbegin',ICON.warn);el.appendChild(document.createTextNode(msg));}
   el.style.display=msg?'block':'none';
 }
 
@@ -1614,9 +1872,9 @@ function buildStiffFrag(Ex,Ey,Ez,Gxy,nu,Gxz,Gyz,showZener){
     const Albl=A<0.7?'strongly axial':A<0.9?'axial dominant':A<1.1?'near-isotropic':A<1.5?'diagonal dominant':'strongly diagonal';
     document.getElementById('zener-label').textContent=Albl;document.getElementById('zener-label').style.color=Acol;
   } else {
-    document.getElementById('zener-val').textContent='n/a';document.getElementById('zener-val').style.color='#555';
+    document.getElementById('zener-val').textContent='n/a';document.getElementById('zener-val').style.color='var(--ink-faint)';
     document.getElementById('zener-marker').style.display='none';
-    document.getElementById('zener-label').textContent='orthotropic — see Ex, Ey, Ez';document.getElementById('zener-label').style.color='#555';
+    document.getElementById('zener-label').textContent='orthotropic — see Ex, Ey, Ez';document.getElementById('zener-label').style.color='var(--ink-faint)';
   }
   function f(v){const s=v.toExponential(8);return s;}
   return`#version 300 es
@@ -1717,9 +1975,9 @@ function renderBells(axes,vals,sdLog10,U){
   U=U||stiffUnit(vals);const fmt=v=>fmtStiff(v,U);
   function hexAlpha(hex,a){const r=parseInt(hex.slice(1,3),16),g2=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g2},${b},${a})`;}
   axes.forEach(({label,color},i)=>{
-    const mu=vals[i],Hc=cellH(mu);const cell=document.createElement('div');cell.style.cssText='background:#0e0e1a;border-radius:4px;overflow:hidden';
+    const mu=vals[i],Hc=cellH(mu);const cell=document.createElement('div');cell.style.cssText='background:var(--card);border-radius:8px;overflow:hidden';
     if(!(mu>0)){
-      cell.innerHTML=`<svg width="100%" viewBox="0 0 ${W} ${Hc}" style="display:block"><text x="${W/2}" y="9" text-anchor="middle" font-size="9" font-weight="500" fill="${color}">${label}</text><text x="${W/2}" y="${Hc-3}" text-anchor="middle" font-size="8" fill="${color}">~0 <tspan fill="#666" font-size="6.5">· no load path</tspan></text></svg>`;
+      cell.innerHTML=`<svg width="100%" viewBox="0 0 ${W} ${Hc}" style="display:block"><text x="${W/2}" y="10" text-anchor="middle" font-size="10" font-weight="600" fill="${color}">${label}</text><text x="${W/2}" y="${Hc-3}" text-anchor="middle" font-size="8.5" fill="${color}">~0 <tspan style="fill:var(--ink-faint)">· no load path</tspan></text></svg>`;
       row.appendChild(cell);return;}
     const lm=Math.log10(mu),lo=lm-3*sdLog10,hi=lm+3*sdLog10,tx=l=>pad+(l-lo)/(hi-lo)*(W-2*pad);
     const top=13,bot=Hc-11,h=bot-top,g=l=>Math.exp(-0.5*((l-lm)/sdLog10)**2);
@@ -1733,11 +1991,11 @@ function renderBells(axes,vals,sdLog10,U){
       <path d="${band(lm-sdLog10,lm+sdLog10)}" fill="${hexAlpha(color,0.28)}"/>
       <path d="${curve}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.9"/>
       <line x1="${px}" y1="${bot}" x2="${px}" y2="${top}" stroke="${color}" stroke-width="1" opacity="0.4" stroke-dasharray="2 2"/>
-      <line x1="${pad}" y1="${bot}" x2="${W-pad}" y2="${bot}" stroke="#333" stroke-width="0.5"/>
-      <text x="${W/2}" y="9" text-anchor="middle" font-size="9" font-weight="500" fill="${color}">${label}</text>
-      <text x="${px}" y="${Hc-3}" text-anchor="middle" font-size="8" fill="${color}" opacity="0.9">${fmt(mu)} ${U.name}</text>
-      <text x="${pad}" y="${Hc-3}" text-anchor="start" font-size="6.5" fill="#555">${fmt(mu/K)}</text>
-      <text x="${W-pad}" y="${Hc-3}" text-anchor="end" font-size="6.5" fill="#555">${fmt(mu*K)}</text>
+      <line x1="${pad}" y1="${bot}" x2="${W-pad}" y2="${bot}" style="stroke:var(--hair-strong)" stroke-width="0.5"/>
+      <text x="${W/2}" y="10" text-anchor="middle" font-size="10" font-weight="600" fill="${color}">${label}</text>
+      <text x="${px}" y="${Hc-3}" text-anchor="middle" font-size="8.5" fill="${color}">${fmt(mu)} ${U.name}</text>
+      <text x="${pad}" y="${Hc-3}" text-anchor="start" font-size="8.5" style="fill:var(--ink-faint)">${fmt(mu/K)}</text>
+      <text x="${W-pad}" y="${Hc-3}" text-anchor="end" font-size="8.5" style="fill:var(--ink-faint)">${fmt(mu*K)}</text>
     </svg>`;
     row.appendChild(cell);
   });
@@ -1767,16 +2025,16 @@ function renderCeilings(axes,vals,U){
   row.className='bell-grid';row.style.cssText='display:grid;grid-template-columns:repeat('+axes.length+',1fr);gap:4px;align-items:end';
   axes.forEach(({label,color},i)=>{
     const v=vals[i],Hc=cellH(v),top=13,bot=Hc-11,gid='ceil-'+label.replace(/\W/g,'');
-    const cell=document.createElement('div');cell.style.cssText='background:#0e0e1a;border-radius:4px;overflow:hidden';
-    const hint=(bot-top)>=22?`<text x="${W/2}" y="${(top+bot)/2+3}" text-anchor="middle" font-size="7" fill="${color}" opacity="0.7">likely below ↓</text>`:'';
+    const cell=document.createElement('div');cell.style.cssText='background:var(--card);border-radius:8px;overflow:hidden';
+    const hint=(bot-top)>=22?`<text x="${W/2}" y="${(top+bot)/2+3}" text-anchor="middle" font-size="8.5" fill="${color}" opacity="0.8">likely below</text>`:'';
     cell.innerHTML=`<svg width="100%" viewBox="0 0 ${W} ${Hc}" style="display:block">
       <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity="0.38"/><stop offset="1" stop-color="${color}" stop-opacity="0.02"/></linearGradient></defs>
       <rect x="${pad}" y="${top}" width="${W-2*pad}" height="${Math.max(bot-top,1)}" fill="url(#${gid})"/>
       <line x1="${pad}" y1="${top}" x2="${W-pad}" y2="${top}" stroke="${color}" stroke-width="2"/>
-      <line x1="${pad}" y1="${bot}" x2="${W-pad}" y2="${bot}" stroke="#333" stroke-width="0.5"/>
+      <line x1="${pad}" y1="${bot}" x2="${W-pad}" y2="${bot}" style="stroke:var(--hair-strong)" stroke-width="0.5"/>
       ${hint}
-      <text x="${W/2}" y="9" text-anchor="middle" font-size="9" font-weight="500" fill="${color}">${label}</text>
-      <text x="${W/2}" y="${Hc-3}" text-anchor="middle" font-size="8" fill="${color}" opacity="0.9">≤ ${fmtStiff(v,U)} ${U.name}</text>
+      <text x="${W/2}" y="10" text-anchor="middle" font-size="10" font-weight="600" fill="${color}">${label}</text>
+      <text x="${W/2}" y="${Hc-3}" text-anchor="middle" font-size="8.5" fill="${color}">≤ ${fmtStiff(v,U)} ${U.name}</text>
     </svg>`;
     row.appendChild(cell);
   });
@@ -1784,7 +2042,8 @@ function renderCeilings(axes,vals,U){
 }
 
 document.getElementById('runBtn').addEventListener('click',async function(){
-  this.disabled=true;this.textContent='Running...';
+  this.disabled=true;this.textContent='Running…';
+  if(window.F13UI&&window.F13UI.onAnalyze)window.F13UI.onAnalyze('running');
   const modeLabel=piMode?'PI-TPMS r='+pipeRVal.toFixed(2):shellMode?'shell t='+wallVal.toFixed(2):'solid';
   document.getElementById('homo-status').textContent='Voxelizing...';
   await new Promise(r=>setTimeout(r,10));
@@ -1831,11 +2090,11 @@ document.getElementById('runBtn').addEventListener('click',async function(){
   const savColor=res.savNorm<0.42?'#60a5fa':res.savNorm<0.65?'#2dd4bf':res.savNorm<0.88?'#22c55e':'#aaff00';
   const savLabel=res.savNorm<0.42?'low':res.savNorm<0.65?'moderate':res.savNorm<0.88?'high':'very high';
   document.getElementById('rsav').textContent=piMode?'n/a':res.savNorm.toFixed(2);
-  document.getElementById('rsav').style.color=piMode?'#555':savColor;
+  document.getElementById('rsav').style.color=piMode?'var(--ink-faint)':savColor;
   document.getElementById('sav-bar').style.width=piMode?'0%':(res.savNorm*100).toFixed(1)+'%';
   document.getElementById('sav-bar').style.background=savColor;
   document.getElementById('sav-note').textContent=piMode?'pipe network':savLabel;
-  document.getElementById('sav-note').style.color=piMode?'#c8ff80':savColor;
+  document.getElementById('sav-note').style.color=piMode?'var(--accent)':savColor;
   document.getElementById('sav-block').style.display=piMode?'none':'';
   document.getElementById('homo-results').style.display='block';
   await new Promise(r=>setTimeout(r,10));
@@ -1856,18 +2115,20 @@ document.getElementById('runBtn').addEventListener('click',async function(){
   lastHomogResult={res,N,Es,nu};
   updateHomogMMHints();
   document.getElementById('exportBtn').textContent='Export JSON (+ homog)';
-  document.getElementById('exportBtn').style.borderColor='#7c6ff7';
-  document.getElementById('exportBtn').style.color='#a89cf7';
+  document.getElementById('exportBtn').classList.add('has-homog');
   this.disabled=false;this.textContent='Run homogenization';
+  if(window.F13UI&&window.F13UI.onAnalyze)window.F13UI.onAnalyze('new');
 });
 
 let lastHomogResult=null;
 function onSurfaceChange(){
   lastHomogResult=null;
   const btn=document.getElementById('exportBtn');
-  btn.textContent='Export JSON';btn.style.borderColor='';btn.style.color='';
+  const had=btn.classList.contains('has-homog');
+  btn.textContent='Export JSON';btn.classList.remove('has-homog');
   const mmRow=document.getElementById('homog-mm-row');
   if(mmRow) mmRow.style.display='none';
+  if(had&&window.F13UI&&window.F13UI.onAnalyze)window.F13UI.onAnalyze('stale');
 }
 
 function buildExportJSON(){
@@ -1950,18 +2211,15 @@ document.getElementById('exportBtn').addEventListener('click',function(){
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
   navigator.clipboard.writeText(json).catch(()=>{});
   const orig=this.textContent;
-  this.textContent='Copied + downloaded ✓';this.style.borderColor='#69f0ae';this.style.color='#69f0ae';
+  this.textContent='Copied + downloaded';this.classList.add('done');
   setTimeout(()=>{
-    this.textContent=orig;
-    this.style.borderColor=lastHomogResult?'#7c6ff7':'';
-    this.style.color=lastHomogResult?'#a89cf7':'';
+    this.textContent=orig;this.classList.remove('done');
   },1800);
 });
 
 let lastTs=0;
-function frame(ts){
-  const dt=Math.min((ts-lastTs)/1000,0.05);lastTs=ts;
-  if(autoRot)applyDelta(dt*50,0);
+function drawMain(q){
+  resize(q);
   rotMat=orthonormalize(rotMat);
   if(prog&&uRes){
     gl.viewport(0,0,canvas.width,canvas.height);
@@ -1971,21 +2229,149 @@ function frame(ts){
     if(uClipAxis)gl.uniform1f(uClipAxis,clipState.axis);
     if(uClipPos)gl.uniform1f(uClipPos,clipState.pos);
     if(uClipSide)gl.uniform1f(uClipSide,clipState.side);
+    if(uMaxSteps)gl.uniform1i(uMaxSteps,q.steps);
+    if(uThreshScale)gl.uniform1f(uThreshScale,q.thresh);
     if(f13View)f13View.apply(gl,prog);
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
   }
   drawAxisGizmo(rotMat,canvas.clientWidth,canvas.clientHeight,camZoom);
   drawClipHandle(rotMat,canvas.clientWidth,canvas.clientHeight,camZoom);
-  drawStiffnessSurface();
+}
+// On-demand loop: the main view is drawn only when something changed
+// (renderDirty) or auto-rotate is on, at interactive quality while moving,
+// then once more at full quality when the user goes idle.
+function frame(ts){
+  const dt=Math.min((ts-lastTs)/1000,0.05);lastTs=ts;
+  if(autoRot){applyDelta(dt*50,0);renderDirty=true;}
+  const now=performance.now();
+  const moving=autoRot||drag||scrub||!!pinch||(now-lastInteract<IDLE_MS)||!!(f13View&&f13View.interacting);
+  if(renderDirty){
+    renderDirty=false;
+    if(moving){drawMain(Q_INT);refinePending=true;}
+    else{drawMain(Q_HI);refinePending=false;}
+  } else if(refinePending&&!moving){
+    drawMain(Q_HI);refinePending=false;
+  }
+  // stiffness glyph spins while its results card is on screen
+  if(sprog){const ec=document.getElementById('ellcv');if(ec&&ec.getClientRects().length)drawStiffnessSurface();}
   requestAnimationFrame(frame);
 }
 
 // Init
-f13View=f13ViewInit({tool:'tpms',host:document.getElementById('cw'),canvas:canvas});
+f13View=f13ViewInit({tool:'tpms',host:document.getElementById('cw'),canvas:canvas,redraw:requestRender});
+// The shared view menu labels its button with a glyph; swap in a drawn icon (shared block untouched).
+(function(){var b=document.querySelector('#cw .f13v>button');if(b)b.innerHTML='<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg><span>view</span>';})();
 syncModeUI();
 loadPreset('gyroid');
 updateMMHints();
 requestAnimationFrame(frame);
+
+// ════ Layout shell: sections, desktop scroll-spy, phone bottom sheet ════
+// window.F13UI is the hook surface for the liquid widgets:
+//   F13UI.sections            ['surface','volume','cell','analyze']
+//   F13UI.active              current section id
+//   F13UI.isPhone()           true below 900 px (bottom-sheet layout)
+//   F13UI.scrollToSection(id) desktop: scroll the control column; phone: showSection
+//   F13UI.showSection(id)     phone: show only that section; desktop: scrollToSection
+//   F13UI.setSheet('peek'|'full')  phone sheet snap
+//   F13UI.onSectionChange(id) set by the lead; called whenever the active section changes
+//   F13UI.onModeChange(m) / onClipChange(axis) / onAnalyze('running'|'new'|'stale') — optional hooks
+(function(){
+  const UI=window.F13UI=window.F13UI||{};
+  const SECS=['surface','volume','cell','analyze'];
+  const mq=window.matchMedia('(max-width:899px)');
+  const scroller=document.getElementById('ctrlScroll');
+  const pane=document.getElementById('ctrlPane');
+  const secEl=id=>document.getElementById('sec-'+id);
+  const reduce=window.matchMedia('(prefers-reduced-motion:reduce)');
+  UI.sections=SECS.slice();
+  UI.active='surface';
+  UI.isPhone=()=>mq.matches;
+  function setActive(id){
+    if(!SECS.includes(id)||id===UI.active)return;
+    UI.active=id;
+    document.querySelectorAll('.sb-fallback [data-section]').forEach(b=>b.classList.toggle('on',b.dataset.section===id));
+    if(UI.onSectionChange)try{UI.onSectionChange(id);}catch(e){console.error(e);}
+  }
+  function applyPhoneSections(){
+    SECS.forEach(s=>secEl(s).classList.toggle('on',s===UI.active));
+  }
+  UI.showSection=function(id){
+    if(!SECS.includes(id))return;
+    if(!mq.matches){UI.scrollToSection(id);return;}
+    setActive(id);applyPhoneSections();scroller.scrollTop=0;
+  };
+  UI.scrollToSection=function(id){
+    if(!SECS.includes(id))return;
+    if(mq.matches){UI.showSection(id);return;}
+    const top=secEl(id).offsetTop-scroller.offsetTop;
+    spyLock=performance.now()+600;setActive(id);
+    scroller.scrollTo({top:Math.max(0,top),behavior:reduce.matches?'auto':'smooth'});
+  };
+  // desktop scroll-spy: the active section is the last one whose top has passed a third of the column
+  let spyLock=0;
+  function spy(){
+    if(mq.matches||performance.now()<spyLock)return;
+    const y=scroller.scrollTop,h=scroller.clientHeight;
+    let cur=SECS[0];
+    if(y+h>=scroller.scrollHeight-2)cur=SECS[SECS.length-1];
+    else SECS.forEach(s=>{if(secEl(s).offsetTop-scroller.offsetTop<=y+h*0.33)cur=s;});
+    setActive(cur);
+  }
+  scroller.addEventListener('scroll',spy,{passive:true});
+  document.querySelectorAll('.sb-fallback [data-section]').forEach(b=>b.addEventListener('click',()=>UI.showSection(b.dataset.section)));
+
+  // header height drives the phone viewer height (the header wraps on phones)
+  const hdr=document.querySelector('.f13ld-header');
+  function setHdr(){document.documentElement.style.setProperty('--hdr-h',hdr.offsetHeight+'px');}
+  setHdr();if(window.ResizeObserver)new ResizeObserver(setHdr).observe(hdr);
+
+  // phone bottom sheet: drag the handle between peek (~45dvh) and full (~88dvh)
+  const handle=document.getElementById('sheetHandle');
+  let sheetState='peek';
+  const vh=()=>window.innerHeight;
+  const snapH=s=>Math.round(vh()*(s==='full'?0.88:0.45));
+  function setSheet(s,animate){
+    sheetState=s;
+    if(!animate)pane.classList.add('dragging');
+    pane.style.setProperty('--sheet-h',snapH(s)+'px');
+    if(!animate)requestAnimationFrame(()=>pane.classList.remove('dragging'));
+  }
+  UI.setSheet=s=>{if(s==='peek'||s==='full')setSheet(s,true);};
+  let dragY=null,startH=0,lastY=0,lastT=0,vel=0,moved=false;
+  handle.addEventListener('pointerdown',e=>{
+    if(!mq.matches)return;
+    dragY=e.clientY;lastY=e.clientY;lastT=performance.now();vel=0;moved=false;
+    startH=pane.getBoundingClientRect().height;
+    pane.classList.add('dragging');handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener('pointermove',e=>{
+    if(dragY===null)return;
+    const dy=e.clientY-dragY;if(Math.abs(dy)>4)moved=true;
+    const h=Math.max(snapH('peek')*0.6,Math.min(snapH('full'),startH-dy));
+    pane.style.setProperty('--sheet-h',h+'px');
+    const t=performance.now();vel=(e.clientY-lastY)/Math.max(1,t-lastT);lastY=e.clientY;lastT=t;
+  });
+  function endDrag(){
+    if(dragY===null)return;
+    dragY=null;pane.classList.remove('dragging');
+    if(!moved){setSheet(sheetState==='peek'?'full':'peek',true);return;}
+    const h=pane.getBoundingClientRect().height,mid=(snapH('peek')+snapH('full'))/2;
+    setSheet(vel<-0.4?'full':vel>0.4?'peek':(h>mid?'full':'peek'),true);
+  }
+  handle.addEventListener('pointerup',endDrag);
+  handle.addEventListener('pointercancel',endDrag);
+  handle.addEventListener('click',e=>{if(e.detail===0&&mq.matches)setSheet(sheetState==='peek'?'full':'peek',true);});   // keyboard
+
+  function applyLayout(){
+    if(mq.matches){applyPhoneSections();setSheet(sheetState,false);}
+    else{SECS.forEach(s=>secEl(s).classList.remove('on'));pane.style.removeProperty('--sheet-h');}
+    requestRender();
+  }
+  mq.addEventListener?mq.addEventListener('change',applyLayout):mq.addListener(applyLayout);
+  window.addEventListener('resize',()=>{if(mq.matches)setSheet(sheetState,false);});
+  applyLayout();
+})();
 </script>
 
 <!-- ===================================================================== -->
@@ -2117,95 +2503,91 @@ requestAnimationFrame(frame);
   var INTRO = 'F13LD.tpms turns triply-periodic minimal surfaces into printable lattices, straight from their implicit equations \u2014 pick a surface, give it volume, then phase-shift it. Tap any i beside a control to jump here.';
 
   var SECTIONS = [
-    { title:'Mode', items:[
-      { id:'mode', label:'mode \u00b7 solid / thin wall / PI-TPMS', anchor:{row:'#mSolid'},
-        what:'How the implicit surface is given volume: a filled network, a constant-thickness shell, or PI-TPMS pipes.',
-        see:'Solid = bulk between the surfaces; Thin wall = a shell hugging the \u03c6=0 surface; PI-TPMS = cylindrical struts along the surface intersection.',
-        why:'Three ways to turn one surface into a printable lattice \u2014 bulk, shell-efficient, or beam-like.' }
+    { title:'Surface', items:[
+      { id:'presets', label:'preset surfaces', anchor:{titleBefore:'#presetSel'},
+        what:'Loads a named minimal surface — gyroid, Schwarz P/D, Neovius, I-WP, Fischer-Koch, lidinoid, harmonics, and more.',
+        see:'Swaps the whole implicit equation; the equation bar updates to match.',
+        why:'Each is a classic TPMS with its own symmetry and stiffness signature — your starting point before editing terms.' },
+      { id:'terms', label:'implicit equation · terms', anchor:{into:'#eqbar-label'},
+        what:'The live expression defining the surface — each term is a product of sin/cos factors with a coefficient. Each term shows as one line; tap it to edit the coefficient, factors and x/y/z frequencies.',
+        see:'Editing or adding terms rebuilds the surface in real time; the bar mirrors the current math. The switch on each line turns a term on or off. In PI-TPMS with its own field B, tabs above the terms switch between editing field A and field B.',
+        why:'The raw surface synthesizer — every preset is just a short list of these. Compose novel TPMS here.' }
     ]},
-    { title:'Geometry', items:[
-      { id:'cells', label:'cells', range:'0.5 \u2013 3 \u00d7', anchor:{row:'#sCells'},
-        what:'Spatial frequency \u2014 how many unit cells pack into the domain.',
-        see:'Higher = smaller, more repeated cells; lower = fewer, larger cells.',
-        why:'Sets feature and pore size, and the period you will tile.' },
-      { id:'cellsize', label:'cell size', range:'mm \u00b7 display only', anchor:{row:'#cellSizeMM'},
-        what:'Real-world edge length of one unit cell.',
-        see:'No change to the shape \u2014 rescales the mm read-outs beside the sliders.',
-        why:'Anchors the dimensionless model to physical units; does not touch the exported JSON.' },
-      { id:'offset', label:'offset', range:'\u22122 \u2026 2', anchor:{row:'#sOffset'},
+    { title:'Volume', items:[
+      { id:'mode', label:'mode · solid / thin wall / PI-TPMS', anchor:{row:'#mSolid'},
+        what:'How the implicit surface is given volume: a filled network, a constant-thickness shell, or PI-TPMS pipes.',
+        see:'Solid = bulk between the surfaces; Thin wall = a shell hugging the φ=0 surface; PI-TPMS = cylindrical struts along the surface intersection.',
+        why:'Three ways to turn one surface into a printable lattice — bulk, shell-efficient, or beam-like.' },
+      { id:'offset', label:'offset', range:'−2 … 2', anchor:{row:'#sOffset'},
         what:'Shifts the level set the surface is drawn at (the iso value).',
         see:'Sweeps solid fraction up or down; struts thicken, then pinch off near the extremes.',
         why:'Your volume-fraction / relative-density dial in solid mode.' },
-      { id:'wall', label:'wall t', range:'0.02 \u2013 1.5 \u00b7 thin-wall', anchor:{row:'#sWall'},
-        what:'Shell half-thickness in thin-wall mode (the full wall is 2t; the mm read-out shows the full wall). The normalize toggle divides by |\u2207\u03c6| so thickness is a true perpendicular distance.',
+      { id:'wall', label:'wall t', range:'0.02 – 1.5 · thin-wall', anchor:{row:'#sWall'},
+        what:'Shell half-thickness in thin-wall mode (the full wall is 2t; the mm read-outs show the full wall). The normalize switch divides by |∇φ| so thickness is a true perpendicular distance.',
         see:'The shell fattens or thins; normalize on keeps it uniform across the surface, off lets it vary with the gradient.',
-        why:'Relative density for shells \u2014 normalize on for constant-thickness walls.' },
-      { id:'pipe', label:'pipe r', range:'0.02 \u2013 1.45 \u00b7 PI-TPMS', anchor:{row:'#sPipeR'},
-        what:'Radius of the cylindrical pipes in PI-TPMS mode (the mm read-out also shows the diameter). The stiffness estimate was trained on r = 0.16\u20131.41.',
+        why:'Relative density for shells — normalize on for constant-thickness walls.' },
+      { id:'pipe', label:'pipe r', range:'0.02 – 1.45 · PI-TPMS', anchor:{row:'#sPipeR'},
+        what:'Radius of the cylindrical pipes in PI-TPMS mode (the Cell section also shows the diameter in mm). The stiffness estimate was trained on r = 0.16–1.41.',
         see:'Struts grow or shrink in cross-section.',
-        why:'Relative density for the pipe network \u2014 the beam-like analogue of wall thickness.' }
-    ]},
-    { title:'PI-TPMS \u00b7 field pair + phase shift', items:[
-      { id:'fieldb', label:'field B \u00b7 pairing + frequency', anchor:{row:'#fieldBSel'},
-        what:'Chooses the second surface the pipes are cut from: a copy of field A (classic PI-TPMS), any preset, or custom terms. \u201cat\u201d runs field B at a whole-number multiple of field A\u2019s frequency.',
+        why:'Relative density for the pipe network — the beam-like analogue of wall thickness.' },
+      { id:'fieldb', label:'field B · pairing + frequency', anchor:{row:'#fieldBSel'},
+        what:'Chooses the second surface the pipes are cut from: a copy of field A (classic PI-TPMS), any preset, or custom terms. “at” runs field B at a whole-number multiple of field A’s frequency.',
         see:'Pipes trace wherever field A and field B cross. New pairs and multiples give new pipe networks; whole-number multiples keep one cell tileable in F13LD.mesh. A warning appears if the two surfaces mostly coincide or barely cross.',
-        why:'Opens PI-TPMS from self-pairs to any pair of fields. Field B is rescaled to field A\u2019s amplitude so pipe r means the same thing for any pair. Pairs other than self-pairs are outside the trained stiffness estimate.' },
-      { id:'pishift', label:'phase shift \u03b4 \u00b7 \u0394x \u0394y \u0394z', anchor:{into:'.pi-title'},
-        what:'Offsets field B by a fraction of its own period on each axis; the pipes trace where field A and the shifted field B intersect.',
-        see:'\u0394x / \u0394y / \u0394z reroute the strut network \u2014 from straight channels toward chiral, woven, or hex paths.',
-        why:'PI-TPMS \u2014 the phase triple tunes connectivity and anisotropy independently of cell size.' },
+        why:'Opens PI-TPMS from self-pairs to any pair of fields. Field B is rescaled to field A’s amplitude so pipe r means the same thing for any pair. Pairs other than self-pairs are outside the trained stiffness estimate.' },
+      { id:'pishift', label:'phase shift δ · Δx Δy Δz', anchor:{into:'.pi-title'},
+        what:'Offsets field B by a fraction of its own period on each axis; the pipes trace where field A and the shifted field B intersect. Sliders are continuous and settle onto the nearest eighth of a period when released close to one; type a value for anything in between.',
+        see:'Δx / Δy / Δz reroute the strut network — from straight channels toward chiral, woven, or hex paths.',
+        why:'PI-TPMS — the phase triple tunes connectivity and anisotropy independently of cell size.' },
       { id:'pinorm', label:'normalize (PI)',
         what:'Uses an angle-corrected perpendicular distance to the intersection curve.',
         see:'On = true round pipes of radius r; off = axis-aligned, angle-skewed cross-sections.',
         why:'On gives uniform cylindrical struts no matter how the two surfaces meet.' },
-      { id:'pisnap', label:'snap',
-        what:'Locks the phase sliders to eighths of a period \u2014 8 stops per axis.',
-        see:'On = discrete clicks; off = any value, typed entry, and the quick-set chips unlock.',
-        why:'Snap for clean symmetric phases; off to chase off-grid ratios.' },
-      { id:'pichips', label:'quick set \u00b7 \u03c0/6 \u2026 golden',
-        what:'One-tap phase ratios: \u03c0/6, \u03c0/3, 2\u03c0/5, 2\u03c0/3, and golden (1/\u03c6\u00b2).',
-        see:'Sets the last-touched axis (\u0394x, \u0394y or \u0394z) to a named symmetry \u2014 hex, pentagonal, triangular, or quasi-periodic.',
-        why:'Shortcuts to biomimetic phase relationships (needs snap off).' }
+      { id:'pichips', label:'quick set · π/6 … golden',
+        what:'One-tap phase ratios: π/6, π/3, 2π/5, 2π/3, and golden (1/φ²).',
+        see:'Sets the last-touched axis (Δx, Δy or Δz) to a named symmetry — hex, pentagonal, triangular, or quasi-periodic.',
+        why:'Shortcuts to biomimetic phase relationships.' }
     ]},
-    { title:'Surfaces', items:[
-      { id:'presets', label:'preset surfaces', anchor:{titleBefore:'#presetSel'},
-        what:'Loads a named minimal surface \u2014 gyroid, Schwarz P/D, Neovius, I-WP, Fischer-Koch, lidinoid, harmonics, and more.',
-        see:'Swaps the whole implicit equation; the equation bar at the top updates to match.',
-        why:'Each is a classic TPMS with its own symmetry and stiffness signature \u2014 your starting point before editing terms.' }
+    { title:'Cell', items:[
+      { id:'cells', label:'cells', range:'0.5 – 3 ×', anchor:{row:'#sCells'},
+        what:'Spatial frequency — how many unit cells pack into the view.',
+        see:'Higher = smaller, more repeated cells; lower = fewer, larger cells.',
+        why:'Sets how much of the tiling you see; analysis and export always use one cell.' },
+      { id:'cellsize', label:'cell size', range:'mm · display only', anchor:{row:'#cellSizeMM'},
+        what:'Real-world edge length of one unit cell.',
+        see:'No change to the shape — rescales the mm read-outs and the physical size block.',
+        why:'Anchors the dimensionless model to physical units; does not touch the exported JSON.' }
     ]},
-    { title:'Implicit equation', items:[
-      { id:'terms', label:'implicit equation \u00b7 terms', anchor:{into:'#eqbar-label'},
-        what:'The live expression defining the surface \u2014 each term is a product of sin/cos factors with a coefficient.',
-        see:'Editing or adding terms rebuilds the surface in real time; the bar mirrors the current math. In PI-TPMS with its own field B, tabs above the terms switch between editing field A and field B.',
-        why:'The raw surface synthesizer \u2014 every preset is just a short list of these. Compose novel TPMS here.' }
-    ]},
-    { title:'Homogenization \u00b7 MIL-HS', items:[
-      { id:'grid', label:'grid', range:'32\u00b3 / 48\u00b3 / 64\u00b3', anchor:{row:'#gridsize'},
+    { title:'Analyze · homogenization', items:[
+      { id:'grid', label:'grid', range:'32³ / 48³ / 64³', anchor:{row:'#gridsize'},
         what:'Voxel resolution used to estimate effective stiffness.',
         see:'No change to the model; higher grid = more accurate numbers, slower run.',
         why:'Bump it when the anisotropy ratios need to be trustworthy.' },
-      { id:'es', label:'E\u209b (GPa)',
-        what:'Young\u2019s modulus of the bulk solid you will print.',
+      { id:'es', label:'Eₛ (GPa)',
+        what:'Young’s modulus of the bulk solid you will print.',
         see:'Scales the reported effective moduli linearly.',
-        why:'Sets the material baseline \u2014 e.g. Ti-6Al-4V \u2248 110 GPa \u2014 that the estimate scales from.' },
-      { id:'nu', label:'\u03bd (solid)', range:'0 \u2013 0.49',
-        what:'Poisson\u2019s ratio of the bulk solid.',
+        why:'Sets the material baseline — e.g. Ti-6Al-4V ≈ 110 GPa — that the estimate scales from.' },
+      { id:'nu', label:'ν (solid)', range:'0 – 0.49',
+        what:'Poisson’s ratio of the bulk solid.',
         see:'Adjusts the estimated effective response.',
-        why:'The solid\u2019s lateral coupling, fed into the MIL-HS bound.' },
+        why:'The solid’s lateral coupling, fed into the MIL-HS bound.' },
       { id:'run', label:'Run homogenization',
         what:'Estimates the directional-stiffness surface, volume fraction, and surface complexity for the current geometry.',
         see:'Fills the stiffness glyph, the per-axis moduli, the Zener ratio, and the surface-complexity bar.',
-        why:'PI-TPMS: a Vixiv-trained estimate (accuracy shown in the results banner). Solid and thin wall: an upper limit (Hashin\u2013Shtrikman \u00d7 MIL fabric). Neither is ground truth \u2014 F13LD.lab does the rigorous FFT version.' }
+        why:'PI-TPMS: a Vixiv-trained estimate (accuracy shown in the results banner). Solid and thin wall: an upper limit (Hashin–Shtrikman × MIL fabric). Neither is ground truth — F13LD.lab does the rigorous FFT version.' }
     ]},
-    { title:'Render', items:[
-      { id:'quality', label:'quality \u00b7 Low / Med / High',
-        what:'Raymarch sampling resolution of the live preview (top-left of the viewport).',
-        see:'Higher = crisper surface, smoother edges, slower; lower = faster, blockier.',
-        why:'Preview fidelity only \u2014 it does not change the geometry or what gets exported.' }
+    { title:'Viewer', items:[
+      { id:'clip', label:'clip · X / Y / Z',
+        what:'Cuts the view with a plane across one axis. Tap the active axis again to remove it.',
+        see:'Drag the ring handle in the view to slide the plane through the lattice.',
+        why:'Look inside the cell without changing the geometry or the export.' },
+      { id:'quality', label:'render quality · automatic',
+        what:'The preview renders faster while you orbit, zoom or drag a control, then sharpens once you stop.',
+        see:'A brief soft frame while moving; full detail a moment after.',
+        why:'Preview fidelity only — it does not change the geometry or what gets exported.' }
     ]},
     { title:'Handoff', items:[
       { id:'export', label:'Export JSON / Queue / Mesh / Lab',
-        what:'Saves the current recipe as JSON, or hands it on from the header: ⊕ Queue adds it to your F13LD.queue (▾ picks which queue), ⬡ Mesh opens it in F13LD.mesh, ▦ Lab opens it in F13LD.lab.',
+        what:'Saves the current recipe as JSON (bottom of Analyze), or hands it on from the header: Queue adds it to your F13LD.queue (the arrow picks which queue), Mesh opens it in F13LD.mesh, Lab opens it in F13LD.lab.',
         see:'Downloads a file; in F13LD.mesh the recipe becomes a watertight, printable 3MF. In F13LD.lab it is homogenized by the FFT solver.',
         why:'The bridge from surface design to meshing and printing.' }
     ]}
@@ -2360,7 +2742,7 @@ requestAnimationFrame(frame);
         return o.toDataURL('image/webp',0.72);
       }catch(e){ return null; }
     };
-    var RIGHT='.fh-right', ANCHOR='.fh-mesh-btn', LABEL='⊕ Queue';
+    var RIGHT='.fh-right', ANCHOR='.fh-mesh-btn', LABEL='Queue';   // drawn icon comes from CSS (.f13ldq-main::before)
     var TIP='Add to queue — save this recipe to an F13LD.queue list you can open on any device';
     function tipQueue(){
       var m=document.querySelector(RIGHT+' .f13ldq-main'), c=document.querySelector(RIGHT+' .f13ldq-caret');
@@ -2378,9 +2760,18 @@ requestAnimationFrame(frame);
       var r=document.querySelector(RIGHT), a=document.querySelector(ANCHOR); if(!r) return;
       var b=document.createElement('button'); b.type='button'; b.id='f13ldq-fallback';
       b.className='fh-mesh-btn'; b.textContent=LABEL; b.title=TIP;
-      b.addEventListener('click', function(){ alert('Add to queue is offline — couldn\u2019t reach the queue service. Reload the page to try again.'); });
+      b.addEventListener('click', function(){ showHdrMsg('Add to queue is offline \u2014 couldn\u2019t reach the queue service. Reload the page to try again.'); });
       if(a) r.insertBefore(b,a); else r.appendChild(b);
     }
+    // Inline message under the header (replaces alert()).
+    var msgT=null;
+    function showHdrMsg(t){
+      var m=document.getElementById('hdrMsg'); if(!m) return;
+      m.textContent=t; m.hidden=false; clearTimeout(msgT);
+      msgT=setTimeout(function(){ m.hidden=true; }, 5000);
+    }
+    window.F13UI=window.F13UI||{}; window.F13UI.message=showHdrMsg;
+    document.addEventListener('click', function(e){ var m=document.getElementById('hdrMsg'); if(m&&!m.hidden&&!e.target.closest('#f13ldq-fallback')) m.hidden=true; });
     function load(retry){
       var sc=document.createElement('script');
       sc.src='https://mshomper.github.io/f13ld.queue/f13ld-queue.js';
